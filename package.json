@@ -3,13 +3,13 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "main": "server/index.cjs",
+  "main": "server.js",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "dev": "node server/kill-ports.cjs && concurrently \"node server/index.cjs\" \"vite\" --names \"api,vite\" --prefix-colors \"cyan,green\"",
-    "start": "node server/index.cjs",
+    "start": "node server.js",
     "server": "node server/index.cjs",
     "build": "vite build",
     "postbuild": "node scripts/compat-assets.cjs",
