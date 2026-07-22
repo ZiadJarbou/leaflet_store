@@ -1,13 +1,15 @@
 const fs = require('fs');
 const path = require('path');
 
-const assetsDir = path.resolve(__dirname, '../dist/assets');
+const assetsDir = ['app-assets', 'assets']
+  .map(dir => path.resolve(__dirname, '../dist', dir))
+  .find(dir => fs.existsSync(dir));
 const legacyNames = {
   js: ['index-B5IqVcR5.js'],
   css: ['index-1UtsMkKD.css'],
 };
 
-if (!fs.existsSync(assetsDir)) {
+if (!assetsDir) {
   process.exit(0);
 }
 

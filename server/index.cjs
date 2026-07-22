@@ -4159,7 +4159,9 @@ app.delete('/api/admin/help-articles/:id', adminMiddleware, (req, res) => {
 // Serve the Vite frontend when deployed as a single Hostinger Node.js app.
 const DIST_DIR = path.resolve(__dirname, '../dist');
 if (fs.existsSync(DIST_DIR)) {
-  const DIST_ASSETS_DIR = path.join(DIST_DIR, 'assets');
+  const DIST_ASSETS_DIR = ['app-assets', 'assets']
+    .map(dir => path.join(DIST_DIR, dir))
+    .find(dir => fs.existsSync(dir));
   // Layouts saved during development may contain Vite source paths. Resolve
   // those paths to the fingerprinted production assets emitted in dist.
   app.get('/src/assets/library/deal_tag/:filename', (req, res, next) => {
@@ -4167,14 +4169,14 @@ if (fs.existsSync(DIST_DIR)) {
     if (!filename || filename !== req.params.filename) return next();
     const ext = path.extname(filename);
     const stem = path.basename(filename, ext);
-    const assetsDir = path.join(DIST_DIR, 'assets');
-    const match = fs.readdirSync(assetsDir).find(name =>
+    if (!DIST_ASSETS_DIR) return next();
+    const match = fs.readdirSync(DIST_ASSETS_DIR).find(name =>
       name.startsWith(`${stem}-`) && path.extname(name).toLowerCase() === ext.toLowerCase()
     );
     if (!match) return next();
-    res.sendFile(path.join(assetsDir, match));
+    res.sendFile(path.join(DIST_ASSETS_DIR, match));
   });
-  if (fs.existsSync(DIST_ASSETS_DIR)) {
+  if (DIST_ASSETS_DIR) {
     app.get('/assets/:filename', (req, res, next) => {
       const filename = path.basename(req.params.filename || '');
       if (!filename || filename !== req.params.filename) return next();
@@ -4195,6 +4197,11 @@ if (fs.existsSync(DIST_DIR)) {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.sendFile(path.join(DIST_ASSETS_DIR, current));
     });
+    app.use('/app-assets', express.static(DIST_ASSETS_DIR, {
+      fallthrough: false,
+      immutable: true,
+      maxAge: '1y',
+    }));
     app.use('/assets', express.static(DIST_ASSETS_DIR, {
       fallthrough: false,
       immutable: true,
