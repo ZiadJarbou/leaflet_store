@@ -1,0 +1,224 @@
+.cp-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.cp-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cp-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.cp-flag-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+  line-height: 1;
+}
+.cp-flag-btn:hover,
+.cp-open .cp-flag-btn {
+  background: rgba(99,102,241,.25);
+  border-color: #6366f1;
+}
+
+.cp-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: #1e1e2e;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.6);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 260px;
+}
+
+.cp-search-wrap {
+  padding: 8px 8px 6px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  flex-shrink: 0;
+}
+
+.cp-search {
+  width: 100%;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 6px;
+  padding: 5px 10px;
+  color: #e2e8f0;
+  font-size: .82rem;
+  outline: none;
+  box-sizing: border-box;
+}
+.cp-search:focus { border-color: #6366f1; }
+
+.cp-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.1) transparent;
+}
+
+.cp-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background .1s;
+  user-select: none;
+}
+.cp-item:hover { background: rgba(99,102,241,.15); }
+.cp-item-active { background: rgba(99,102,241,.22); }
+
+.cp-flag {
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+}
+.cp-name {
+  flex: 1;
+  font-size: .82rem;
+  color: #e2e8f0;
+}
+.cp-iso {
+  font-size: .68rem;
+  color: #64748b;
+  font-family: monospace;
+}
+.cp-empty {
+  padding: 10px 12px;
+  color: #64748b;
+  font-size: .82rem;
+}
+
+/* ── OriginInput ── */
+.oi-wrap { width: 100%; position: relative; }
+
+.oi-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.oi-input { flex: 1; min-width: 0; }
+
+.oi-status {
+  flex-shrink: 0;
+  font-size: 18px;
+  line-height: 1;
+  width: 26px;
+  text-align: center;
+}
+.oi-spin {
+  display: inline-block;
+  animation: oi-rotate .8s linear infinite;
+  color: #6366f1;
+  font-style: normal;
+}
+@keyframes oi-rotate { to { transform: rotate(360deg); } }
+.oi-ok   { /* flag emoji — no extra style needed */ }
+.oi-warn { color: #f59e0b; font-weight: 700; }
+
+/* Hidden select — invisible but in DOM for form/accessibility */
+.oi-hidden-select {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  clip: rect(0 0 0 0);
+}
+
+.oi-match-hint {
+  margin: 4px 0 0;
+  font-size: .74rem;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.oi-match-hint strong { color: #e2e8f0; }
+.oi-iso {
+  background: rgba(99,102,241,.18);
+  color: #818cf8;
+  font-family: monospace;
+  font-size: .68rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.oi-translated { color: #64748b; font-style: italic; }
+
+/* Clickable flag button inside OriginInput */
+.oi-flag-btn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, border-color .15s;
+  line-height: 1;
+  padding: 0;
+}
+.oi-flag-btn:hover {
+  background: rgba(99,102,241,.25);
+  border-color: #6366f1;
+}
+
+/* "Change flag" / "Pick flag manually" inline button */
+.oi-change-flag-btn {
+  background: none;
+  border: none;
+  color: #6366f1;
+  font-size: .74rem;
+  cursor: pointer;
+  padding: 0 2px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color .15s;
+}
+.oi-change-flag-btn:hover { color: #818cf8; }
+
+/* No-match hint row */
+.oi-no-match { flex-wrap: wrap; gap: 4px; }
+.oi-warn-text { color: #f59e0b; font-weight: 600; }
+
+/* Manual flag picker dropdown (reuses cp-dropdown styles, positioned relative to oi-wrap) */
+.oi-manual-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 9999;
+}

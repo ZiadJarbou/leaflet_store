@@ -1,0 +1,105 @@
+/* ── NumericInput — segmented stepper control ── */
+.num-ctrl {
+  display: inline-flex;
+  align-items: stretch;
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color .15s, box-shadow .15s;
+  box-sizing: border-box;
+}
+.num-ctrl:focus-within {
+  border-color: rgba(99, 102, 241, .6);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, .15);
+}
+.num-ctrl__input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  color: #e2e8f0;
+  font-size: .82rem;
+  font-family: inherit;
+  padding: 4px 8px;
+  text-align: right;
+}
+.num-ctrl__unit {
+  display: inline-flex;
+  align-items: center;
+  padding-right: 7px;
+  color: #93c5fd;
+  font-size: .72rem;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+}
+/* hide native spin buttons */
+.num-ctrl__input::-webkit-outer-spin-button,
+.num-ctrl__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.num-ctrl__input[type=number] { -moz-appearance: textfield; }
+
+.num-ctrl__divider {
+  width: 1px;
+  background: rgba(255, 255, 255, .10);
+  flex-shrink: 0;
+  align-self: stretch;
+}
+.num-ctrl__arrows {
+  display: flex;
+  flex-direction: column;
+  width: 22px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, .04);
+  transition: background .15s;
+}
+.num-ctrl__arrows:hover { background: rgba(255, 255, 255, .09); }
+
+.num-ctrl__btn {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  font-size: .5rem;
+  transition: color .12s, opacity .12s;
+  user-select: none;
+}
+.num-ctrl__btn:hover  { color: #e2e8f0; }
+.num-ctrl__btn:active { opacity: .55; }
+.num-ctrl__btn + .num-ctrl__btn { border-top: 1px solid rgba(255, 255, 255, .07); }
+
+/* ── Size variants ── */
+.num-ctrl--sm {
+  border-radius: 6px;
+}
+.num-ctrl--sm .num-ctrl__input {
+  font-size: .76rem;
+  padding: 3px 5px;
+}
+.num-ctrl--sm .num-ctrl__unit {
+  padding-right: 5px;
+  font-size: .68rem;
+}
+.num-ctrl--sm .num-ctrl__arrows { width: 18px; }
+.num-ctrl--sm .num-ctrl__btn   { font-size: .42rem; }
+
+.num-ctrl--xs {
+  border-radius: 5px;
+}
+.num-ctrl--xs .num-ctrl__input {
+  font-size: .72rem;
+  padding: 2px 4px;
+}
+.num-ctrl--xs .num-ctrl__unit {
+  padding-right: 4px;
+  font-size: .62rem;
+}
+.num-ctrl--xs .num-ctrl__arrows { width: 16px; }
+.num-ctrl--xs .num-ctrl__btn   { font-size: .38rem; }

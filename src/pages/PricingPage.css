@@ -1,0 +1,588 @@
+/* ── Page wrapper ── */
+.pp-page {
+  min-height: 100vh;
+  padding-bottom: 80px;
+}
+
+/* ── Notice banners ── */
+.pp-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-radius: var(--radius);
+  font-size: .875rem;
+  margin-bottom: 16px;
+}
+.pp-notice--warn  { background: rgba(234,179,8,.12);  border: 1px solid rgba(234,179,8,.3);  color: #fde68a; }
+.pp-notice--error { background: rgba(239,68,68,.12);  border: 1px solid rgba(239,68,68,.3);  color: #fca5a5; }
+.pp-notice-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.pp-notice-icon {
+  flex: 0 0 auto;
+  font-size: 20px;
+}
+.pp-notice-close  { background: none; border: none; cursor: pointer; color: inherit; font-size: 1.2rem; opacity: .7; padding: 0 4px; }
+.pp-notice-close:hover { opacity: 1; }
+
+/* ── Current plan banner ── */
+.pp-current-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-radius: var(--radius);
+  background: rgba(73,242,182,.08);
+  border: 1px solid rgba(73,242,182,.2);
+  font-size: .875rem;
+  color: var(--muted);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.pp-current-banner strong { color: var(--brand); }
+.pp-portal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .8rem;
+  padding: 6px 14px;
+}
+.pp-portal-btn .material-symbol {
+  font-size: 18px;
+}
+
+/* ── Current plan card highlight ── */
+.pp-card--current {
+  border-color: rgba(73,242,182,.5) !important;
+  box-shadow: 0 0 0 2px rgba(73,242,182,.2), 0 20px 50px rgba(73,242,182,.08) !important;
+}
+.pp-card-current-badge {
+  position: absolute;
+  top: -13px;
+  right: 20px;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  background: rgba(73,242,182,.18);
+  color: var(--brand);
+  border: 1px solid rgba(73,242,182,.35);
+  border-radius: 100px;
+  padding: 3px 12px;
+}
+
+/* ── Loading spinner inside button ── */
+.pp-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: pp-spin .7s linear infinite;
+}
+@keyframes pp-spin { to { transform: rotate(360deg); } }
+
+/* ── Hero ── */
+.pp-hero {
+  text-align: center;
+  padding: 80px 24px 48px;
+}
+.pp-eyebrow {
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--brand);
+  margin: 0 0 16px;
+}
+.pp-title {
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  font-weight: 800;
+  letter-spacing: -.03em;
+  margin: 0 0 16px;
+  background: linear-gradient(135deg, #eaf0ff 30%, var(--brand) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.pp-sub {
+  font-size: 1.05rem;
+  color: var(--muted);
+  max-width: 520px;
+  margin: 0 auto 36px;
+  line-height: 1.65;
+}
+
+/* ── Billing toggle ── */
+.pp-toggle-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 8px 20px;
+}
+.pp-toggle-label {
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--muted2);
+  transition: color .2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pp-toggle-label.active { color: var(--text); }
+.pp-toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 100px;
+  border: none;
+  background: rgba(255,255,255,.12);
+  cursor: pointer;
+  transition: background .2s;
+  padding: 0;
+  flex-shrink: 0;
+}
+.pp-toggle.on { background: var(--brand); }
+.pp-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform .2s;
+}
+.pp-toggle.on .pp-toggle-thumb { transform: translateX(20px); }
+.pp-save-badge {
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  background: rgba(73,242,182,.18);
+  color: var(--brand);
+  border: 1px solid rgba(73,242,182,.3);
+  border-radius: 100px;
+  padding: 2px 8px;
+}
+
+/* ── Plan cards ── */
+.pp-cards-wrap {
+  padding: 0 0 60px;
+}
+.pp-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .pp-cards { grid-template-columns: 1fr; max-width: 420px; }
+}
+
+.pp-card {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius2);
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  transition: transform .2s, box-shadow .2s;
+}
+.pp-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 24px 60px rgba(0,0,0,.35);
+}
+.pp-card--highlight {
+  border-color: rgba(73,242,182,.4);
+  background: linear-gradient(160deg, rgba(73,242,182,.07) 0%, var(--card) 60%);
+  box-shadow: 0 0 0 1px rgba(73,242,182,.25), 0 20px 50px rgba(73,242,182,.1);
+}
+
+.pp-card-badge {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, var(--brand2), var(--brand));
+  color: #fff;
+  border-radius: 100px;
+  padding: 4px 16px;
+  white-space: nowrap;
+}
+
+.pp-card-top { display: flex; flex-direction: column; gap: 8px; }
+.pp-plan-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+}
+.pp-plan-desc {
+  font-size: .85rem;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+}
+.pp-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  margin-top: 8px;
+}
+.pp-price-amount {
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: -.04em;
+  line-height: 1;
+  color: var(--text);
+}
+.pp-price-amount--localized {
+  font-size: clamp(2rem, 4vw, 2.6rem);
+  letter-spacing: 0;
+}
+.pp-price-period {
+  font-size: .9rem;
+  color: var(--muted2);
+  margin-left: 2px;
+}
+.pp-billed-note {
+  font-size: .75rem;
+  color: var(--muted2);
+  margin: 0;
+}
+
+/* CTA buttons */
+.pp-cta-btn {
+  width: 100%;
+  justify-content: center;
+  padding: 12px 20px;
+  font-size: .9rem;
+  border-radius: 12px;
+}
+.pp-cta-primary {
+  background: linear-gradient(135deg, #49f2b6, #2dd4a0);
+  color: #0b0f1e;
+  font-weight: 700;
+  border: none;
+}
+.pp-cta-primary:hover { filter: brightness(1.08); }
+.pp-cta-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.pp-cta-ghost:hover { background: rgba(255,255,255,.06); color: var(--text); }
+.pp-cta-brand2 {
+  background: linear-gradient(135deg, #7c5cff, #a78bfa);
+  color: #fff;
+  font-weight: 700;
+  border: none;
+}
+.pp-cta-brand2:hover { filter: brightness(1.1); }
+
+/* Feature list inside card */
+.pp-feature-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+.pp-feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: .84rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.pp-feature-check {
+  color: var(--brand);
+  font-size: .8rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.pp-feature-label strong { color: var(--text); font-weight: 600; }
+
+/* ── Comparison table ── */
+.pp-table-section {
+  padding: 0 0 72px;
+}
+.pp-table-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  margin: 0 0 28px;
+  color: var(--text);
+}
+.pp-table-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.pp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .875rem;
+}
+.pp-table th, .pp-table td {
+  padding: 14px 20px;
+  text-align: center;
+}
+.pp-th-feature, .pp-td-feature {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text);
+  width: 38%;
+}
+.pp-th-plan {
+  font-size: .8rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: rgba(255,255,255,.03);
+}
+.pp-th--highlight, .pp-td--highlight {
+  background: rgba(73,242,182,.05);
+  color: var(--brand);
+}
+.pp-th--highlight { color: var(--brand); }
+.pp-tr-even td { background: rgba(255,255,255,.02); }
+.pp-table tr { border-bottom: 1px solid rgba(255,255,255,.05); }
+.pp-table tr:last-child { border-bottom: none; }
+.pp-td-val { color: var(--muted2); }
+.pp-check { color: var(--brand); font-weight: 700; font-size: 1rem; }
+.pp-dash { color: rgba(255,255,255,.2); font-size: 1.1rem; }
+.pp-text-val { font-weight: 600; color: var(--text); }
+
+/* ── FAQ ── */
+.pp-faq {
+  padding: 0 0 72px;
+}
+.pp-faq-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  margin: 0 0 36px;
+  color: var(--text);
+}
+.pp-faq-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+@media (max-width: 720px) {
+  .pp-faq-grid { grid-template-columns: 1fr; }
+}
+.pp-faq-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+.pp-faq-q {
+  font-size: .95rem;
+  font-weight: 700;
+  margin: 0 0 10px;
+  color: var(--text);
+}
+.pp-faq-a {
+  font-size: .85rem;
+  color: var(--muted);
+  line-height: 1.65;
+  margin: 0;
+}
+
+/* ── CTA Banner ── */
+.pp-banner {
+  padding: 0 0 40px;
+}
+.pp-banner-inner {
+  background: linear-gradient(135deg, rgba(124,92,255,.18), rgba(73,242,182,.12));
+  border: 1px solid rgba(73,242,182,.2);
+  border-radius: var(--radius2);
+  padding: 56px 40px;
+  text-align: center;
+}
+.pp-banner-title {
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -.03em;
+  margin: 0 0 12px;
+}
+.pp-banner-sub {
+  font-size: 1rem;
+  color: var(--muted);
+  margin: 0 0 28px;
+}
+.pp-banner-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 760px) {
+  .pp-page {
+    overflow-x: hidden;
+    padding-bottom: 56px;
+  }
+
+  .pp-hero {
+    padding: 44px 14px 32px;
+  }
+
+  .pp-title {
+    line-height: 1.12;
+  }
+
+  .pp-sub {
+    font-size: .95rem;
+    margin-bottom: 24px;
+  }
+
+  .pp-toggle-wrap {
+    width: 100%;
+    justify-content: center;
+    gap: 10px;
+    padding: 8px 12px;
+  }
+
+  .pp-save-badge {
+    display: inline-flex;
+    margin-left: 0;
+  }
+
+  .pp-notice,
+  .pp-current-banner {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 12px 14px;
+  }
+
+  .pp-notice-close {
+    position: absolute;
+    right: 10px;
+    top: 8px;
+  }
+
+  .pp-notice {
+    position: relative;
+    padding-right: 42px;
+  }
+
+  .pp-portal-btn,
+  .pp-current-banner .btn {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .pp-cards-wrap {
+    padding-bottom: 42px;
+  }
+
+  .pp-cards {
+    max-width: none;
+    gap: 18px;
+  }
+
+  .pp-card {
+    padding: 26px 18px;
+    border-radius: 12px;
+  }
+
+  .pp-card:hover {
+    transform: none;
+  }
+
+  .pp-card-badge,
+  .pp-card-current-badge {
+    position: static;
+    align-self: flex-start;
+    transform: none;
+    margin-bottom: -8px;
+  }
+
+  .pp-price-row {
+    flex-wrap: wrap;
+  }
+
+  .pp-price-amount {
+    font-size: 2.35rem;
+  }
+
+  .pp-table-section,
+  .pp-faq,
+  .pp-banner {
+    padding-bottom: 44px;
+  }
+
+  .pp-table-title,
+  .pp-faq-title {
+    font-size: 1.2rem;
+    margin-bottom: 18px;
+  }
+
+  .pp-table-wrap {
+    border-radius: 10px;
+    scrollbar-width: thin;
+  }
+
+  .pp-table {
+    min-width: 680px;
+  }
+
+  .pp-table th,
+  .pp-table td {
+    padding: 12px 14px;
+  }
+
+  .pp-faq-item {
+    padding: 18px 16px;
+  }
+
+  .pp-banner-inner {
+    padding: 32px 18px;
+    border-radius: 12px;
+  }
+
+  .pp-banner-actions .btn {
+    justify-content: center;
+    width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .pp-toggle-wrap {
+    align-items: stretch;
+    flex-direction: column;
+    border-radius: 14px;
+  }
+
+  .pp-toggle-label {
+    justify-content: center;
+  }
+
+  .pp-toggle {
+    align-self: center;
+  }
+}

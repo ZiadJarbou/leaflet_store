@@ -1,0 +1,15 @@
+export const PRESET_ICONS: { label: string; svg: string }[] = [
+  { label: 'New', svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><circle cx="40" cy="40" r="38" fill="#22c55e"/><text x="40" y="47" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="22" font-weight="900" fill="#fff">NEW</text></svg>` },
+  { label: 'Killer offer', svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><polygon points="40,2 52,28 80,32 60,52 65,78 40,65 15,78 20,52 0,32 28,28" fill="#ef4444"/><text x="40" y="37" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="9" font-weight="900" fill="#fff">KILLER</text><text x="40" y="51" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="9" font-weight="900" fill="#fff">OFFER</text></svg>` },
+  { label: 'Wow', svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><polygon points="40,2 52,28 80,32 60,52 65,78 40,65 15,78 20,52 0,32 28,28" fill="#f97316"/><text x="40" y="47" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="22" font-weight="900" fill="#fff">WOW</text></svg>` },
+  { label: 'Awesome', svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><circle cx="40" cy="40" r="38" fill="#8b5cf6"/><text x="40" y="37" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="11" font-weight="900" fill="#fff">AWESOM</text><text x="40" y="52" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="11" font-weight="900" fill="#fff">E!</text></svg>` },
+  { label: 'Big deal', svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><polygon points="40,2 52,28 80,32 60,52 65,78 40,65 15,78 20,52 0,32 28,28" fill="#0ea5e9"/><text x="40" y="37" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="10" font-weight="900" fill="#fff">BIG</text><text x="40" y="51" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="10" font-weight="900" fill="#fff">DEAL</text></svg>` },
+  { label: 'Per piece', svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect x="2" y="20" width="76" height="40" rx="8" fill="#f59e0b"/><text x="40" y="37" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="9" font-weight="900" fill="#fff">PER</text><text x="40" y="51" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="9" font-weight="900" fill="#fff">PIECE</text></svg>` },
+  { label: 'Special offer', svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><polygon points="40,2 52,28 80,32 60,52 65,78 40,65 15,78 20,52 0,32 28,28" fill="#ec4899"/><text x="40" y="37" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="8.5" font-weight="900" fill="#fff">SPECIAL</text><text x="40" y="51" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="8.5" font-weight="900" fill="#fff">OFFER</text></svg>` },
+];
+
+export function editorIconSvgToDataUrl(svg: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+export const PRESET_ICON_URLS = PRESET_ICONS.map(ic => ({ label: ic.label, url: editorIconSvgToDataUrl(ic.svg) }));

@@ -1,0 +1,21 @@
+/* ── Terms-specific overrides (base styles from PrivacyPage.css) ── */
+.tp-link {
+  color: #818cf8;
+  text-decoration: none;
+  transition: color .14s;
+}
+.tp-link:hover { color: #c7d2fe; }
+
+/* Cross (✗) list — used for restrictions / warnings */
+.tp-cross-list li::before {
+  content: '✕';
+  color: #f87171;
+  font-size: .75rem;
+}
+
+/* Sharia callout — amber tint */
+.tp-sharia-callout {
+  background: rgba(251,191,36,.07);
+  border-left-color: #f59e0b;
+}
+.tp-sharia-callout strong { color: #fcd34d; }

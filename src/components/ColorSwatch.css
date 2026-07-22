@@ -1,0 +1,115 @@
+/* ── ColorSwatch ────────────────────────────────────────────────── */
+.cs-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+}
+
+/* Trigger */
+.cs-trigger {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 2px solid rgba(255,255,255,.22);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0,0,0,.4);
+  transition: transform .1s, box-shadow .1s;
+}
+.cs-trigger:hover {
+  transform: scale(1.12);
+  box-shadow: 0 2px 8px rgba(0,0,0,.55);
+}
+
+/* Popover — rendered via portal at document.body */
+.cs-popover {
+  z-index: 99999;
+  display: flex;
+  background: #1e2535;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.7);
+  width: 220px;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* react-colorful overrides — fill the popover width */
+.cs-popover .react-colorful {
+  width: 100% !important;
+  height: 160px !important;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.cs-popover .react-colorful__saturation {
+  border-radius: 8px 8px 0 0;
+}
+.cs-popover .react-colorful__hue {
+  height: 14px !important;
+  border-radius: 0 0 8px 8px;
+  margin-top: 2px;
+}
+.cs-popover .react-colorful__pointer {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.5);
+}
+
+/* Hex row */
+.cs-hex-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 7px;
+  padding: 0 8px;
+  height: 32px;
+}
+.cs-hex-hash {
+  color: rgba(255,255,255,.35);
+  font-size: .82rem;
+  font-family: monospace;
+  flex-shrink: 0;
+}
+.cs-hex-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #f1f5f9;
+  font-size: .82rem;
+  font-family: monospace;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  min-width: 0;
+}
+.cs-hex-preview {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid rgba(255,255,255,.2);
+  flex-shrink: 0;
+}
+
+/* Presets */
+.cs-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 18px);
+  gap: 4px;
+}
+.cs-preset {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform .1s;
+}
+.cs-preset:hover  { transform: scale(1.25); border-color: rgba(255,255,255,.5); }
+.cs-preset.active { border-color: #6366f1; box-shadow: 0 0 0 1px #6366f1; }
