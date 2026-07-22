@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "server/index.cjs",
   "engines": {
     "node": ">=20"
   },
@@ -10,7 +11,8 @@
     "dev": "node server/kill-ports.cjs && concurrently \"node server/index.cjs\" \"vite\" --names \"api,vite\" --prefix-colors \"cyan,green\"",
     "start": "node server/index.cjs",
     "server": "node server/index.cjs",
-    "build": "vite build && node scripts/compat-assets.cjs",
+    "build": "vite build",
+    "postbuild": "node scripts/compat-assets.cjs",
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "preview": "vite preview"
