@@ -38,6 +38,7 @@ function mountApp() {
   }
 
   try {
+    root.dataset.appMounted = 'true';
     createRoot(root).render(
       <HelmetProvider>
         <App />

@@ -2,9 +2,18 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'strip-built-crossorigin',
+      transformIndexHtml(html) {
+        return html.replace(/\s+crossorigin(="")?/g, '');
+      },
+    },
+  ],
   build: {
     assetsDir: 'app-assets',
+    target: 'es2018',
     chunkSizeWarningLimit: 2500,
   },
   server: {

@@ -11,7 +11,18 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..24,400,0,0&display=swap" rel="stylesheet">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="app-startup-fallback" style="font-family: Inter, system-ui, sans-serif; max-width: 720px; margin: 64px auto; padding: 24px; line-height: 1.5;">
+        <h1 style="font-size: 24px; margin: 0 0 12px;">Loading LeafletAI...</h1>
+        <p style="margin: 0; color: #4b5563;">If this message stays visible, refresh the page.</p>
+      </div>
+    </div>
+    <noscript>
+      <div style="font-family: Inter, system-ui, sans-serif; max-width: 720px; margin: 64px auto; padding: 24px; line-height: 1.5;">
+        <h1 style="font-size: 24px; margin: 0 0 12px;">JavaScript is required</h1>
+        <p style="margin: 0; color: #4b5563;">Please enable JavaScript to use LeafletAI.</p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
