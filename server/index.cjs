@@ -709,13 +709,27 @@ app.use((req, res, next) => {
 const appOrigin = (() => {
   try { return new URL(APP_URL).origin; } catch { return ''; }
 })();
+const configuredCorsOrigins = new Set(
+  [
+    appOrigin,
+    'https://leafletai.ai',
+    'https://www.leafletai.ai',
+    ...String(process.env.CORS_ORIGINS || '')
+      .split(',')
+      .map(origin => origin.trim().replace(/\/+$/, '')),
+  ].filter(Boolean)
+);
+function isAllowedCorsOrigin(origin) {
+  if (!origin) return true;
+  if (configuredCorsOrigins.has(origin)) return true;
+  if (/^https:\/\/([a-z0-9-]+\.)?leafletai\.ai$/i.test(origin)) return true;
+  if (process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) return true;
+  return false;
+}
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || origin === appOrigin) return callback(null, true);
-    if (process.env.NODE_ENV !== 'production' && /^http:\/\/localhost:\d+$/.test(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error('Origin not allowed by CORS.'));
+    if (isAllowedCorsOrigin(origin)) return callback(null, true);
+    return callback(new Error(`Origin not allowed by CORS: ${origin}`));
   },
   credentials: true,
 }));
