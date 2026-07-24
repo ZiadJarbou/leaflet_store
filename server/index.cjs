@@ -48,10 +48,6 @@ console.log({
   clientIdLoaded: Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID),
   clientSecretLoaded: Boolean(process.env.GOOGLE_OAUTH_CLIENT_SECRET),
 });
-const APPLE_OAUTH_CLIENT_ID        = process.env.APPLE_OAUTH_CLIENT_ID || '';
-const APPLE_OAUTH_TEAM_ID          = process.env.APPLE_OAUTH_TEAM_ID || '';
-const APPLE_OAUTH_KEY_ID           = process.env.APPLE_OAUTH_KEY_ID || '';
-const APPLE_OAUTH_PRIVATE_KEY      = process.env.APPLE_OAUTH_PRIVATE_KEY || '';
 const SMTP_HOST                    = process.env.SMTP_HOST || '';
 const SMTP_PORT                    = Number(process.env.SMTP_PORT || 587);
 const SMTP_SECURE                  = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true';
@@ -893,33 +889,6 @@ function signJwt(user) {
 function googleOAuthRedirectUri() {
   return `${APP_URL}/api/oauth/google/callback`;
 }
-function appleOAuthRedirectUri() {
-  return `${APP_URL}/api/oauth/apple/callback`;
-}
-function isAppleOAuthConfigured() {
-  return !!(APPLE_OAUTH_CLIENT_ID && APPLE_OAUTH_TEAM_ID && APPLE_OAUTH_KEY_ID && APPLE_OAUTH_PRIVATE_KEY);
-}
-function makeAppleClientSecret() {
-  const privateKey = APPLE_OAUTH_PRIVATE_KEY.replace(/\\n/g, '\n');
-  return jwt.sign({}, privateKey, {
-    algorithm: 'ES256',
-    expiresIn: '15m',
-    audience: 'https://appleid.apple.com',
-    issuer: APPLE_OAUTH_TEAM_ID,
-    subject: APPLE_OAUTH_CLIENT_ID,
-    keyid: APPLE_OAUTH_KEY_ID,
-  });
-}
-function decodeJwtPayload(token) {
-  try {
-    const payload = String(token || '').split('.')[1];
-    if (!payload) return null;
-    const padded = payload.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(payload.length / 4) * 4, '=');
-    return JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
-  } catch {
-    return null;
-  }
-}
 function validatePasswordRules(password) {
   const errs = {};
   if (!password || password.length < 8) {
@@ -1319,7 +1288,6 @@ app.get('/api/config/status', (req, res) => {
       clientIdSuffix: googleClientId ? googleClientId.slice(-28) : '',
       clientSecretPresent: !!GOOGLE_OAUTH_CLIENT_SECRET,
     },
-    appleOAuthConfigured: isAppleOAuthConfigured(),
     smtpConfigured: isSmtpConfigured(),
   });
 });
@@ -1416,109 +1384,6 @@ app.get('/api/oauth/google/callback', async (req, res, next) => {
     res.redirect(`${APP_URL}/oauth/callback#${fragment.toString()}`);
   } catch (err) { next(err); }
 });
-
-/* ── Apple OAuth ── */
-function startAppleOAuth(req, res) {
-  if (!isAppleOAuthConfigured()) {
-    res.status(503).send('Apple login is not configured. Set APPLE_OAUTH_CLIENT_ID, APPLE_OAUTH_TEAM_ID, APPLE_OAUTH_KEY_ID, and APPLE_OAUTH_PRIVATE_KEY.');
-    return;
-  }
-
-  const state = jwt.sign({ nonce: makeToken(), mode: req.path.endsWith('/signup') ? 'signup' : 'login' }, JWT_SECRET, { expiresIn: '10m' });
-  const params = new URLSearchParams({
-    client_id: APPLE_OAUTH_CLIENT_ID,
-    redirect_uri: appleOAuthRedirectUri(),
-    response_type: 'code id_token',
-    response_mode: 'form_post',
-    scope: 'name email',
-    state,
-  });
-  res.redirect(`https://appleid.apple.com/auth/authorize?${params.toString()}`);
-}
-
-app.get('/api/oauth/apple', startAppleOAuth);
-app.get('/api/oauth/apple/signup', startAppleOAuth);
-
-async function handleAppleOAuthCallback(req, res, next) {
-  try {
-    if (!isAppleOAuthConfigured()) {
-      res.redirect(`${APP_URL}/oauth/callback?error=${encodeURIComponent('Apple login is not configured.')}`);
-      return;
-    }
-
-    const source = req.method === 'POST' ? req.body : req.query;
-    const code = String(source.code || '');
-    const state = String(source.state || '');
-    if (!code || !state) {
-      res.redirect(`${APP_URL}/oauth/callback?error=${encodeURIComponent('Apple login was cancelled or incomplete.')}`);
-      return;
-    }
-
-    try {
-      jwt.verify(state, JWT_SECRET);
-    } catch {
-      res.redirect(`${APP_URL}/oauth/callback?error=${encodeURIComponent('Apple login expired. Please try again.')}`);
-      return;
-    }
-
-    const tokenRes = await fetch('https://appleid.apple.com/auth/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: APPLE_OAUTH_CLIENT_ID,
-        client_secret: makeAppleClientSecret(),
-        code,
-        grant_type: 'authorization_code',
-        redirect_uri: appleOAuthRedirectUri(),
-      }),
-    });
-    const tokenData = await tokenRes.json().catch(() => ({}));
-    if (!tokenRes.ok || !tokenData.id_token) {
-      console.error('[apple-oauth] token exchange failed:', tokenData);
-      res.redirect(`${APP_URL}/oauth/callback?error=${encodeURIComponent('Apple login failed. Please try again.')}`);
-      return;
-    }
-
-    const identity = decodeJwtPayload(tokenData.id_token);
-    const email = normalizeEmail(identity?.email || '');
-    if (!email || identity?.email_verified === 'false' || identity?.email_verified === false) {
-      console.error('[apple-oauth] id token missing verified email:', identity);
-      res.redirect(`${APP_URL}/oauth/callback?error=${encodeURIComponent('Apple did not return a verified email address.')}`);
-      return;
-    }
-
-    let appleName = '';
-    if (source.user) {
-      try {
-        const appleUser = JSON.parse(String(source.user));
-        appleName = normalizeName([appleUser?.name?.firstName, appleUser?.name?.lastName].filter(Boolean).join(' '));
-      } catch {}
-    }
-    const name = appleName || normalizeName(email.split('@')[0] || 'Apple user');
-
-    let user = db.prepare('SELECT id, name, email FROM users WHERE email = ?').get(email);
-    if (user) {
-      db.prepare('UPDATE users SET email_verified = 1, verify_token = NULL, verify_token_expires = NULL WHERE id = ?').run(user.id);
-    } else {
-      const passwordHash = await bcrypt.hash(makeToken(), 12);
-      const result = db.prepare(`
-        INSERT INTO users (name, email, password_hash, email_verified, verify_token, verify_token_expires)
-        VALUES (?, ?, ?, 1, NULL, NULL)
-      `).run(name, email, passwordHash);
-      user = { id: result.lastInsertRowid, name, email };
-    }
-
-    const appToken = signJwt(user);
-    const fragment = new URLSearchParams({
-      token: appToken,
-      user: JSON.stringify({ id: user.id, name: user.name, email: user.email }),
-    });
-    res.redirect(`${APP_URL}/oauth/callback#${fragment.toString()}`);
-  } catch (err) { next(err); }
-}
-
-app.get('/api/oauth/apple/callback', handleAppleOAuthCallback);
-app.post('/api/oauth/apple/callback', handleAppleOAuthCallback);
 
 /* ── GET /api/me ── */
 app.get('/api/me', authMiddleware, (req, res, next) => {

@@ -13,9 +13,6 @@ const GoogleIcon = () => (<svg viewBox="0 0 48 48">
     <path d="M24 45c5.7 0 11-2.2 14.9-5.9l-6.9-5.7c-2 1.4-4.6 2.6-8 2.6-5.9 0-10.9-3.9-12.7-9.2l-7.2 5.5C6.8 39.9 14.8 45 24 45z" fill="#4CAF50"/>
     <path d="M44.5 20H24v8.5h11.8c-1 3-3.1 5.2-5.8 6.6l.1.1 6.9 5.7C40.6 37.6 44 32.7 44 24c0-1.3-.2-2.7-.5-4z" fill="#1976D2"/>
   </svg>);
-const AppleIcon = () => (<svg viewBox="0 0 24 24">
-    <path fill="currentColor" d="M16.6 13.1c0-1.8 1-3.1 2.5-3.9-0.8-1.1-2-1.7-3.6-1.8-1.5-.1-3 .9-3.6.9-.6 0-1.9-.8-3.1-.8C6.2 7.6 4 9.1 4 12.4c0 1 .2 2 .7 3.1.6 1.3 2.7 4.4 4.9 4.4 1.1 0 1.9-.8 3.3-.8 1.3 0 2.1.8 3.3.8 2.2 0 4.1-2.8 4.6-4.1-2.3-1-3.2-2.7-3.2-4.7zM14.9 5.2c.6-.8 1-1.9.9-3-1 .1-2.1.7-2.7 1.5-.6.7-1.1 1.8-1 2.9 1.1.1 2.2-.6 2.8-1.4z"/>
-  </svg>);
 function OAuthButtons({ mode }: { mode: 'login' | 'signup' }) {
     const action = mode === 'signup' ? 'Sign up' : 'Continue';
     const suffix = mode === 'signup' ? '/signup' : '';
@@ -23,10 +20,6 @@ function OAuthButtons({ mode }: { mode: 'login' | 'signup' }) {
       <button type="button" className="btn ghost oauth-btn" onClick={() => window.location.href = `/api/oauth/google${suffix}`}>
         <span className="oauth-ic"><GoogleIcon /></span>
         <span>{action} with Google</span>
-      </button>
-      <button type="button" className={cx("btn ghost oauth-btn", cssClass({ color: '#fff' }))} onClick={() => window.location.href = `/api/oauth/apple${suffix}`}>
-        <span className="oauth-ic"><AppleIcon /></span>
-        <span>{action} with Apple</span>
       </button>
       <div className="oauth-divider"><span>or</span></div>
     </div>);
