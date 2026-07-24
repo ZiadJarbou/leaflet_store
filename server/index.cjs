@@ -979,6 +979,25 @@ async function sendVerificationEmail({ email, name, verifyLink }) {
   });
   return true;
 }
+function verificationEmailFailureMessage(err) {
+  if (!isSmtpConfigured()) {
+    return 'Verification email is not configured. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in Hostinger.';
+  }
+
+  const code = err?.code || '';
+  const responseCode = err?.responseCode || '';
+  const message = err instanceof Error ? err.message : String(err || '');
+  if (code === 'EAUTH' || responseCode === 535 || /Username and Password not accepted/i.test(message)) {
+    return 'Google rejected the email login. Use a Google App Password for no-reply@leafletai.ai, then redeploy the app.';
+  }
+  if (code === 'EENVELOPE' || /sender|from/i.test(message)) {
+    return 'The email sender address was rejected. Make sure MAIL_FROM is LeafletAI <no-reply@leafletai.ai>.';
+  }
+  if (code === 'ECONNECTION' || code === 'ETIMEDOUT' || code === 'ESOCKET') {
+    return 'The app could not connect to the email server. Check SMTP_HOST, SMTP_PORT, and SMTP_SECURE in Hostinger.';
+  }
+  return 'The verification email could not be sent. Please check the SMTP settings in Hostinger and try again.';
+}
 async function logSmtpStartupStatus() {
   if (!isSmtpConfigured()) {
     console.warn('[smtp] not configured', {
@@ -1289,18 +1308,21 @@ app.post('/api/signup', async (req, res, next) => {
     const token = signJwt(user);
     const verifyLink = `${APP_URL}/verify-email?token=${verifyToken}&email=${encodeURIComponent(email)}`;
     let emailSent = false;
+    let emailError = null;
     try {
       emailSent = await sendVerificationEmail({ email, name, verifyLink });
     } catch (mailErr) {
+      emailError = mailErr;
       console.error('[verify-email] failed to send:', mailErr instanceof Error ? mailErr.message : mailErr);
       console.log(`[verify-email] fallback link for ${email}: ${verifyLink}`);
     }
     if (!emailSent) {
       db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
+      const emailMessage = verificationEmailFailureMessage(emailError);
       res.status(503).json({
         errors: {
-          general: 'Account was not created because the verification email could not be sent. Please contact support or try again later.',
-          email: 'We could not send a verification email to this address.',
+          general: emailMessage,
+          email: emailMessage,
         },
         old: { name, email },
       });
