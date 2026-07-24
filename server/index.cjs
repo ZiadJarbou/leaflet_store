@@ -928,7 +928,7 @@ async function sendVerificationEmail({ email, name, verifyLink }) {
     return false;
   }
 
-  await mailer.sendMail({
+  const info = await mailer.sendMail({
     from: MAIL_FROM,
     to: email,
     subject: 'Verify your LeafletAI email',
@@ -954,7 +954,49 @@ async function sendVerificationEmail({ email, name, verifyLink }) {
       </div>
     `,
   });
+  console.log('[verify-email] sent', {
+    to: email,
+    messageId: info.messageId,
+    accepted: info.accepted,
+    rejected: info.rejected,
+    response: info.response,
+  });
   return true;
+}
+async function logSmtpStartupStatus() {
+  if (!isSmtpConfigured()) {
+    console.warn('[smtp] not configured', {
+      hostLoaded: Boolean(SMTP_HOST),
+      userLoaded: Boolean(SMTP_USER),
+      passLoaded: Boolean(SMTP_PASS),
+      from: MAIL_FROM,
+    });
+    return;
+  }
+
+  try {
+    const mailer = createMailer();
+    await mailer.verify();
+    console.log('[smtp] ready', {
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_SECURE,
+      user: SMTP_USER,
+      from: MAIL_FROM,
+    });
+  } catch (err) {
+    console.error('[smtp] verification failed', {
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_SECURE,
+      user: SMTP_USER,
+      from: MAIL_FROM,
+      code: err?.code,
+      command: err?.command,
+      responseCode: err?.responseCode,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 /* ── Auth middleware ── */
@@ -1288,7 +1330,15 @@ app.get('/api/config/status', (req, res) => {
       clientIdSuffix: googleClientId ? googleClientId.slice(-28) : '',
       clientSecretPresent: !!GOOGLE_OAUTH_CLIENT_SECRET,
     },
-    smtpConfigured: isSmtpConfigured(),
+    smtp: {
+      configured: isSmtpConfigured(),
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_SECURE,
+      user: SMTP_USER,
+      from: MAIL_FROM,
+      passwordLoaded: Boolean(SMTP_PASS),
+    },
   });
 });
 
@@ -4202,4 +4252,7 @@ if (fs.existsSync(DIST_DIR)) {
   });
 }
 
-app.listen(PORT, () => console.log(`LeafletAI running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`LeafletAI running on port ${PORT}`);
+  logSmtpStartupStatus();
+});
