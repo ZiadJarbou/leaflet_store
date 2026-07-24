@@ -1322,7 +1322,6 @@ app.post('/api/signup', async (req, res, next) => {
       res.status(503).json({
         errors: {
           general: emailMessage,
-          email: emailMessage,
         },
         old: { name, email },
       });
