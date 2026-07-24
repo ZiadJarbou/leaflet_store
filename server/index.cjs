@@ -1272,16 +1272,27 @@ app.post('/api/signup', async (req, res, next) => {
     const user  = { id: result.lastInsertRowid, name, email };
     const token = signJwt(user);
     const verifyLink = `${APP_URL}/verify-email?token=${verifyToken}&email=${encodeURIComponent(email)}`;
+    let emailSent = false;
     try {
-      await sendVerificationEmail({ email, name, verifyLink });
+      emailSent = await sendVerificationEmail({ email, name, verifyLink });
     } catch (mailErr) {
       console.error('[verify-email] failed to send:', mailErr instanceof Error ? mailErr.message : mailErr);
       console.log(`[verify-email] fallback link for ${email}: ${verifyLink}`);
     }
+    if (!emailSent) {
+      db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
+      res.status(503).json({
+        errors: {
+          general: 'Account was not created because the verification email could not be sent. Please contact support or try again later.',
+          email: 'We could not send a verification email to this address.',
+        },
+        old: { name, email },
+      });
+      return;
+    }
     res.json({
       user, token,
-      notice: 'Account created! Please verify your email to unlock all features.',
-      verifyLink,
+      notice: 'Verification email sent. Please check your inbox to unlock all features.',
     });
   } catch (err) { next(err); }
 });
