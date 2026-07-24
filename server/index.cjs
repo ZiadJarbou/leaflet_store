@@ -44,6 +44,10 @@ function envValue(...names) {
 }
 const GOOGLE_OAUTH_CLIENT_ID       = envValue('GOOGLE_OAUTH_CLIENT_ID', 'GOOGLE_CLIENT_ID', 'GOOGLE_AUTH_CLIENT_ID');
 const GOOGLE_OAUTH_CLIENT_SECRET   = envValue('GOOGLE_OAUTH_CLIENT_SECRET', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_AUTH_CLIENT_SECRET');
+console.log({
+  clientIdLoaded: Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID),
+  clientSecretLoaded: Boolean(process.env.GOOGLE_OAUTH_CLIENT_SECRET),
+});
 const APPLE_OAUTH_CLIENT_ID        = process.env.APPLE_OAUTH_CLIENT_ID || '';
 const APPLE_OAUTH_TEAM_ID          = process.env.APPLE_OAUTH_TEAM_ID || '';
 const APPLE_OAUTH_KEY_ID           = process.env.APPLE_OAUTH_KEY_ID || '';
