@@ -35,8 +35,15 @@ const STRIPE_BIZ_ANNUAL_PRICE_ID   = process.env.STRIPE_BUSINESS_ANNUAL_PRICE_ID
 const APP_URL                      = String(process.env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
 const GOOGLE_API_KEY               = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '';
 const NANO_BANANA_MODEL            = process.env.NANO_BANANA_MODEL || 'gemini-3.1-flash-image-preview';
-const GOOGLE_OAUTH_CLIENT_ID       = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
-const GOOGLE_OAUTH_CLIENT_SECRET   = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
+function envValue(...names) {
+  for (const name of names) {
+    const value = String(process.env[name] || '').trim();
+    if (value) return value;
+  }
+  return '';
+}
+const GOOGLE_OAUTH_CLIENT_ID       = envValue('GOOGLE_OAUTH_CLIENT_ID', 'GOOGLE_CLIENT_ID', 'GOOGLE_AUTH_CLIENT_ID');
+const GOOGLE_OAUTH_CLIENT_SECRET   = envValue('GOOGLE_OAUTH_CLIENT_SECRET', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_AUTH_CLIENT_SECRET');
 const APPLE_OAUTH_CLIENT_ID        = process.env.APPLE_OAUTH_CLIENT_ID || '';
 const APPLE_OAUTH_TEAM_ID          = process.env.APPLE_OAUTH_TEAM_ID || '';
 const APPLE_OAUTH_KEY_ID           = process.env.APPLE_OAUTH_KEY_ID || '';
@@ -1298,6 +1305,21 @@ app.post('/api/login', async (req, res, next) => {
 });
 
 /* ── Google OAuth ── */
+app.get('/api/config/status', (req, res) => {
+  const googleClientId = GOOGLE_OAUTH_CLIENT_ID;
+  res.json({
+    appUrl: APP_URL,
+    googleOAuth: {
+      clientIdPresent: !!googleClientId,
+      clientIdLooksValid: /\.apps\.googleusercontent\.com$/.test(googleClientId),
+      clientIdSuffix: googleClientId ? googleClientId.slice(-28) : '',
+      clientSecretPresent: !!GOOGLE_OAUTH_CLIENT_SECRET,
+    },
+    appleOAuthConfigured: isAppleOAuthConfigured(),
+    smtpConfigured: isSmtpConfigured(),
+  });
+});
+
 function startGoogleOAuth(req, res) {
   if (!GOOGLE_OAUTH_CLIENT_ID || !GOOGLE_OAUTH_CLIENT_SECRET) {
     res.status(503).send('Google login is not configured. Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET.');
