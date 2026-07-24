@@ -16,6 +16,7 @@ const dns      = require('dns').promises;
 const net      = require('net');
 const multer   = require('multer');
 const Stripe   = require('stripe');
+const nodemailer = require('nodemailer');
 
 const zlib = require('zlib');
 
@@ -40,6 +41,12 @@ const APPLE_OAUTH_CLIENT_ID        = process.env.APPLE_OAUTH_CLIENT_ID || '';
 const APPLE_OAUTH_TEAM_ID          = process.env.APPLE_OAUTH_TEAM_ID || '';
 const APPLE_OAUTH_KEY_ID           = process.env.APPLE_OAUTH_KEY_ID || '';
 const APPLE_OAUTH_PRIVATE_KEY      = process.env.APPLE_OAUTH_PRIVATE_KEY || '';
+const SMTP_HOST                    = process.env.SMTP_HOST || '';
+const SMTP_PORT                    = Number(process.env.SMTP_PORT || 587);
+const SMTP_SECURE                  = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true';
+const SMTP_USER                    = process.env.SMTP_USER || '';
+const SMTP_PASS                    = process.env.SMTP_PASS || '';
+const MAIL_FROM                    = process.env.MAIL_FROM || SMTP_USER || 'LeafletAI <no-reply@leafletai.ai>';
 
 const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2024-12-18.acacia' }) : null;
 
@@ -911,6 +918,64 @@ function validatePasswordRules(password) {
   }
   return errs;
 }
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+function isSmtpConfigured() {
+  return !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
+}
+function createMailer() {
+  if (!isSmtpConfigured()) return null;
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASS,
+    },
+  });
+}
+async function sendVerificationEmail({ email, name, verifyLink }) {
+  const mailer = createMailer();
+  if (!mailer) {
+    console.log(`[verify-email] SMTP not configured. Verification link for ${email}: ${verifyLink}`);
+    return false;
+  }
+
+  await mailer.sendMail({
+    from: MAIL_FROM,
+    to: email,
+    subject: 'Verify your LeafletAI email',
+    text: [
+      `Hi ${name || 'there'},`,
+      '',
+      'Welcome to LeafletAI. Please verify your email address to unlock all features.',
+      '',
+      verifyLink,
+      '',
+      'This link expires in 30 minutes.',
+    ].join('\n'),
+    html: `
+      <div style="font-family:Inter,Arial,sans-serif;line-height:1.55;color:#111827;max-width:560px;margin:0 auto;padding:24px;">
+        <h1 style="font-size:22px;margin:0 0 12px;">Verify your email</h1>
+        <p>Hi ${escapeHtml(name || 'there')},</p>
+        <p>Welcome to LeafletAI. Please verify your email address to unlock all features.</p>
+        <p style="margin:24px 0;">
+          <a href="${escapeHtml(verifyLink)}" style="background:#10b981;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700;display:inline-block;">Verify email</a>
+        </p>
+        <p style="color:#6b7280;font-size:14px;">This link expires in 30 minutes.</p>
+        <p style="color:#6b7280;font-size:14px;">If the button does not work, copy and paste this link into your browser:<br>${escapeHtml(verifyLink)}</p>
+      </div>
+    `,
+  });
+  return true;
+}
 
 /* ── Auth middleware ── */
 function authMiddleware(req, res, next) {
@@ -1184,10 +1249,17 @@ app.post('/api/signup', async (req, res, next) => {
 
     const user  = { id: result.lastInsertRowid, name, email };
     const token = signJwt(user);
+    const verifyLink = `${APP_URL}/verify-email?token=${verifyToken}&email=${encodeURIComponent(email)}`;
+    try {
+      await sendVerificationEmail({ email, name, verifyLink });
+    } catch (mailErr) {
+      console.error('[verify-email] failed to send:', mailErr instanceof Error ? mailErr.message : mailErr);
+      console.log(`[verify-email] fallback link for ${email}: ${verifyLink}`);
+    }
     res.json({
       user, token,
       notice: 'Account created! Please verify your email to unlock all features.',
-      verifyLink: `${APP_URL}/verify-email?token=${verifyToken}&email=${encodeURIComponent(email)}`,
+      verifyLink,
     });
   } catch (err) { next(err); }
 });
