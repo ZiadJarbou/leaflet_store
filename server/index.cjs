@@ -37,10 +37,26 @@ const GOOGLE_API_KEY               = process.env.GOOGLE_API_KEY || process.env.G
 const NANO_BANANA_MODEL            = process.env.NANO_BANANA_MODEL || 'gemini-3.1-flash-image-preview';
 function envValue(...names) {
   for (const name of names) {
-    const value = String(process.env[name] || '').trim();
+    let value = String(process.env[name] || '').trim();
+    if (value.toLowerCase().startsWith(`${name.toLowerCase()}=`)) {
+      value = value.slice(name.length + 1).trim();
+    }
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1).trim();
+    }
     if (value) return value;
   }
   return '';
+}
+function smtpPasswordValue() {
+  const value = envValue('SMTP_PASS');
+  if (/gmail\.com$/i.test(envValue('SMTP_HOST'))) {
+    return value.replace(/\s+/g, '');
+  }
+  return value;
 }
 const GOOGLE_OAUTH_CLIENT_ID       = envValue('GOOGLE_OAUTH_CLIENT_ID', 'GOOGLE_CLIENT_ID', 'GOOGLE_AUTH_CLIENT_ID');
 const GOOGLE_OAUTH_CLIENT_SECRET   = envValue('GOOGLE_OAUTH_CLIENT_SECRET', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_AUTH_CLIENT_SECRET');
@@ -48,12 +64,12 @@ console.log({
   clientIdLoaded: Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID),
   clientSecretLoaded: Boolean(process.env.GOOGLE_OAUTH_CLIENT_SECRET),
 });
-const SMTP_HOST                    = process.env.SMTP_HOST || '';
-const SMTP_PORT                    = Number(process.env.SMTP_PORT || 587);
-const SMTP_SECURE                  = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true';
-const SMTP_USER                    = process.env.SMTP_USER || '';
-const SMTP_PASS                    = process.env.SMTP_PASS || '';
-const MAIL_FROM                    = process.env.MAIL_FROM || SMTP_USER || 'LeafletAI <no-reply@leafletai.ai>';
+const SMTP_HOST                    = envValue('SMTP_HOST');
+const SMTP_PORT                    = Number(envValue('SMTP_PORT') || 587);
+const SMTP_SECURE                  = envValue('SMTP_SECURE').toLowerCase() === 'true';
+const SMTP_USER                    = envValue('SMTP_USER');
+const SMTP_PASS                    = smtpPasswordValue();
+const MAIL_FROM                    = envValue('MAIL_FROM') || SMTP_USER || 'LeafletAI <no-reply@leafletai.ai>';
 
 const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2024-12-18.acacia' }) : null;
 
