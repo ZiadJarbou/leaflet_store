@@ -65,3 +65,4 @@ dev.out.log
 .env
 .env.local
 .env.*.local
+Import.env
