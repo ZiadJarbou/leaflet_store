@@ -3549,7 +3549,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             setSidebarTemplateDeleteId(null);
         }
     }
-    const sidebarVisibleTemplates = sidebarTemplates.filter(t => (t.is_default === true || t.is_platform === true) && t.name !== 'Template 1');
+    const sidebarVisibleTemplates = sidebarTemplates.filter(t => t.is_default === true || t.is_platform === true);
     const sidebarSavedTemplates = sidebarTemplates.filter(t => t.is_default !== true && t.is_platform !== true && t.can_delete !== false);
     const thumbnailSavedRef = useRef<'none' | 'page' | 'cover'>('none');
     useEffect(() => {

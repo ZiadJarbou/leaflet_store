@@ -1726,6 +1726,29 @@ function defaultLayoutForNewLeaflet() {
   }
 }
 
+function defaultCardTemplateRows() {
+  return PLATFORM_DEFAULT_TEMPLATE_NAMES.map((name, index) => {
+    const row = db.prepare(
+      `SELECT t.id, t.user_id, t.name, t.layout_json, t.is_platform, t.created_at, u.role AS owner_role
+       FROM card_layout_templates t
+       LEFT JOIN users u ON u.id = t.user_id
+       WHERE lower(t.name) = lower(?)
+       ORDER BY t.created_at DESC
+       LIMIT 1`
+    ).get(name);
+
+    return row || {
+      id: -(index + 1),
+      user_id: null,
+      name,
+      layout_json: JSON.stringify(DEFAULT_LEAFLET_LAYOUT),
+      is_platform: 1,
+      created_at: new Date(0).toISOString(),
+      owner_role: 'admin',
+    };
+  });
+}
+
 app.post('/api/leaflets', authMiddleware, (req, res, next) => {
   try {
     const { title, description = '', languageMode = 'one', products = [] } = req.body;
@@ -2454,16 +2477,7 @@ function defaultPositions() {
 
 /* ── GET /api/layout-templates ── */
 app.get('/api/layout-templates', authMiddleware, (req, res) => {
-  const defaultRows = PLATFORM_DEFAULT_TEMPLATE_NAMES
-    .map(name => db.prepare(
-      `SELECT t.id, t.user_id, t.name, t.layout_json, t.is_platform, t.created_at, u.role AS owner_role
-       FROM card_layout_templates t
-       LEFT JOIN users u ON u.id = t.user_id
-       WHERE lower(t.name) = lower(?)
-       ORDER BY t.created_at DESC
-       LIMIT 1`
-    ).get(name))
-    .filter(Boolean);
+  const defaultRows = defaultCardTemplateRows();
   const platformRows = db.prepare(
     `SELECT t.id, t.user_id, t.name, t.layout_json, t.is_platform, t.created_at, u.role AS owner_role
      FROM card_layout_templates t
