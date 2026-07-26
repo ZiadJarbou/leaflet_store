@@ -3508,6 +3508,18 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     }
     function applyCardTemplateToLeafletAndCovers(layout: CardLayout, templateName?: string) {
         setCardLayout(layout);
+        if (layout.header_settings)
+            setHeaderSettings(prev => ({ ...prev, ...(layout.header_settings as object) }));
+        if (layout.footer_settings)
+            setFooterSettings(prev => ({ ...prev, ...(layout.footer_settings as object) }));
+        if (layout.page_settings)
+            setPageSettings(prev => ({ ...prev, ...(layout.page_settings as object) }));
+        if (typeof layout.cols_per_page === 'number')
+            setColsPerPage(layout.cols_per_page);
+        if (typeof layout.rows_per_page === 'number')
+            setRowsPerPage(layout.rows_per_page);
+        if (layout.page_overrides)
+            setPageOverrides(layout.page_overrides as Record<number, { header?: boolean; footer?: boolean }>);
         setFrontCoverBuilder(prev => coverBuilderWithProductTemplate(prev, layout, templateName));
         setBackCoverBuilder(prev => coverBuilderWithProductTemplate(prev, layout, templateName));
         setCoverBuilder(prev => coverBuilderWithProductTemplate(prev, layout, templateName));
@@ -3523,11 +3535,9 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             const nextBackCoverBuilder = coverBuilderWithProductTemplate(backCoverBuilder, layout, templateName);
             const nextLayout = { ...layout, cover_page: coverPage, back_page: backPage, cover_builder: nextFrontCoverBuilder as unknown as Record<string, unknown>, back_cover_builder: nextBackCoverBuilder as unknown as Record<string, unknown> } as CardLayout;
             const r = await saveLeafletLayout(id, nextLayout);
-            setCardLayout(r.layout);
+            applyCardTemplateToLeafletAndCovers(r.layout, templateName);
             setFrontCoverBuilder(nextFrontCoverBuilder);
             setBackCoverBuilder(nextBackCoverBuilder);
-            setCoverBuilder(prev => coverBuilderWithProductTemplate(prev, layout, templateName));
-            setCoverBuilderSaveTick(t => t + 1);
         }
         catch (e) {
             setSidebarTemplatesErr(e instanceof Error ? e.message : 'Failed to apply template.');
