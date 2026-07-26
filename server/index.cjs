@@ -1727,6 +1727,13 @@ function defaultLayoutForNewLeaflet() {
 }
 
 function defaultCardTemplateRows() {
+  let fallbackLayouts = {};
+  try {
+    fallbackLayouts = JSON.parse(fs.readFileSync(path.join(__dirname, 'default-card-templates.json'), 'utf8'));
+  } catch (_) {
+    fallbackLayouts = {};
+  }
+
   return PLATFORM_DEFAULT_TEMPLATE_NAMES.map((name, index) => {
     const row = db.prepare(
       `SELECT t.id, t.user_id, t.name, t.layout_json, t.is_platform, t.created_at, u.role AS owner_role
@@ -1741,7 +1748,7 @@ function defaultCardTemplateRows() {
       id: -(index + 1),
       user_id: null,
       name,
-      layout_json: JSON.stringify(DEFAULT_LEAFLET_LAYOUT),
+      layout_json: JSON.stringify(fallbackLayouts[name] || DEFAULT_LEAFLET_LAYOUT),
       is_platform: 1,
       created_at: new Date(0).toISOString(),
       owner_role: 'admin',
@@ -2671,12 +2678,16 @@ app.post('/api/layout-templates', authMiddleware, (req, res) => {
 });
 
 app.get('/api/admin/card-templates', adminMiddleware, (req, res) => {
-  const rows = db.prepare(
+  const platformRows = db.prepare(
     `SELECT id, user_id, name, layout_json, is_platform, created_at
      FROM card_layout_templates
      WHERE is_platform = 1
      ORDER BY created_at DESC`
   ).all();
+  const rows = [
+    ...defaultCardTemplateRows().map(row => ({ ...row, is_platform: 1 })),
+    ...platformRows.filter(row => !PLATFORM_DEFAULT_TEMPLATE_NAMES.includes(row.name)),
+  ];
   const templates = rows.map(r => {
     let layout = null;
     try { layout = JSON.parse(r.layout_json); } catch {}
