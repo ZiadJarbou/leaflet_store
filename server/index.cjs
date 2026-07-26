@@ -1,5 +1,9 @@
 // server/index.cjs
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
+const path = require('path');
+const dotenv = require('dotenv');
+
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 process.on('uncaughtException', err => { console.error('[uncaughtException]', err); });
 process.on('unhandledRejection', (reason) => { console.error('[unhandledRejection]', reason); });
 
@@ -8,7 +12,6 @@ const cors     = require('cors');
 const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
 const Database = require('better-sqlite3');
-const path     = require('path');
 const crypto   = require('crypto');
 const fs       = require('fs');
 const https    = require('https');
@@ -988,6 +991,12 @@ function verificationEmailFailureMessage(err) {
   const responseCode = err?.responseCode || '';
   const message = err instanceof Error ? err.message : String(err || '');
   if (code === 'EAUTH' || responseCode === 535 || /Username and Password not accepted/i.test(message)) {
+    if (/gmail\.com$/i.test(SMTP_HOST)) {
+      return 'Google rejected the email login. Use a Google App Password for no-reply@leafletai.ai, then redeploy the app.';
+    }
+    if (/hostinger\.com$/i.test(SMTP_HOST)) {
+      return 'Hostinger rejected the email login. Use the mailbox password for no-reply@leafletai.ai, then restart or redeploy the app.';
+    }
     return 'Google rejected the email login. Use a Google App Password for no-reply@leafletai.ai, then redeploy the app.';
   }
   if (code === 'EENVELOPE' || /sender|from/i.test(message)) {
@@ -1317,13 +1326,17 @@ app.post('/api/signup', async (req, res, next) => {
       console.log(`[verify-email] fallback link for ${email}: ${verifyLink}`);
     }
     if (!emailSent) {
-      db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
       const emailMessage = verificationEmailFailureMessage(emailError);
-      res.status(503).json({
-        errors: {
-          general: emailMessage,
-        },
-        old: { name, email },
+      console.warn('[verify-email] signup allowed without email delivery', {
+        userId: user.id,
+        email,
+        reason: emailMessage,
+      });
+      res.json({
+        user, token,
+        notice: 'Account created, but the verification email could not be sent. You can sign in now while we fix email delivery.',
+        emailSent: false,
+        emailWarning: emailMessage,
       });
       return;
     }
