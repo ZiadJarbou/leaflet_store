@@ -959,9 +959,18 @@ async function sendVerificationEmail({ email, name, verifyLink }) {
       verifyLink,
       '',
       'This link expires in 30 minutes.',
+      '',
+      'LeafletAI Team',
+      'Create smarter leaflets with AI.',
+      '',
+      'Email: info@leafletai.ai',
+      'Website: www.leafletai.ai',
+      '',
+      'LeafletAI - Design. Automate. Publish.',
     ].join('\n'),
     html: `
       <div style="font-family:Inter,Arial,sans-serif;line-height:1.55;color:#111827;max-width:560px;margin:0 auto;padding:24px;">
+        <img src="${escapeHtml(`${APP_URL}/leafletai_logo.png`)}" alt="LeafletAI" style="display:block;width:142px;max-width:100%;height:auto;margin:0 0 18px;"/>
         <h1 style="font-size:22px;margin:0 0 12px;">Verify your email</h1>
         <p>Hi ${escapeHtml(name || 'there')},</p>
         <p>Welcome to LeafletAI. Please verify your email address to unlock all features.</p>
@@ -970,6 +979,13 @@ async function sendVerificationEmail({ email, name, verifyLink }) {
         </p>
         <p style="color:#6b7280;font-size:14px;">This link expires in 30 minutes.</p>
         <p style="color:#6b7280;font-size:14px;">If the button does not work, copy and paste this link into your browser:<br>${escapeHtml(verifyLink)}</p>
+        <div style="margin-top:28px;padding-top:18px;border-top:1px solid #e5e7eb;color:#374151;font-size:14px;">
+          <p style="margin:0 0 4px;"><strong>LeafletAI Team</strong></p>
+          <p style="margin:0 0 12px;"><em>Create smarter leaflets with AI.</em></p>
+          <p style="margin:0;">&#128231; <a href="mailto:info@leafletai.ai" style="color:#0f766e;text-decoration:none;">info@leafletai.ai</a></p>
+          <p style="margin:0 0 12px;">&#127760; <a href="https://www.leafletai.ai" style="color:#0f766e;text-decoration:none;">www.leafletai.ai</a></p>
+          <p style="margin:0;"><strong>LeafletAI</strong> &mdash; Design. Automate. Publish.</p>
+        </div>
       </div>
     `,
   });
