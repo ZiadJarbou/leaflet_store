@@ -29,7 +29,7 @@ const PORT       = Number(process.env.PORT) || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || 'leafletai-dev-secret-change-in-prod';
 const DB_PATH    = path.join(__dirname, 'leafletai.db');
 
-const STRIPE_SECRET_KEY            = process.env.STRIPE_SECRET_KEY            || '';
+const STRIPE_SECRET_KEY            = envValue('STRIPE_SECRET_KEY')            || '';
 const STRIPE_WEBHOOK_SECRET        = process.env.STRIPE_WEBHOOK_SECRET        || '';
 const STRIPE_PRO_MONTHLY_PRICE_ID  = process.env.STRIPE_PRO_MONTHLY_PRICE_ID  || '';
 const STRIPE_PRO_ANNUAL_PRICE_ID   = process.env.STRIPE_PRO_ANNUAL_PRICE_ID   || '';
@@ -74,7 +74,7 @@ const SMTP_USER                    = envValue('SMTP_USER');
 const SMTP_PASS                    = smtpPasswordValue();
 const MAIL_FROM                    = envValue('MAIL_FROM') || SMTP_USER || 'LeafletAI <no-reply@leafletai.ai>';
 
-const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2024-12-18.acacia' }) : null;
+let stripe = null;
 
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
@@ -601,6 +601,7 @@ const settingDefaults = {
   free_pdf_export_limit: '1',
   support_email: '',
   announcement_banner: '',
+  stripe_secret_key: '',
   stripe_checkout_url: '',
   default_card_template_id: '',
   nano_a4_enabled: '1',
@@ -614,6 +615,18 @@ const settingDefaults = {
 };
 const insertSetting = db.prepare(`INSERT OR IGNORE INTO site_settings (key,value) VALUES (?,?)`);
 for (const [k,v] of Object.entries(settingDefaults)) insertSetting.run(k,v);
+
+function stripeSecretKeyValue() {
+  const row = db.prepare("SELECT value FROM site_settings WHERE key = 'stripe_secret_key'").get();
+  return String(row?.value || '').trim() || STRIPE_SECRET_KEY;
+}
+
+function refreshStripeClient() {
+  const secretKey = stripeSecretKeyValue();
+  stripe = secretKey ? new Stripe(secretKey, { apiVersion: '2024-12-18.acacia' }) : null;
+}
+
+refreshStripeClient();
 
 /* ── Page Content table ── */
 db.exec(`
@@ -3773,6 +3786,9 @@ app.put('/api/admin/settings', adminMiddleware, (req, res) => {
   const upsert = db.prepare('INSERT OR REPLACE INTO site_settings (key,value) VALUES (?,?)');
   const tx = db.transaction(entries => { for (const [k,v] of entries) upsert.run(k, String(v)); });
   tx(Object.entries(req.body));
+  if (Object.prototype.hasOwnProperty.call(req.body, 'stripe_secret_key')) {
+    refreshStripeClient();
+  }
   const rows = db.prepare('SELECT key,value FROM site_settings').all();
   res.json(Object.fromEntries(rows.map(r => [r.key, r.value])));
 });

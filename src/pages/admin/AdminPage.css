@@ -476,6 +476,7 @@
 .cms-settings-grid input[type=text],
 .cms-settings-grid input[type=email],
 .cms-settings-grid input[type=url],
+.cms-settings-grid input[type=password],
 .cms-settings-grid input[type=number] {
   min-height: 42px;
   background: rgba(11, 15, 30, .4);
@@ -492,18 +493,21 @@
 .cms-settings-grid input[type=text]::placeholder,
 .cms-settings-grid input[type=email]::placeholder,
 .cms-settings-grid input[type=url]::placeholder,
+.cms-settings-grid input[type=password]::placeholder,
 .cms-settings-grid input[type=number]::placeholder {
   color: rgba(234, 240, 255, .3);
 }
 .cms-settings-grid input[type=text]:hover,
 .cms-settings-grid input[type=email]:hover,
 .cms-settings-grid input[type=url]:hover,
+.cms-settings-grid input[type=password]:hover,
 .cms-settings-grid input[type=number]:hover {
   border-color: rgba(255, 255, 255, .2);
 }
 .cms-settings-grid input[type=text]:focus,
 .cms-settings-grid input[type=email]:focus,
 .cms-settings-grid input[type=url]:focus,
+.cms-settings-grid input[type=password]:focus,
 .cms-settings-grid input[type=number]:focus {
   background: rgba(11, 15, 30, .65);
   border-color: #49f2b6;

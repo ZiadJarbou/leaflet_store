@@ -49,6 +49,7 @@ interface SiteSettings {
     free_pdf_export_limit: string;
     support_email: string;
     announcement_banner: string;
+    stripe_secret_key: string;
     stripe_checkout_url: string;
     home_demo_video_url: string;
     help_video_1_url: string;
@@ -1314,6 +1315,10 @@ function AdminSettings() {
           <div className="cms-form-row">
             <label>Stripe Checkout Link</label>
             <input type="url" value={s.stripe_checkout_url || ''} placeholder="https://buy.stripe.com/..." onChange={e => setS({ ...s, stripe_checkout_url: e.target.value })}/>
+          </div>
+          <div className="cms-form-row">
+            <label>Stripe Secret Key</label>
+            <input type="password" value={s.stripe_secret_key || ''} placeholder="sk_live_..." autoComplete="off" onChange={e => setS({ ...s, stripe_secret_key: e.target.value })}/>
           </div>
         </div>
 
