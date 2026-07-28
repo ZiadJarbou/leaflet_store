@@ -3620,10 +3620,10 @@ app.put('/api/admin/users/:id', adminMiddleware, (req, res) => {
     res.status(400).json({ error: 'Invalid role' }); return;
   }
   if (role === 'admin' && !targetIsPrimaryAdmin) {
-    res.status(400).json({ error: `Only ${PRIMARY_ADMIN_EMAIL} can be an admin` }); return;
+    res.status(400).json({ error: 'This account cannot be assigned admin access' }); return;
   }
   if (targetIsPrimaryAdmin && role && role !== 'admin') {
-    res.status(400).json({ error: `Cannot remove admin role from ${PRIMARY_ADMIN_EMAIL}` }); return;
+    res.status(400).json({ error: 'Cannot remove admin access from this account' }); return;
   }
   const fields = [];
   const vals   = [];
@@ -4179,7 +4179,7 @@ app.post('/api/admin/setup', authMiddleware, (req, res) => {
   const self = db.prepare('SELECT id,email FROM users WHERE id=?').get(req.user.id);
   const isPrimaryAdmin = String(self?.email || '').trim().toLowerCase() === PRIMARY_ADMIN_EMAIL;
   if (!isPrimaryAdmin) {
-    res.status(403).json({ error: `Only ${PRIMARY_ADMIN_EMAIL} can be the admin.` }); return;
+    res.status(403).json({ error: 'This page is not available for your account.' }); return;
   }
   db.prepare('UPDATE users SET role=? WHERE lower(email) <> lower(?)').run('user', PRIMARY_ADMIN_EMAIL);
   db.prepare("UPDATE users SET role='admin' WHERE id=?").run(req.user.id);

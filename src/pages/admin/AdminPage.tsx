@@ -4,7 +4,7 @@ import { useNavigate, useLocation, Routes, Route } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getStoredToken } from '../../services/authService';
 import { PRESET_ICON_URLS } from '../../data/editorIcons';
-import { adminGetMe, adminCheck, adminSetup, adminGetStats, adminGetUsers, adminUpdateUser, adminDeleteUser, adminGetLeaflets, adminDeleteLeaflet, adminBulkDeleteLeaflets, adminGetUploads, adminDeleteUpload, adminGetSettings, adminSaveSettings, adminGetCoverTemplates, adminCreateCoverTemplate, adminDeleteCoverTemplate, adminGetPresetIcons, adminUpdatePresetIcon, adminDeletePresetIcon, adminGetIcons, adminUploadIcon, adminUpdateIcon, adminDeleteIcon, } from './adminApi';
+import { adminGetMe, adminCheck, adminGetStats, adminGetUsers, adminUpdateUser, adminDeleteUser, adminGetLeaflets, adminDeleteLeaflet, adminBulkDeleteLeaflets, adminGetUploads, adminDeleteUpload, adminGetSettings, adminSaveSettings, adminGetCoverTemplates, adminCreateCoverTemplate, adminDeleteCoverTemplate, adminGetPresetIcons, adminUpdatePresetIcon, adminDeletePresetIcon, adminGetIcons, adminUploadIcon, adminUpdateIcon, adminDeleteIcon, } from './adminApi';
 import AdminSEO from './AdminSEO';
 import AdminBackup from './AdminBackup';
 import AdminPages from './AdminPages';
@@ -1382,37 +1382,17 @@ function AdminSettings() {
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    SETUP SCREEN â€” shown when no admin exists yet
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-function AdminSetup({ onDone }: {
-    onDone: () => void;
-}) {
-    const [busy, setBusy] = useState(false);
-    const [err, setErr] = useState('');
-    async function promote() {
-        setBusy(true);
-        setErr('');
-        try {
-            await adminSetup();
-            onDone();
-        }
-        catch (e: any) {
-            setErr(e.message);
-        }
-        finally {
-            setBusy(false);
-        }
-    }
+function AdminSetup() {
+    const navigate = useNavigate();
     return (<div className="cms-splash-center">
       <div className="cms-setup-box">
         <div className="cms-setup-icon">shield</div>
-        <h2 className="cms-setup-title">Admin Setup</h2>
+        <h2 className="cms-setup-title">Page Not Available</h2>
         <p className="cms-setup-desc">
-          No admin account exists yet.<br />
-          Click below to grant yourself admin access.<br />
-          <span className="cms-setup-note">This option disappears once an admin is created.</span>
+          This page is not available for your account.
         </p>
-        {err && <div className="cms-error">{err}</div>}
-        <button className="cms-btn cms-btn-primary cms-setup-btn" onClick={promote} disabled={busy}>
-          {busy ? 'Activatingâ€¦' : 'Make Me Admin'}
+        <button className="cms-btn cms-btn-primary cms-setup-btn" onClick={() => navigate('/')}>
+          Back to App
         </button>
       </div>
     </div>);
@@ -1498,7 +1478,7 @@ export default function AdminPage() {
     if (boot === 'forbidden')
         return <AdminForbidden />;
     if (boot === 'setup')
-        return <AdminSetup onDone={checkAccess}/>;
+        return <AdminSetup />;
     return (<div className="cms-root">
       <Sidebar active={active}/>
       <main className="cms-main">
