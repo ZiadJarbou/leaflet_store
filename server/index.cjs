@@ -479,13 +479,13 @@ const PLATFORM_DEFAULT_TEMPLATE_NAMES = Array.from({ length: 7 }, (_, i) => `Tem
 const PLATFORM_DEFAULT_TEMPLATE_ORDER_SQL = PLATFORM_DEFAULT_TEMPLATE_NAMES
   .map((name, i) => `WHEN lower(name) = '${name.toLowerCase()}' THEN ${i + 1}`)
   .join(' ');
+const PRIMARY_ADMIN_EMAIL = 'ziad.jarbou@gmail.com';
 function isAdminUser(userId) {
-  const row = db.prepare('SELECT role FROM users WHERE id = ?').get(userId);
-  return row?.role === 'admin';
+  const row = db.prepare('SELECT email FROM users WHERE id = ?').get(userId);
+  return String(row?.email || '').trim().toLowerCase() === PRIMARY_ADMIN_EMAIL;
 }
 function isUnlimitedUser(user) {
-  return user?.role === 'admin'
-    || String(user?.email || '').trim().toLowerCase() === 'ziad.jarbou@gmail.com';
+  return String(user?.email || '').trim().toLowerCase() === PRIMARY_ADMIN_EMAIL;
 }
 
 if (!hasMigration('platform_default_card_templates_v1')) {
@@ -506,7 +506,7 @@ if (!userCols.includes('subscription_status')) db.exec("ALTER TABLE users ADD CO
 if (!userCols.includes('subscription_period')) db.exec("ALTER TABLE users ADD COLUMN subscription_period TEXT NOT NULL DEFAULT 'monthly'");
 if (!userCols.includes('subscription_end'))    db.exec("ALTER TABLE users ADD COLUMN subscription_end TEXT");
 if (!userCols.includes('role'))                db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
-db.prepare("UPDATE users SET role = 'admin' WHERE lower(email) = lower(?)").run('ziad.jarbou@gmail.com');
+db.prepare("UPDATE users SET role = CASE WHEN lower(email) = lower(?) THEN 'admin' ELSE 'user' END").run(PRIMARY_ADMIN_EMAIL);
 
 // one-time free exports
 try { db.prepare("ALTER TABLE users ADD COLUMN free_pdf_used INTEGER DEFAULT 0").run(); } catch(e) {}
@@ -1088,9 +1088,13 @@ function authMiddleware(req, res, next) {
 /* ── Admin middleware ── */
 function adminMiddleware(req, res, next) {
   authMiddleware(req, res, () => {
-    const row = db.prepare('SELECT role FROM users WHERE id=?').get(req.user.id);
-    if (!row || row.role !== 'admin') {
+    const row = db.prepare('SELECT email, role FROM users WHERE id=?').get(req.user.id);
+    const isPrimaryAdmin = String(row?.email || '').trim().toLowerCase() === PRIMARY_ADMIN_EMAIL;
+    if (!isPrimaryAdmin) {
       res.status(403).json({ error: 'Forbidden: admin only' }); return;
+    }
+    if (row.role !== 'admin') {
+      db.prepare("UPDATE users SET role='admin' WHERE id=?").run(req.user.id);
     }
     next();
   });
@@ -3607,8 +3611,19 @@ app.get('/api/admin/users', adminMiddleware, (req, res) => {
 app.put('/api/admin/users/:id', adminMiddleware, (req, res) => {
   const { role, subscription_plan, subscription_status, email_verified } = req.body;
   const id = Number(req.params.id);
-  if (id === req.user.id && role && role !== 'admin') {
-    res.status(400).json({ error: 'Cannot remove your own admin role' }); return;
+  const target = db.prepare('SELECT id,email FROM users WHERE id=?').get(id);
+  if (!target) {
+    res.status(404).json({ error: 'User not found' }); return;
+  }
+  const targetIsPrimaryAdmin = String(target.email || '').trim().toLowerCase() === PRIMARY_ADMIN_EMAIL;
+  if (role !== undefined && !['admin', 'user'].includes(String(role))) {
+    res.status(400).json({ error: 'Invalid role' }); return;
+  }
+  if (role === 'admin' && !targetIsPrimaryAdmin) {
+    res.status(400).json({ error: `Only ${PRIMARY_ADMIN_EMAIL} can be an admin` }); return;
+  }
+  if (targetIsPrimaryAdmin && role && role !== 'admin') {
+    res.status(400).json({ error: `Cannot remove admin role from ${PRIMARY_ADMIN_EMAIL}` }); return;
   }
   const fields = [];
   const vals   = [];
@@ -4151,7 +4166,7 @@ app.put('/api/admin/seo/:id', adminMiddleware, (req, res) => {
   res.json(updated);
 });
 app.get('/api/admin/check', (req, res) => {
-  const hasAdmin = !!db.prepare("SELECT id FROM users WHERE role='admin' LIMIT 1").get();
+  const hasAdmin = !!db.prepare('SELECT id FROM users WHERE lower(email)=lower(?) LIMIT 1').get(PRIMARY_ADMIN_EMAIL);
   res.json({ hasAdmin });
 });
 app.get('/api/admin/me', adminMiddleware, (req, res) => {
@@ -4159,10 +4174,14 @@ app.get('/api/admin/me', adminMiddleware, (req, res) => {
   res.json(user);
 });
 
-/* ── POST /api/admin/setup ── promote self to admin ONLY when no admin exists ── */
+/* ── POST /api/admin/setup ── promote only the primary admin account ── */
 app.post('/api/admin/setup', authMiddleware, (req, res) => {
-  const existingAdmin = db.prepare("SELECT id FROM users WHERE role='admin'").get();
-  if (existingAdmin) { res.status(403).json({ error: 'An admin already exists. Contact your admin.' }); return; }
+  const self = db.prepare('SELECT id,email FROM users WHERE id=?').get(req.user.id);
+  const isPrimaryAdmin = String(self?.email || '').trim().toLowerCase() === PRIMARY_ADMIN_EMAIL;
+  if (!isPrimaryAdmin) {
+    res.status(403).json({ error: `Only ${PRIMARY_ADMIN_EMAIL} can be the admin.` }); return;
+  }
+  db.prepare('UPDATE users SET role=? WHERE lower(email) <> lower(?)').run('user', PRIMARY_ADMIN_EMAIL);
   db.prepare("UPDATE users SET role='admin' WHERE id=?").run(req.user.id);
   const user = db.prepare('SELECT id,name,email,role FROM users WHERE id=?').get(req.user.id);
   res.json({ ok: true, user });
