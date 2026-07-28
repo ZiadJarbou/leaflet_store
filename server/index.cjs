@@ -3098,6 +3098,34 @@ app.get('/api/stripe/localized-pricing', async (req, res) => {
   }
 });
 
+function isStripeMissingCustomerError(err) {
+  const message = err instanceof Error ? err.message : String(err || '');
+  return err?.code === 'resource_missing'
+    && (err?.param === 'customer' || /No such customer/i.test(message));
+}
+
+async function getOrCreateStripeCustomer(user) {
+  let customerId = user?.stripe_customer_id || '';
+  if (customerId) {
+    try {
+      const existing = await stripe.customers.retrieve(customerId);
+      if (!existing?.deleted) return customerId;
+    } catch (err) {
+      if (!isStripeMissingCustomerError(err)) throw err;
+      console.warn('[stripe] clearing missing customer id', { userId: user.id, customerId });
+    }
+    db.prepare('UPDATE users SET stripe_customer_id = NULL WHERE id = ?').run(user.id);
+  }
+
+  const customer = await stripe.customers.create({
+    email: user.email,
+    name: user.name,
+    metadata: { userId: String(user.id) },
+  });
+  db.prepare('UPDATE users SET stripe_customer_id = ? WHERE id = ?').run(customer.id, user.id);
+  return customer.id;
+}
+
 app.post('/api/stripe/create-checkout-session', authMiddleware, async (req, res) => {
   if (!stripe) {
     const configuredCheckoutUrl = getSetting('stripe_checkout_url', '').trim();
@@ -3146,12 +3174,7 @@ app.post('/api/stripe/create-checkout-session', authMiddleware, async (req, res)
 
   const user = db.prepare('SELECT id, email, name, stripe_customer_id FROM users WHERE id = ?').get(req.user.id);
 
-  let customerId = user.stripe_customer_id;
-  if (!customerId) {
-    const customer = await stripe.customers.create({ email: user.email, name: user.name, metadata: { userId: String(user.id) } });
-    customerId = customer.id;
-    db.prepare('UPDATE users SET stripe_customer_id = ? WHERE id = ?').run(customerId, user.id);
-  }
+  const customerId = await getOrCreateStripeCustomer(user);
 
   const session = await stripe.checkout.sessions.create({
     customer:             customerId,
@@ -3207,11 +3230,20 @@ app.post('/api/stripe/create-portal-session', authMiddleware, async (req, res) =
     res.status(400).json({ error: 'No active subscription found.' });
     return;
   }
-  const portalSession = await stripe.billingPortal.sessions.create({
-    customer:   user.stripe_customer_id,
-    return_url: `${APP_URL}/pricing`,
-  });
-  res.json({ url: portalSession.url });
+  try {
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer:   user.stripe_customer_id,
+      return_url: `${APP_URL}/pricing`,
+    });
+    res.json({ url: portalSession.url });
+  } catch (err) {
+    if (isStripeMissingCustomerError(err)) {
+      db.prepare('UPDATE users SET stripe_customer_id = NULL WHERE id = ?').run(req.user.id);
+      res.status(400).json({ error: 'Your saved Stripe customer was not found in the active Stripe account. Start checkout again to create a fresh customer.' });
+      return;
+    }
+    throw err;
+  }
 });
 
 /* ── Global JSON error handler ── */
