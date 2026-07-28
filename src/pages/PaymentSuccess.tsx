@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import SEOHelmet from '../components/SEOHelmet';
 import Footer from '../components/Footer';
 import { Link, useSearchParams } from 'react-router-dom';
-import { getSubscription, type SubscriptionInfo } from '../services/api';
+import { confirmCheckoutSession, getSubscription, type SubscriptionInfo } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import './PaymentSuccess.css';
 
@@ -12,26 +12,56 @@ export default function PaymentSuccess() {
   const sessionId         = searchParams.get('session_id');
   const [sub, setSub]     = useState<SubscriptionInfo | null>(null);
   const [dots, setDots]   = useState('');
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     if (!user) return;
     let attempts = 0;
+    let stopped = false;
+    async function refreshSubscription() {
+      const info = await getSubscription();
+      if (info.subscription_plan !== 'free') {
+        setSub(info);
+        return true;
+      }
+      return false;
+    }
+    async function confirmSession() {
+      if (!sessionId) return;
+      try {
+        const confirmed = await confirmCheckoutSession(sessionId);
+        if (confirmed.confirmed && confirmed.subscription_plan !== 'free') {
+          setSub(confirmed);
+          stopped = true;
+        }
+      } catch (e) {
+        setNotice(e instanceof Error ? e.message : 'Payment confirmation is still processing.');
+      }
+    }
+    void confirmSession();
     const interval = setInterval(async () => {
+      if (stopped) {
+        clearInterval(interval);
+        return;
+      }
       attempts++;
       setDots('.'.repeat((attempts % 3) + 1));
       try {
-        const info = await getSubscription();
-        if (info.subscription_plan !== 'free') {
-          setSub(info);
+        const done = await refreshSubscription();
+        if (done) {
+          stopped = true;
           clearInterval(interval);
         }
       } catch {
         /* retry */
       }
-      if (attempts >= 10) clearInterval(interval);
+      if (attempts >= 8) {
+        clearInterval(interval);
+        setNotice('Stripe accepted the payment, but the subscription update is taking longer than expected. Refresh this page in a moment.');
+      }
     }, 1500);
-    return () => clearInterval(interval);
-  }, [user]);
+    return () => { stopped = true; clearInterval(interval); };
+  }, [sessionId, user]);
 
   const planName = sub
     ? sub.subscription_plan.charAt(0).toUpperCase() + sub.subscription_plan.slice(1)
@@ -63,6 +93,7 @@ export default function PaymentSuccess() {
             <div className="ps-spinner" />
             <h1 className="ps-title">Confirming your payment{dots}</h1>
             <p className="ps-sub">This usually takes just a few seconds.</p>
+            {notice && <p className="ps-notice">{notice}</p>}
           </>
         )}
       </div>

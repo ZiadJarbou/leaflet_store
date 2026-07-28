@@ -748,6 +748,13 @@ export async function createCheckoutSession(plan: 'pro' | 'business', period: 'm
   return url;
 }
 
+export function confirmCheckoutSession(sessionId: string): Promise<SubscriptionInfo & { confirmed: boolean }> {
+  return request<SubscriptionInfo & { confirmed: boolean }>('/stripe/confirm-session', {
+    method: 'POST',
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+}
+
 export function getLocalizedPricing(): Promise<LocalizedPricing> {
   const { locale, country } = detectBillingLocale();
   const params = new URLSearchParams();

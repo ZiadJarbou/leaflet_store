@@ -3064,6 +3064,74 @@ app.get('/api/stripe/subscription', authMiddleware, (req, res) => {
   });
 });
 
+app.post('/api/stripe/confirm-session', authMiddleware, async (req, res) => {
+  if (!stripe) { res.status(503).json({ error: 'Stripe not configured' }); return; }
+  const sessionId = String(req.body?.session_id || '').trim();
+  if (!sessionId || !sessionId.startsWith('cs_')) {
+    res.status(400).json({ error: 'Valid Stripe session_id is required.' });
+    return;
+  }
+
+  try {
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ['subscription'],
+    });
+    const sessionUserId = String(session.metadata?.userId || '');
+    if (sessionUserId && sessionUserId !== String(req.user.id)) {
+      res.status(403).json({ error: 'This checkout session does not belong to the current user.' });
+      return;
+    }
+
+    if (session.payment_status !== 'paid' && session.status !== 'complete') {
+      res.json({ confirmed: false, status: session.status || '', payment_status: session.payment_status || '' });
+      return;
+    }
+
+    const subscription = session.subscription && typeof session.subscription === 'object'
+      ? session.subscription
+      : null;
+    const priceId = subscription?.items?.data?.[0]?.price?.id || '';
+    const resolved = resolveStripePlanFromPriceId(priceId) || {
+      plan: session.metadata?.plan || 'pro',
+      period: session.metadata?.period || 'monthly',
+    };
+    const subscriptionStatus = subscription?.status === 'active' || subscription?.status === 'trialing'
+      ? 'active'
+      : (subscription?.status || 'active');
+    const endDate = subscription?.current_period_end
+      ? new Date(subscription.current_period_end * 1000).toISOString()
+      : null;
+
+    db.prepare(`
+      UPDATE users
+      SET stripe_customer_id = COALESCE(?, stripe_customer_id),
+          subscription_plan = ?,
+          subscription_status = ?,
+          subscription_period = ?,
+          subscription_end = ?
+      WHERE id = ?
+    `).run(
+      session.customer || null,
+      resolved.plan,
+      subscriptionStatus,
+      resolved.period,
+      endDate,
+      req.user.id,
+    );
+
+    res.json({
+      confirmed: true,
+      subscription_plan: resolved.plan,
+      subscription_status: subscriptionStatus,
+      subscription_period: resolved.period,
+      subscription_end: endDate,
+    });
+  } catch (err) {
+    console.error('[stripe-confirm-session] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to confirm Stripe checkout session.' });
+  }
+});
+
 /* ── POST /api/stripe/create-checkout-session ── */
 app.get('/api/stripe/localized-pricing', async (req, res) => {
   const queryCountry = normalizeCountryCode(req.query.country);

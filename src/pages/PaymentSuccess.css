@@ -61,6 +61,17 @@
 }
 .ps-sub strong { color: var(--brand); }
 
+.ps-notice {
+  font-size: .85rem;
+  color: #facc15;
+  background: rgba(250, 204, 21, .08);
+  border: 1px solid rgba(250, 204, 21, .22);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0;
+  line-height: 1.5;
+}
+
 .ps-session {
   font-size: .75rem;
   color: var(--muted2);
