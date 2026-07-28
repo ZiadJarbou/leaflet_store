@@ -12,6 +12,7 @@ import AdminHelpCenter from './AdminHelpCenter';
 import AdminCardTemplates from './AdminCardTemplates';
 import LeafletView from '../LeafletView';
 import './AdminPage.css';
+const PRIMARY_ADMIN_EMAIL = 'ziad.jarbou@gmail.com';
 const NANO_A4_VISIBILITY_STORAGE_KEY = 'leafletai_nano_a4_enabled';
 /* â”€â”€ types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 interface AdminUser {
@@ -1424,10 +1425,9 @@ function AdminForbidden() {
     return (<div className="cms-splash-center">
       <div className="cms-setup-box">
         <div className="cms-setup-icon">block</div>
-        <h2 className="cms-setup-title">Access Denied</h2>
+        <h2 className="cms-setup-title">Page Not Available</h2>
         <p className="cms-setup-desc">
-          Your account does not have admin privileges.<br />
-          Ask an existing admin to grant you access.
+          This page is not available for your account.
         </p>
         <button className="cms-btn cms-btn-primary" onClick={() => navigate('/')}>
           Back to App
@@ -1482,6 +1482,10 @@ export default function AdminPage() {
             return;
         if (!user) {
             setBoot('no-session');
+            return;
+        }
+        if (user.email.trim().toLowerCase() !== PRIMARY_ADMIN_EMAIL) {
+            setBoot('forbidden');
             return;
         }
         checkAccess();
