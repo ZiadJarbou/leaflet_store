@@ -89,7 +89,7 @@ function FeatureValue({ val }: { val: string | boolean }) {
 }
 
 export default function PricingPage() {
-  const [annual, setAnnual]           = useState(true);
+  const [annual, setAnnual]           = useState(false);
   const [loading, setLoading]         = useState<string | null>(null);
   const [errorMsg, setErrorMsg]       = useState('');
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);

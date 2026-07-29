@@ -88,7 +88,7 @@ const DEFAULT_FAQ = [
 export default function HomePage() {
     const { user, openAuthModal, closeAuthModal } = useAuth();
     const [demoOpen, setDemoOpen] = useState(false);
-    const [annual, setAnnual] = useState(true);
+    const [annual, setAnnual] = useState(false);
     const [ctaLoading, setCtaLoading] = useState<string | null>(null);
     const [pricingError, setPricingError] = useState('');
     const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
