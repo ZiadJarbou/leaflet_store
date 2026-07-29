@@ -1010,7 +1010,9 @@ async function sendVerificationEmail({ email, name, verifyLink }) {
     ].join('\n'),
     html: `
       <div style="font-family:Inter,Arial,sans-serif;line-height:1.55;color:#111827;max-width:560px;margin:0 auto;padding:24px;">
-        <img src="${escapeHtml(`${APP_URL}/leafletai_logo.png`)}" alt="LeafletAI" style="display:block;width:142px;max-width:100%;height:auto;margin:0 0 18px;"/>
+        <a href="${escapeHtml(APP_URL)}" style="display:inline-block;margin:0 0 18px;text-decoration:none;">
+          <img src="${escapeHtml(`${APP_URL}/leafletai_logo.png`)}" alt="LeafletAI" style="display:block;width:142px;max-width:100%;height:auto;border:0;"/>
+        </a>
         <h1 style="font-size:22px;margin:0 0 12px;">Verify your email</h1>
         <p>Hi ${escapeHtml(name || 'there')},</p>
         <p>Welcome to LeafletAI. Please verify your email address to unlock all features.</p>
@@ -1120,7 +1122,9 @@ async function sendSubscriptionDetailsEmail(userId, details) {
     ].join('\n'),
     html: `
       <div style="font-family:Inter,Arial,sans-serif;line-height:1.55;color:#111827;max-width:600px;margin:0 auto;padding:24px;">
-        <img src="${escapeHtml(`${APP_URL}/leafletai_logo.png`)}" alt="LeafletAI" style="display:block;width:142px;max-width:100%;height:auto;margin:0 0 18px;"/>
+        <a href="${escapeHtml(APP_URL)}" style="display:inline-block;margin:0 0 18px;text-decoration:none;">
+          <img src="${escapeHtml(`${APP_URL}/leafletai_logo.png`)}" alt="LeafletAI" style="display:block;width:142px;max-width:100%;height:auto;border:0;"/>
+        </a>
         <h1 style="font-size:22px;margin:0 0 12px;">Your subscription details</h1>
         <p>Hi ${escapeHtml(user.name || 'there')},</p>
         <p>Your LeafletAI subscription is active. Here are the details for your account.</p>
