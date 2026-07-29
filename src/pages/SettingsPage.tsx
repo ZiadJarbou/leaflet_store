@@ -7,6 +7,18 @@ import { useAuth } from '../context/AuthContext';
 import { updateProfile, changePassword, deleteAccount, createPortalSession, getSubscription, type SubscriptionInfo } from '../services/api';
 import './SettingsPage.css';
 type Tab = 'profile' | 'security' | 'subscription';
+function formatSubscriptionDate(value: string | null) {
+    if (!value)
+        return 'Not available';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime()))
+        return 'Not available';
+    return new Intl.DateTimeFormat(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+    }).format(date);
+}
 function Toast({ msg, type, onClose }: {
     msg: string;
     type: 'success' | 'error';
@@ -137,6 +149,7 @@ export default function SettingsPage() {
     const initial = user.name.charAt(0).toUpperCase();
     const PLAN_COLOR: Record<string, string> = { free: '#64748b', pro: '#49f2b6', business: '#7c5cff' };
     const planColor = PLAN_COLOR[sub?.subscription_plan ?? 'free'];
+    const hasPaidSubscription = sub?.subscription_plan === 'pro' || sub?.subscription_plan === 'business';
     return (<>
       <SEOHelmet pageKey="settings"/>
       <div className="st-page container">
@@ -264,6 +277,17 @@ export default function SettingsPage() {
                         </div>)}
                     </div>
                   </div>
+
+                  {hasPaidSubscription && (<div className="st-sub-dates" aria-label="Subscription dates">
+                    <div className="st-sub-date-item">
+                      <span className="st-sub-date-label">Subscription date</span>
+                      <strong>{formatSubscriptionDate(sub.subscription_start)}</strong>
+                    </div>
+                    <div className="st-sub-date-item">
+                      <span className="st-sub-date-label">End date</span>
+                      <strong>{formatSubscriptionDate(sub.subscription_end)}</strong>
+                    </div>
+                  </div>)}
 
                   <div className="st-sub-features">
                     {[

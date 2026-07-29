@@ -143,6 +143,21 @@
 .st-sub-status--active    { background: rgba(73,242,182,.15); color: var(--brand); }
 .st-sub-status--cancelled { background: rgba(239,68,68,.12); color: #fca5a5; }
 
+.st-sub-dates {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;
+}
+.st-sub-date-item {
+  border: 1px solid var(--border); border-radius: 10px; background: rgba(255,255,255,.03);
+  padding: 12px 14px; min-width: 0;
+}
+.st-sub-date-label {
+  display: block; color: var(--muted2); font-size: .72rem; font-weight: 700; text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.st-sub-date-item strong {
+  display: block; color: var(--text); font-size: .94rem; line-height: 1.25;
+}
+
 .st-sub-features {
   display: flex; flex-direction: column; gap: 0;
   background: rgba(255,255,255,.03); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
@@ -235,6 +250,10 @@
 
   .st-sub-plan-row {
     align-items: flex-start;
+  }
+
+  .st-sub-dates {
+    grid-template-columns: 1fr;
   }
 
   .st-sub-feat-row {

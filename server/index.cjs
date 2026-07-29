@@ -504,8 +504,21 @@ if (!userCols.includes('stripe_customer_id'))  db.exec("ALTER TABLE users ADD CO
 if (!userCols.includes('subscription_plan'))   db.exec("ALTER TABLE users ADD COLUMN subscription_plan TEXT NOT NULL DEFAULT 'free'");
 if (!userCols.includes('subscription_status')) db.exec("ALTER TABLE users ADD COLUMN subscription_status TEXT NOT NULL DEFAULT 'active'");
 if (!userCols.includes('subscription_period')) db.exec("ALTER TABLE users ADD COLUMN subscription_period TEXT NOT NULL DEFAULT 'monthly'");
+if (!userCols.includes('subscription_start'))  db.exec("ALTER TABLE users ADD COLUMN subscription_start TEXT");
 if (!userCols.includes('subscription_end'))    db.exec("ALTER TABLE users ADD COLUMN subscription_end TEXT");
 if (!userCols.includes('role'))                db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
+db.prepare(`
+  UPDATE users
+  SET subscription_start = COALESCE(
+    subscription_start,
+    CASE
+      WHEN subscription_end IS NOT NULL AND subscription_period = 'annual' THEN datetime(subscription_end, '-1 year')
+      WHEN subscription_end IS NOT NULL THEN datetime(subscription_end, '-1 month')
+      ELSE created_at
+    END
+  )
+  WHERE subscription_plan <> 'free'
+`).run();
 db.prepare("UPDATE users SET role = CASE WHEN lower(email) = lower(?) THEN 'admin' ELSE 'user' END").run(PRIMARY_ADMIN_EMAIL);
 
 // one-time free exports
@@ -816,7 +829,8 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           SET stripe_customer_id = COALESCE(?, stripe_customer_id),
               subscription_plan   = ?,
               subscription_status = 'active',
-              subscription_period = ?
+              subscription_period = ?,
+              subscription_start  = COALESCE(subscription_start, datetime('now'))
           WHERE id = ?
         `).run(customerId || null, plan, period || 'monthly', parseInt(userId, 10));
         console.log(`[webhook] checkout.session.completed — user ${userId} → ${plan}/${period}`);
@@ -835,6 +849,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           ? { plan: sub.metadata.plan, period: sub.metadata.period || 'monthly' }
           : null
       );
+      const startDate  = toIso(sub.current_period_start || sub.start_date || sub.created);
       const endDate    = toIso(sub.current_period_end);
 
       if (resolved) {
@@ -844,9 +859,10 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           SET subscription_plan   = ?,
               subscription_status = ?,
               subscription_period = ?,
+              subscription_start  = COALESCE(subscription_start, ?),
               subscription_end    = ?
           WHERE stripe_customer_id = ?
-        `).run(resolved.plan, status, resolved.period, endDate, customerId);
+        `).run(resolved.plan, status, resolved.period, startDate, endDate, customerId);
         console.log(`[webhook] ${event.type} — customer ${customerId} → ${resolved.plan}/${resolved.period} status=${status}`);
       } else {
         /* status-only update (e.g. past_due, unpaid) */
@@ -2943,7 +2959,7 @@ app.get('/api/user/stats', authMiddleware, (req, res) => {
     WHERE user_id = ? ORDER BY created_at DESC LIMIT 6
   `).all(req.user.id);
   const user = db.prepare(
-    'SELECT email, role, subscription_plan, subscription_status, subscription_period, subscription_end, created_at FROM users WHERE id = ?'
+    'SELECT email, role, subscription_plan, subscription_status, subscription_period, subscription_start, subscription_end, created_at FROM users WHERE id = ?'
   ).get(req.user.id);
   const firstLeaflet = db.prepare(`
     SELECT created_at FROM leaflets WHERE user_id = ? ORDER BY created_at ASC LIMIT 1
@@ -2956,6 +2972,7 @@ app.get('/api/user/stats', authMiddleware, (req, res) => {
     subscription_plan:    unlimited ? 'admin' : (user?.subscription_plan ?? 'free'),
     subscription_status:  user?.subscription_status  ?? 'active',
     subscription_period:  user?.subscription_period  ?? 'monthly',
+    subscription_start:   user?.subscription_start   ?? null,
     subscription_end:     user?.subscription_end     ?? null,
     member_since:         user?.created_at           ?? firstLeaflet?.created_at ?? null,
     unlimited,
@@ -3053,16 +3070,17 @@ app.post('/api/user/consume-export', authMiddleware, (req, res) => {
 /* ── GET /api/stripe/subscription ── returns current user plan ── */
 app.get('/api/stripe/subscription', authMiddleware, (req, res) => {
   const row = db.prepare(
-    'SELECT email, role, subscription_plan, subscription_status, subscription_period, subscription_end FROM users WHERE id = ?'
+    'SELECT email, role, subscription_plan, subscription_status, subscription_period, subscription_start, subscription_end FROM users WHERE id = ?'
   ).get(req.user.id);
   if (!row) {
-    res.json({ subscription_plan: 'free', subscription_status: 'active', subscription_period: 'monthly', subscription_end: null, unlimited: false });
+    res.json({ subscription_plan: 'free', subscription_status: 'active', subscription_period: 'monthly', subscription_start: null, subscription_end: null, unlimited: false });
     return;
   }
   res.json({
     subscription_plan: isUnlimitedUser(row) ? 'admin' : (row.subscription_plan || 'free'),
     subscription_status: row.subscription_status || 'active',
     subscription_period: row.subscription_period || 'monthly',
+    subscription_start: row.subscription_start ?? null,
     subscription_end: row.subscription_end ?? null,
     unlimited: isUnlimitedUser(row),
   });
@@ -3105,6 +3123,9 @@ app.post('/api/stripe/confirm-session', authMiddleware, async (req, res) => {
     const endDate = subscription?.current_period_end
       ? new Date(subscription.current_period_end * 1000).toISOString()
       : null;
+    const startDate = subscription?.current_period_start || subscription?.start_date || subscription?.created
+      ? new Date((subscription.current_period_start || subscription.start_date || subscription.created) * 1000).toISOString()
+      : null;
 
     db.prepare(`
       UPDATE users
@@ -3112,6 +3133,7 @@ app.post('/api/stripe/confirm-session', authMiddleware, async (req, res) => {
           subscription_plan = ?,
           subscription_status = ?,
           subscription_period = ?,
+          subscription_start = COALESCE(subscription_start, ?),
           subscription_end = ?
       WHERE id = ?
     `).run(
@@ -3119,6 +3141,7 @@ app.post('/api/stripe/confirm-session', authMiddleware, async (req, res) => {
       resolved.plan,
       subscriptionStatus,
       resolved.period,
+      startDate,
       endDate,
       req.user.id,
     );
@@ -3128,6 +3151,7 @@ app.post('/api/stripe/confirm-session', authMiddleware, async (req, res) => {
       subscription_plan: resolved.plan,
       subscription_status: subscriptionStatus,
       subscription_period: resolved.period,
+      subscription_start: startDate,
       subscription_end: endDate,
     });
   } catch (err) {

@@ -644,6 +644,7 @@ export interface SubscriptionInfo {
   subscription_plan:    'free' | 'pro' | 'business' | 'admin';
   subscription_status:  'active' | 'cancelled' | 'past_due';
   subscription_period:  'monthly' | 'annual';
+  subscription_start:   string | null;
   subscription_end:     string | null;
   unlimited?:           boolean;
 }
@@ -781,6 +782,7 @@ export interface UserStats {
   subscription_plan:   'free' | 'pro' | 'business' | 'admin';
   subscription_status: string;
   subscription_period: 'monthly' | 'annual';
+  subscription_start:  string | null;
   subscription_end:    string | null;
   member_since:        string | null;
   unlimited?:          boolean;
