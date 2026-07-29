@@ -506,6 +506,7 @@ if (!userCols.includes('subscription_status')) db.exec("ALTER TABLE users ADD CO
 if (!userCols.includes('subscription_period')) db.exec("ALTER TABLE users ADD COLUMN subscription_period TEXT NOT NULL DEFAULT 'monthly'");
 if (!userCols.includes('subscription_start'))  db.exec("ALTER TABLE users ADD COLUMN subscription_start TEXT");
 if (!userCols.includes('subscription_end'))    db.exec("ALTER TABLE users ADD COLUMN subscription_end TEXT");
+if (!userCols.includes('subscription_email_key')) db.exec("ALTER TABLE users ADD COLUMN subscription_email_key TEXT");
 if (!userCols.includes('role'))                db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
 db.prepare(`
   UPDATE users
@@ -863,6 +864,16 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
               subscription_end    = ?
           WHERE stripe_customer_id = ?
         `).run(resolved.plan, status, resolved.period, startDate, endDate, customerId);
+        const paidUser = db.prepare('SELECT id, subscription_start FROM users WHERE stripe_customer_id = ?').get(customerId);
+        if (paidUser) {
+          sendSubscriptionDetailsEmail(paidUser.id, {
+            plan: resolved.plan,
+            period: resolved.period,
+            status,
+            startDate: paidUser.subscription_start || startDate,
+            endDate,
+          }).catch(err => console.error('[subscription-email] failed:', err instanceof Error ? err.message : err));
+        }
         console.log(`[webhook] ${event.type} — customer ${customerId} → ${resolved.plan}/${resolved.period} status=${status}`);
       } else {
         /* status-only update (e.g. past_due, unpaid) */
@@ -1020,6 +1031,126 @@ async function sendVerificationEmail({ email, name, verifyLink }) {
   });
   console.log('[verify-email] sent', {
     to: email,
+    messageId: info.messageId,
+    accepted: info.accepted,
+    rejected: info.rejected,
+    response: info.response,
+  });
+  return true;
+}
+function formatEmailDate(value) {
+  if (!value) return 'Not available';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Not available';
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
+}
+function titleCase(value) {
+  return String(value || '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+function subscriptionEmailKey(details) {
+  return [
+    details.plan,
+    details.period,
+    details.status,
+    details.startDate || '',
+    details.endDate || '',
+  ].join('|');
+}
+async function sendSubscriptionDetailsEmail(userId, details) {
+  const plan = String(details?.plan || '').toLowerCase();
+  if (!['pro', 'business'].includes(plan)) return false;
+
+  const user = db.prepare('SELECT id,name,email,subscription_email_key FROM users WHERE id = ?').get(userId);
+  if (!user?.email) return false;
+
+  const emailKey = subscriptionEmailKey({ ...details, plan });
+  if (user.subscription_email_key === emailKey) {
+    console.log('[subscription-email] already sent', { userId, emailKey });
+    return false;
+  }
+
+  const mailer = createMailer();
+  if (!mailer) {
+    console.warn('[subscription-email] SMTP not configured', { userId, email: user.email });
+    return false;
+  }
+
+  const planLabel = `${titleCase(plan)} Plan`;
+  const periodLabel = String(details.period || 'monthly') === 'annual' ? 'Annual' : 'Monthly';
+  const statusLabel = titleCase(details.status || 'active');
+  const startLabel = formatEmailDate(details.startDate);
+  const endLabel = formatEmailDate(details.endDate);
+  const settingsUrl = `${APP_URL}/settings`;
+  const rows = [
+    ['Plan', planLabel],
+    ['Billing period', periodLabel],
+    ['Status', statusLabel],
+    ['Subscription date', startLabel],
+    ['End date', endLabel],
+    ['Account email', user.email],
+  ];
+
+  const info = await mailer.sendMail({
+    from: MAIL_FROM,
+    to: user.email,
+    subject: `Your LeafletAI ${planLabel} subscription details`,
+    text: [
+      `Hi ${user.name || 'there'},`,
+      '',
+      'Your LeafletAI subscription is active. Here are the details:',
+      '',
+      ...rows.map(([label, value]) => `${label}: ${value}`),
+      '',
+      `Manage your subscription and invoices: ${settingsUrl}`,
+      '',
+      'LeafletAI Team',
+      'Create smarter leaflets with AI.',
+      '',
+      'Email: info@leafletai.ai',
+      'Website: www.leafletai.ai',
+      '',
+      'LeafletAI - Design. Automate. Publish.',
+    ].join('\n'),
+    html: `
+      <div style="font-family:Inter,Arial,sans-serif;line-height:1.55;color:#111827;max-width:600px;margin:0 auto;padding:24px;">
+        <img src="${escapeHtml(`${APP_URL}/leafletai_logo.png`)}" alt="LeafletAI" style="display:block;width:142px;max-width:100%;height:auto;margin:0 0 18px;"/>
+        <h1 style="font-size:22px;margin:0 0 12px;">Your subscription details</h1>
+        <p>Hi ${escapeHtml(user.name || 'there')},</p>
+        <p>Your LeafletAI subscription is active. Here are the details for your account.</p>
+        <table role="presentation" style="width:100%;border-collapse:collapse;margin:20px 0;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+          <tbody>
+            ${rows.map(([label, value]) => `
+              <tr>
+                <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;background:#f9fafb;color:#4b5563;font-size:14px;width:42%;">${escapeHtml(label)}</td>
+                <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#111827;font-weight:700;font-size:14px;">${escapeHtml(value)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <p style="margin:24px 0;">
+          <a href="${escapeHtml(settingsUrl)}" style="background:#10b981;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700;display:inline-block;">Manage subscription</a>
+        </p>
+        <div style="margin-top:28px;padding-top:18px;border-top:1px solid #e5e7eb;color:#374151;font-size:14px;">
+          <p style="margin:0 0 4px;"><strong>LeafletAI Team</strong></p>
+          <p style="margin:0 0 12px;"><em>Create smarter leaflets with AI.</em></p>
+          <p style="margin:0;">&#128231; <a href="mailto:info@leafletai.ai" style="color:#0f766e;text-decoration:none;">info@leafletai.ai</a></p>
+          <p style="margin:0 0 12px;">&#127760; <a href="https://www.leafletai.ai" style="color:#0f766e;text-decoration:none;">www.leafletai.ai</a></p>
+          <p style="margin:0;"><strong>LeafletAI</strong> &mdash; Design. Automate. Publish.</p>
+        </div>
+      </div>
+    `,
+  });
+
+  db.prepare('UPDATE users SET subscription_email_key = ? WHERE id = ?').run(emailKey, userId);
+  console.log('[subscription-email] sent', {
+    to: user.email,
     messageId: info.messageId,
     accepted: info.accepted,
     rejected: info.rejected,
@@ -3145,6 +3276,15 @@ app.post('/api/stripe/confirm-session', authMiddleware, async (req, res) => {
       endDate,
       req.user.id,
     );
+
+    const updatedUser = db.prepare('SELECT subscription_start FROM users WHERE id = ?').get(req.user.id);
+    sendSubscriptionDetailsEmail(req.user.id, {
+      plan: resolved.plan,
+      period: resolved.period,
+      status: subscriptionStatus,
+      startDate: updatedUser?.subscription_start || startDate,
+      endDate,
+    }).catch(err => console.error('[subscription-email] failed:', err instanceof Error ? err.message : err));
 
     res.json({
       confirmed: true,
