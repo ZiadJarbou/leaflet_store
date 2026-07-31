@@ -90,6 +90,29 @@ async function main() {
   });
   await db.connect();
 
+  const responseCache = new Map();
+  function getCachedJson(key) {
+    const item = responseCache.get(key);
+    if (!item) return null;
+    if (Date.now() > item.expiresAt) {
+      responseCache.delete(key);
+      return null;
+    }
+    return item.value;
+  }
+  function setCachedJson(key, value, ttlSeconds) {
+    responseCache.set(key, {
+      value,
+      expiresAt: Date.now() + Math.max(1, ttlSeconds) * 1000
+    });
+    return value;
+  }
+  function clearResponseCache(prefix) {
+    for (const key of responseCache.keys()) {
+      if (!prefix || key.startsWith(prefix)) responseCache.delete(key);
+    }
+  }
+
   const DEFAULT_STRIPE_PLAN_PRICES = {
     pro: { monthlyPrice: 19, yearlyPrice: 14, name: 'Pro' },
     business: { monthlyPrice: 49, yearlyPrice: 39, name: 'Business' }
@@ -3380,11 +3403,17 @@ async function main() {
   app.get('/api/stripe/localized-pricing', paymentLimiter, async (req, res) => {
     const queryCountry = normalizeCountryCode(req.query.country);
     const quoteCountry = detectCheckoutCountry(req, queryCountry);
+    const cacheKey = `localized-pricing:${quoteCountry || 'default'}`;
+    const cached = getCachedJson(cacheKey);
+    if (cached) {
+      res.set('X-Cache', 'HIT');
+      res.json(cached);return;
+    }
     const plans = {};
     try {
       for (const plan of ['pro', 'business']) {
-        const monthlyBase = getCheckoutPlanPrice(plan, 'monthly');
-        const annualBase = getCheckoutPlanPrice(plan, 'annual');
+        const monthlyBase = await getCheckoutPlanPrice(plan, 'monthly');
+        const annualBase = await getCheckoutPlanPrice(plan, 'annual');
         if (!monthlyBase || !annualBase) continue;
         const monthly = await quoteLocalizedPlanPrice(monthlyBase, quoteCountry);
         const annualTotal = await quoteLocalizedPlanPrice(annualBase, quoteCountry);
@@ -3400,11 +3429,13 @@ async function main() {
           }
         };
       }
-      res.json({
+      const payload = {
         country: quoteCountry === ['U', 'S'].join('') ? '' : quoteCountry || '',
         currency: plans.pro?.monthly?.currency || 'USD',
         plans
-      });
+      };
+      res.set('X-Cache', 'MISS');
+      res.json(setCachedJson(cacheKey, payload, 60));
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to localize pricing.' });
     }
@@ -4074,6 +4105,11 @@ async function main() {
   });
 
   app.get('/api/public-settings', async (req, res) => {
+    const cached = getCachedJson('public-settings');
+    if (cached) {
+      res.set('X-Cache', 'HIT');
+      res.json(cached);return;
+    }
     const keys = [
     'nano_a4_enabled',
     'deleted_deal_tags',
@@ -4087,8 +4123,8 @@ async function main() {
 
     const rows = await db.all(`SELECT key,value FROM site_settings WHERE key IN (${keys.map(() => '?').join(',')})`, ...keys);
     const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
-    res.set('Cache-Control', 'no-store');
-    res.json({
+    res.set('X-Cache', 'MISS');
+    res.json(setCachedJson('public-settings', {
       nano_a4_enabled: settings.nano_a4_enabled ?? '1',
       deleted_deal_tags: settings.deleted_deal_tags ?? '[]',
       home_demo_video_url: settings.home_demo_video_url ?? '',
@@ -4098,7 +4134,7 @@ async function main() {
       help_video_4_url: settings.help_video_4_url ?? '',
       help_video_5_url: settings.help_video_5_url ?? '',
       help_video_6_url: settings.help_video_6_url ?? ''
-    });
+    }, 60));
   });
 
   app.delete('/api/admin/deal-tags/:key', adminMiddleware, async (req, res) => {
@@ -4135,6 +4171,7 @@ async function main() {
     } catch {}
     if (!deleted.includes(key)) deleted.push(key);
     await db.run("INSERT OR REPLACE INTO site_settings (key, value) VALUES ('deleted_deal_tags', ?)", JSON.stringify(deleted));
+    clearResponseCache('public-settings');
     res.json({ ok: true, deleted_file: deletedFile, deleted_deal_tags: deleted });
   });
 
@@ -4149,6 +4186,7 @@ async function main() {
     if (Object.prototype.hasOwnProperty.call(req.body, 'stripe_secret_key')) {
       await refreshStripeClient();
     }
+    clearResponseCache('public-settings');
     const rows = await db.all('SELECT key,value FROM site_settings');
     res.json(Object.fromEntries(rows.map((r) => [r.key, r.value])));
   });
@@ -4387,9 +4425,17 @@ async function main() {
   /* ── GET /api/seo/:pageKey ── public, used by frontend ── */
   app.get('/api/seo/:pageKey', async (req, res) => {
     const pageKey = String(req.params.pageKey || '');
+    const normalizedPageKey = pageKey.trim().toLowerCase().replace(/-/g, '_');
+    const cacheKey = `seo:${normalizedPageKey}`;
+    const cached = getCachedJson(cacheKey);
+    if (cached) {
+      res.set('X-Cache', 'HIT');
+      res.json(cached);return;
+    }
     const row = await db.get('SELECT * FROM seo_pages WHERE page_key=? OR page_key=?', pageKey, pageKey.replace(/-/g, '_'));
     if (!row) {res.status(404).json({ error: 'Not found' });return;}
-    res.json(row);
+    res.set('X-Cache', 'MISS');
+    res.json(setCachedJson(cacheKey, row, 120));
   });
 
   /* ── GET /api/admin/seo ── list all SEO pages ── */
@@ -4408,6 +4454,7 @@ async function main() {
     WHERE id=?
   `, title ?? '', description ?? '', keywords ?? '', og_title ?? '', og_description ?? '', og_image ?? '', canonical_url ?? '', robots ?? 'index, follow', Number(req.params.id));
     const updated = await db.get('SELECT * FROM seo_pages WHERE id=?', Number(req.params.id));
+    clearResponseCache('seo:');
     res.json(updated);
   });
   app.get('/api/admin/check', async (req, res) => {
@@ -4525,8 +4572,16 @@ async function main() {
 
   /* GET /api/pages/:page  (public — no auth) */
   app.get('/api/pages/:page', async (req, res) => {
+    const page = String(req.params.page || '').trim().toLowerCase();
+    const cacheKey = `page-content:${page}`;
+    const cached = getCachedJson(cacheKey);
+    if (cached) {
+      res.set('X-Cache', 'HIT');
+      res.json(cached);return;
+    }
     const rows = await db.all('SELECT section,field,value FROM page_content WHERE page=?', req.params.page);
-    res.json(buildPageContent(rows));
+    res.set('X-Cache', 'MISS');
+    res.json(setCachedJson(cacheKey, buildPageContent(rows), page === 'pricing' ? 60 : 120));
   });
 
   /* GET /api/admin/pages/:page  (admin — raw rows for editor) */
@@ -4559,6 +4614,8 @@ async function main() {
       }
     });
     await tx();
+    clearResponseCache(`page-content:${String(page || '').trim().toLowerCase()}`);
+    if (page === 'pricing') clearResponseCache('localized-pricing:');
     if (page === 'pricing' && entries?.plans && Object.prototype.hasOwnProperty.call(entries.plans, 'items')) {
       if (stripe) {
         try {
