@@ -2918,6 +2918,48 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     } | null>(null);
     const coverBuilderNudgeRef = useRef<number | null>(null);
     const pdfContainerRef = useRef<HTMLDivElement>(null);
+    const layoutAutosaveTimerRef = useRef<number | null>(null);
+    const layoutAutosavePendingRef = useRef<CardLayout | null>(null);
+    const layoutAutosaveBusyRef = useRef(false);
+    const layoutSaveLatestPartsRef = useRef<Partial<CardLayout>>({});
+    const completeLayoutForSave = React.useCallback((layout: CardLayout): CardLayout => ({
+        ...layout,
+        ...layoutSaveLatestPartsRef.current,
+    }), []);
+    const runQueuedLayoutSave = React.useCallback(() => {
+        if (layoutAutosaveTimerRef.current !== null) {
+            window.clearTimeout(layoutAutosaveTimerRef.current);
+            layoutAutosaveTimerRef.current = null;
+        }
+        if (!id || layoutAutosaveBusyRef.current || !layoutAutosavePendingRef.current)
+            return;
+        const layout = completeLayoutForSave(layoutAutosavePendingRef.current);
+        layoutAutosavePendingRef.current = null;
+        layoutAutosaveBusyRef.current = true;
+        saveLeafletLayout(id, layout)
+            .catch(() => { })
+            .finally(() => {
+            layoutAutosaveBusyRef.current = false;
+            if (layoutAutosavePendingRef.current)
+                layoutAutosaveTimerRef.current = window.setTimeout(runQueuedLayoutSave, 300);
+        });
+    }, [completeLayoutForSave, id]);
+    const queueLeafletLayoutSave = React.useCallback((layout: CardLayout, delayMs = 700) => {
+        layoutAutosavePendingRef.current = completeLayoutForSave(layout);
+        if (layoutAutosaveTimerRef.current !== null)
+            window.clearTimeout(layoutAutosaveTimerRef.current);
+        layoutAutosaveTimerRef.current = window.setTimeout(runQueuedLayoutSave, delayMs);
+    }, [completeLayoutForSave, runQueuedLayoutSave]);
+    useEffect(() => () => {
+        if (layoutAutosaveTimerRef.current !== null) {
+            window.clearTimeout(layoutAutosaveTimerRef.current);
+            layoutAutosaveTimerRef.current = null;
+        }
+        const pendingLayoutSave = layoutAutosavePendingRef.current;
+        layoutAutosavePendingRef.current = null;
+        if (id && pendingLayoutSave)
+            saveLeafletLayout(id, completeLayoutForSave(pendingLayoutSave)).catch(() => { });
+    }, [completeLayoutForSave, id]);
     const startEditorTour = React.useCallback(() => {
         setEditorTourStep(0);
         setEditorTourSkipped(false);
@@ -3233,6 +3275,21 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             return next;
         });
     }
+    layoutSaveLatestPartsRef.current = {
+        cover_page: coverPage,
+        back_page: backPage,
+        cover_builder: frontCoverBuilder as unknown as Record<string, unknown>,
+        back_cover_builder: backCoverBuilder as unknown as Record<string, unknown>,
+        header_settings: headerSettings as unknown as Record<string, unknown>,
+        footer_settings: footerSettings as unknown as Record<string, unknown>,
+        page_settings: pageSettings as unknown as Record<string, unknown>,
+        cols_per_page: colsPerPage,
+        rows_per_page: rowsPerPage,
+        page_overrides: pageOverrides as unknown as Record<string, {
+            header?: boolean;
+            footer?: boolean;
+        }>,
+    };
     const [openSbSection, setOpenSbSection] = useState<string | null>(null);
     const [currencySearch, setCurrencySearch] = useState('');
     const [uploadingHdr, setUploadingHdr] = useState(false);
@@ -3298,12 +3355,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             return;
         if (coverBuilderEditingLiveRef.current)
             return;
-        const timer = setTimeout(() => {
-            saveLeafletLayout(id, { ...cardLayout, cover_page: coverPage, back_page: backPage, cover_builder: frontCoverBuilder as unknown as Record<string, unknown>, back_cover_builder: backCoverBuilder as unknown as Record<string, unknown> })
-                .then(r => setCardLayout(r.layout))
-                .catch(() => null);
-        }, 600);
-        return () => clearTimeout(timer);
+        queueLeafletLayoutSave({ ...cardLayout, cover_page: coverPage, back_page: backPage, cover_builder: frontCoverBuilder as unknown as Record<string, unknown>, back_cover_builder: backCoverBuilder as unknown as Record<string, unknown> }, 600);
     }, [coverPage, backPage, frontCoverBuilder, backCoverBuilder, coverBuilderSaveTick]); // eslint-disable-line react-hooks/exhaustive-deps
     useEffect(() => {
         selectedCoverTemplateRef.current = selectedCoverTemplate;
@@ -3372,21 +3424,18 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         }
         if (!id || !cardLayout)
             return;
-        const timer = setTimeout(() => {
-            saveLeafletLayout(id, {
-                ...cardLayout,
-                header_settings: headerSettings as unknown as Record<string, unknown>,
-                footer_settings: footerSettings as unknown as Record<string, unknown>,
-                page_settings: pageSettings as unknown as Record<string, unknown>,
-                cols_per_page: colsPerPage,
-                rows_per_page: rowsPerPage,
-                page_overrides: pageOverrides as unknown as Record<string, {
-                    header?: boolean;
-                    footer?: boolean;
-                }>,
-            }).then(r => setCardLayout(r.layout)).catch(() => null);
+        queueLeafletLayoutSave({
+            ...cardLayout,
+            header_settings: headerSettings as unknown as Record<string, unknown>,
+            footer_settings: footerSettings as unknown as Record<string, unknown>,
+            page_settings: pageSettings as unknown as Record<string, unknown>,
+            cols_per_page: colsPerPage,
+            rows_per_page: rowsPerPage,
+            page_overrides: pageOverrides as unknown as Record<string, {
+                header?: boolean;
+                footer?: boolean;
+            }>,
         }, 800);
-        return () => clearTimeout(timer);
     }, [headerSettings, footerSettings, pageSettings, colsPerPage, rowsPerPage, pageOverrides]); // eslint-disable-line react-hooks/exhaustive-deps
     const fetchExportQuota = React.useCallback(async () => {
         const token = readAuthToken();
@@ -3533,7 +3582,11 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         try {
             const nextFrontCoverBuilder = coverBuilderWithProductTemplate(frontCoverBuilder, layout, templateName);
             const nextBackCoverBuilder = coverBuilderWithProductTemplate(backCoverBuilder, layout, templateName);
-            const nextLayout = { ...layout, cover_page: coverPage, back_page: backPage, cover_builder: nextFrontCoverBuilder as unknown as Record<string, unknown>, back_cover_builder: nextBackCoverBuilder as unknown as Record<string, unknown> } as CardLayout;
+            const nextLayout = {
+                ...completeLayoutForSave(layout),
+                cover_builder: nextFrontCoverBuilder as unknown as Record<string, unknown>,
+                back_cover_builder: nextBackCoverBuilder as unknown as Record<string, unknown>,
+            } as CardLayout;
             const r = await saveLeafletLayout(id, nextLayout);
             applyCardTemplateToLeafletAndCovers(r.layout, templateName);
             setFrontCoverBuilder(nextFrontCoverBuilder);
@@ -8568,7 +8621,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 if (!prev)
                     return prev;
                 const next = { ...prev, [key]: value };
-                saveLeafletLayout(id!, next).catch(() => { });
+                queueLeafletLayoutSave(next);
                 return next;
             });
         }}/>
@@ -8584,7 +8637,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             if (!prev)
                 return prev;
             const next = { ...prev, show_currency_current: e.target.checked };
-            saveLeafletLayout(id!, next).catch(() => { });
+            queueLeafletLayoutSave(next);
             return next;
         })}/>
                 <span className="lv-sb-switch-track"/>
@@ -8597,7 +8650,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             if (!prev)
                 return prev;
             const next = { ...prev, show_currency_old: e.target.checked };
-            saveLeafletLayout(id!, next).catch(() => { });
+            queueLeafletLayoutSave(next);
             return next;
         })}/>
                 <span className="lv-sb-switch-track"/>
@@ -8613,7 +8666,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             if (!prev)
                 return prev;
             const next = { ...prev, currency_symbol: '', currency_code: '' };
-            saveLeafletLayout(id!, next).catch(() => { });
+            queueLeafletLayoutSave(next);
             return next;
         })}>
                 <span className="lv-sb-currency-sym">-</span>
@@ -8635,7 +8688,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                     if (!prev)
                         return prev;
                     const next = { ...prev, currency_symbol: c.symbol, currency_code: c.code };
-                    saveLeafletLayout(id!, next).catch(() => { });
+                    queueLeafletLayoutSave(next);
                     return next;
                 })}>
                     <span className="lv-sb-currency-sym">{c.symbol}</span>
@@ -8656,7 +8709,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 if (!prev)
                     return prev;
                 const next = { ...prev, currency_symbol: sym };
-                saveLeafletLayout(id!, next).catch(() => { });
+                queueLeafletLayoutSave(next);
                 return next;
             });
             return (<div className={cx("lv-sb-row lv-sb-row--inline", cssClass({ marginTop: 6 }))}>
@@ -8682,7 +8735,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                     if (!prev)
                         return prev;
                     const next = { ...prev, currency_symbol_position: p };
-                    saveLeafletLayout(id!, next).catch(() => { });
+                    queueLeafletLayoutSave(next);
                     return next;
                 })}>
                         {p === 'before' ? `${cardLayout?.currency_symbol} 59` : `59 ${cardLayout?.currency_symbol}`}
@@ -8696,7 +8749,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                     if (!prev)
                         return prev;
                     const next = { ...prev, currency_symbol_position_current: p };
-                    saveLeafletLayout(id!, next).catch(() => { });
+                    queueLeafletLayoutSave(next);
                     return next;
                 })}>
                         {p === 'top' ? 'up' : p === 'bottom' ? 'down' : p === 'left' ? '<- sym' : 'sym ->'}
@@ -8712,7 +8765,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             if (!prev)
                 return prev;
             const next = { ...prev, currency_symbol_size_current: +e.target.value };
-            saveLeafletLayout(id!, next).catch(() => { });
+            queueLeafletLayoutSave(next);
             return next;
         })}/>
                   <span className="lv-sb-val">{cardLayout?.currency_symbol_size_current ?? cardLayout?.currency_symbol_size ?? 14}px</span>
@@ -8726,7 +8779,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             if (!prev)
                 return prev;
             const next = { ...prev, currency_symbol_size_old: +e.target.value };
-            saveLeafletLayout(id!, next).catch(() => { });
+            queueLeafletLayoutSave(next);
             return next;
         })}/>
                   <span className="lv-sb-val">{cardLayout?.currency_symbol_size_old ?? cardLayout?.currency_symbol_size ?? 14}px</span>
@@ -8740,7 +8793,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             if (!prev)
                 return prev;
             const next = { ...prev, currency_symbol_gap: +e.target.value };
-            saveLeafletLayout(id!, next).catch(() => { });
+            queueLeafletLayoutSave(next);
             return next;
         })}/>
                   <span className="lv-sb-val">{cardLayout?.currency_symbol_gap ?? 2}px</span>
@@ -8759,7 +8812,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 if (!prev)
                     return prev;
                 const next = { ...prev, currency_symbol_icon: '' };
-                saveLeafletLayout(id!, next).catch(() => { });
+                queueLeafletLayoutSave(next);
                 return next;
             })}>x</button>
                   </>) : (<label className="lv-sb-icon-upload lv-sb-currency-icon-upload">
@@ -8777,7 +8830,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                         if (!prev)
                             return prev;
                         const next = { ...prev, currency_symbol_icon: url };
-                        saveLeafletLayout(id!, next).catch(() => { });
+                        queueLeafletLayoutSave(next);
                         return next;
                     });
                 };
@@ -8797,7 +8850,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                     if (!prev)
                         return prev;
                     const next = { ...prev, currency_symbol_icon_color_current: v };
-                    saveLeafletLayout(id!, next).catch(() => { });
+                    queueLeafletLayoutSave(next);
                     return next;
                 })}/>
                         <span className="lv-sb-val">{cardLayout.currency_symbol_icon_color_current || cardLayout.currency_symbol_icon_color || '#000000'}</span>
@@ -8805,7 +8858,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                         if (!prev)
                             return prev;
                         const next = { ...prev, currency_symbol_icon_color_current: '' };
-                        saveLeafletLayout(id!, next).catch(() => { });
+                        queueLeafletLayoutSave(next);
                         return next;
                     })}>x</button>)}
                       </div>
@@ -8817,7 +8870,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                     if (!prev)
                         return prev;
                     const next = { ...prev, currency_symbol_icon_color_old: v };
-                    saveLeafletLayout(id!, next).catch(() => { });
+                    queueLeafletLayoutSave(next);
                     return next;
                 })}/>
                         <span className="lv-sb-val">{cardLayout.currency_symbol_icon_color_old || cardLayout.currency_symbol_icon_color || '#000000'}</span>
@@ -8825,7 +8878,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                         if (!prev)
                             return prev;
                         const next = { ...prev, currency_symbol_icon_color_old: '' };
-                        saveLeafletLayout(id!, next).catch(() => { });
+                        queueLeafletLayoutSave(next);
                         return next;
                     })}>x</button>)}
                       </div>
@@ -8838,7 +8891,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 if (!prev)
                     return prev;
                 const next = { ...prev, currency_symbol_icon_size_current: +e.target.value };
-                saveLeafletLayout(id!, next).catch(() => { });
+                queueLeafletLayoutSave(next);
                 return next;
             })}/>
                     <span className="lv-sb-val">{cardLayout.currency_symbol_icon_size_current ?? cardLayout.currency_symbol_icon_size ?? 16}px</span>
@@ -8851,7 +8904,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 if (!prev)
                     return prev;
                 const next = { ...prev, currency_symbol_icon_size_old: +e.target.value };
-                saveLeafletLayout(id!, next).catch(() => { });
+                queueLeafletLayoutSave(next);
                 return next;
             })}/>
                     <span className="lv-sb-val">{cardLayout.currency_symbol_icon_size_old ?? cardLayout.currency_symbol_icon_size ?? 16}px</span>
@@ -8864,7 +8917,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                     if (!prev)
                         return prev;
                     const next = { ...prev, currency_symbol_position: p };
-                    saveLeafletLayout(id!, next).catch(() => { });
+                    queueLeafletLayoutSave(next);
                     return next;
                 })}>
                         {p === 'before' ? 'Icon 59' : '59 Icon'}
@@ -9166,7 +9219,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     </div>{/* /lv-page */}
 
     {customizerOpen && id && (<LayoutCustomizer initial={cardLayout ?? {} as CardLayout} onClose={() => setCustomizerOpen(false)} cardAspectRatio={cardW / cardH} onSave={async (layout) => {
-                const r = await saveLeafletLayout(id, { ...layout, cover_page: coverPage, back_page: backPage, cover_builder: frontCoverBuilder as unknown as Record<string, unknown>, back_cover_builder: backCoverBuilder as unknown as Record<string, unknown> });
+                const r = await saveLeafletLayout(id, completeLayoutForSave(layout));
                 setCardLayout(r.layout);
             }} onReset={async () => {
                 const r = await resetLeafletLayout(id);
