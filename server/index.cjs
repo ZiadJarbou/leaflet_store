@@ -9,6 +9,7 @@ process.on('unhandledRejection', (reason) => {console.error('[unhandledRejection
 
 const express = require('express');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { createDb } = require('./db.cjs');
@@ -761,6 +762,7 @@ async function main() {
   }
 
   const app = express();
+  app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 1));
   app.use((req, res, next) => {
     res.setHeader(
       'Content-Security-Policy',
@@ -807,8 +809,41 @@ async function main() {
     credentials: true
   }));
 
+  function intEnv(name, fallback) {
+    const value = Number(process.env[name]);
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+  }
+
+  function makeLimiter(name, windowMs, max, message) {
+    return rateLimit({
+      windowMs,
+      max,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: message || 'Too many requests. Please wait and try again.' },
+      handler(req, res, _next, options) {
+        console.warn('[rate-limit]', {
+          limiter: name,
+          ip: req.ip,
+          method: req.method,
+          path: req.originalUrl
+        });
+        res.status(options.statusCode).json(options.message);
+      }
+    });
+  }
+
+  const apiLimiter = makeLimiter('api', 15 * 60 * 1000, intEnv('RATE_LIMIT_API_MAX', 600), 'Too many requests. Please slow down and try again shortly.');
+  const authLimiter = makeLimiter('auth', 15 * 60 * 1000, intEnv('RATE_LIMIT_AUTH_MAX', 20), 'Too many login or signup attempts. Please wait 15 minutes and try again.');
+  const passwordResetLimiter = makeLimiter('password-reset', 60 * 60 * 1000, intEnv('RATE_LIMIT_PASSWORD_RESET_MAX', 5), 'Too many password reset attempts. Please wait before trying again.');
+  const uploadLimiter = makeLimiter('upload', 15 * 60 * 1000, intEnv('RATE_LIMIT_UPLOAD_MAX', 30), 'Too many uploads. Please wait and try again.');
+  const aiLimiter = makeLimiter('ai', 60 * 60 * 1000, intEnv('RATE_LIMIT_AI_MAX', 20), 'Too many AI generation requests. Please wait before trying again.');
+  const searchLimiter = makeLimiter('image-search', 15 * 60 * 1000, intEnv('RATE_LIMIT_SEARCH_MAX', 80), 'Too many image searches. Please wait and try again.');
+  const paymentLimiter = makeLimiter('payment', 15 * 60 * 1000, intEnv('RATE_LIMIT_PAYMENT_MAX', 40), 'Too many payment requests. Please wait and try again.');
+  const webhookLimiter = makeLimiter('stripe-webhook', 60 * 1000, intEnv('RATE_LIMIT_WEBHOOK_MAX', 120), 'Too many webhook requests.');
+
   /* ── Stripe webhook needs raw body — register BEFORE express.json ── */
-  app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  app.post('/api/stripe/webhook', webhookLimiter, express.raw({ type: 'application/json' }), async (req, res) => {
     if (!stripe) {res.status(503).json({ error: 'Stripe not configured' });return;}
     const sig = req.headers['stripe-signature'];
     let event;
@@ -948,6 +983,7 @@ async function main() {
     res.json({ received: true });
   });
 
+  app.use('/api', apiLimiter);
   app.use(express.json({ limit: '20mb' }));
   app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
@@ -1483,7 +1519,7 @@ async function main() {
   });
 
   /* ── POST /api/upload ── */
-  app.post('/api/upload', authMiddleware, (req, res, next) => {
+  app.post('/api/upload', uploadLimiter, authMiddleware, (req, res, next) => {
     upload.single('image')(req, res, (err) => {
       if (err) {
         const msg = err.message || 'Upload failed.';
@@ -1495,7 +1531,7 @@ async function main() {
   });
 
   /* ── POST /api/signup ── */
-  app.post('/api/signup', async (req, res, next) => {
+  app.post('/api/signup', authLimiter, async (req, res, next) => {
     try {
       const name = normalizeName(req.body.name || '');
       const email = normalizeEmail(req.body.email || '');
@@ -1562,7 +1598,7 @@ async function main() {
   });
 
   /* ── POST /api/login ── */
-  app.post('/api/login', async (req, res, next) => {
+  app.post('/api/login', authLimiter, async (req, res, next) => {
     try {
       const email = normalizeEmail(req.body.email || '');
       const password = req.body.password || '';
@@ -1635,10 +1671,10 @@ async function main() {
     res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
   }
 
-  app.get('/api/oauth/google', startGoogleOAuth);
-  app.get('/api/oauth/google/signup', startGoogleOAuth);
+  app.get('/api/oauth/google', authLimiter, startGoogleOAuth);
+  app.get('/api/oauth/google/signup', authLimiter, startGoogleOAuth);
 
-  app.get('/api/oauth/google/callback', async (req, res, next) => {
+  app.get('/api/oauth/google/callback', authLimiter, async (req, res, next) => {
     try {
       if (!GOOGLE_OAUTH_CLIENT_ID || !GOOGLE_OAUTH_CLIENT_SECRET) {
         res.redirect(`${APP_URL}/oauth/callback?error=${encodeURIComponent('Google login is not configured.')}`);
@@ -1758,7 +1794,7 @@ async function main() {
   });
 
   /* ── POST /api/forgot-password ── */
-  app.post('/api/forgot-password', async (req, res, next) => {
+  app.post('/api/forgot-password', passwordResetLimiter, async (req, res, next) => {
     try {
       const email = normalizeEmail(req.body.email || '');
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -2819,7 +2855,7 @@ async function main() {
   });
 
   /* -- GET /api/product-image-search -- */
-  app.get('/api/product-image-search', authMiddleware, async (req, res) => {
+  app.get('/api/product-image-search', searchLimiter, authMiddleware, async (req, res) => {
     const query = String(req.query.q || '').trim().slice(0, 160);
     if (!query) {
       res.json({ images: [] });
@@ -3257,7 +3293,7 @@ async function main() {
     });
   });
 
-  app.post('/api/stripe/confirm-session', authMiddleware, async (req, res) => {
+  app.post('/api/stripe/confirm-session', paymentLimiter, authMiddleware, async (req, res) => {
     if (!stripe) {res.status(503).json({ error: 'Stripe not configured' });return;}
     const sessionId = String(req.body?.session_id || '').trim();
     if (!sessionId || !sessionId.startsWith('cs_')) {
@@ -3341,7 +3377,7 @@ async function main() {
   });
 
   /* ── POST /api/stripe/create-checkout-session ── */
-  app.get('/api/stripe/localized-pricing', async (req, res) => {
+  app.get('/api/stripe/localized-pricing', paymentLimiter, async (req, res) => {
     const queryCountry = normalizeCountryCode(req.query.country);
     const quoteCountry = detectCheckoutCountry(req, queryCountry);
     const plans = {};
@@ -3402,7 +3438,7 @@ async function main() {
     return customer.id;
   }
 
-  app.post('/api/stripe/create-checkout-session', authMiddleware, async (req, res) => {
+  app.post('/api/stripe/create-checkout-session', paymentLimiter, authMiddleware, async (req, res) => {
     if (!stripe) {
       const configuredCheckoutUrl = String((await getSetting('stripe_checkout_url')) || '').trim();
       if (configuredCheckoutUrl) {
@@ -3499,7 +3535,7 @@ async function main() {
   });
 
   /* ── POST /api/stripe/create-portal-session ── billing portal for manage/cancel ── */
-  app.post('/api/stripe/create-portal-session', authMiddleware, async (req, res) => {
+  app.post('/api/stripe/create-portal-session', paymentLimiter, authMiddleware, async (req, res) => {
     if (!stripe) {res.status(503).json({ error: 'Stripe not configured' });return;}
     const user = await db.get('SELECT stripe_customer_id FROM users WHERE id = ?', req.user.id);
     if (!user?.stripe_customer_id) {
@@ -3523,7 +3559,7 @@ async function main() {
   });
 
   /* ── Global JSON error handler ── */
-  app.post('/api/generate-a4', authMiddleware, async (req, res) => {
+  app.post('/api/generate-a4', aiLimiter, authMiddleware, async (req, res) => {
     const { prompt, orientation, resolution, width, height, referenceImage, referenceImages } = req.body || {};
     const safePrompt = String(prompt || '').trim();
     const safeOrientation = orientation === 'landscape' ? 'landscape' : 'portrait';
