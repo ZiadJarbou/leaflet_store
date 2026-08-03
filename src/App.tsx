@@ -22,6 +22,7 @@ import AdminPage from './pages/admin/AdminPage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import HelpCenterPage from './pages/HelpCenterPage';
+import NotFoundPage from './pages/NotFoundPage';
 import ChatBot from './components/ChatBot';
 function NoticeBanner() {
     const { notice, setNotice } = useAuth();
@@ -77,6 +78,7 @@ function AppShell() {
           <Route path="/help" element={<HelpCenterPage />}/>
           {/* Admin CMS — role check is inside AdminPage itself */}
           <Route path="/admin/*" element={<AdminPage />}/>
+          <Route path="*" element={<NotFoundPage />}/>
         </Routes>
     </>);
 }

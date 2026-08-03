@@ -910,8 +910,16 @@ a.lv-card-image-license:hover {
 .lv-header-toolbar-menu {
   text-align: left;
 }
+.lv-header-toolbar-menu.lc-toolbar-menu--panel {
+  width: min(300px, calc(100vw - 32px));
+  padding: 12px;
+}
 .lv-header-toolbar-menu .lc-toolbar-field {
   min-width: 0;
+}
+.lv-header-toolbar-menu .lc-toolbar-field > span,
+.lv-header-toolbar-toggle span {
+  color: #93c5fd;
 }
 .lv-header-toolbar-menu .lc-toolbar-field em {
   color: #bfdbfe;
@@ -956,6 +964,39 @@ a.lv-card-image-license:hover {
   width: 16px;
   height: 16px;
   accent-color: #49f2b6;
+}
+.lv-header-toolbar-menu .lv-logo-upload-wrap {
+  gap: 8px;
+}
+.lv-header-toolbar-menu .lv-logo-dropzone {
+  min-height: 44px;
+  padding: 6px;
+  border-radius: 6px;
+}
+.lv-header-toolbar-menu .lv-logo-empty,
+.lv-header-toolbar-menu .lv-logo-preview-row {
+  font-size: 12px;
+}
+.lv-header-toolbar-menu .lv-logo-empty-icon {
+  width: 18px;
+  height: 18px;
+}
+.lv-header-toolbar-menu .lv-logo-preview {
+  width: 42px;
+  height: 28px;
+}
+.lv-header-toolbar-menu .lv-logo-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.lv-header-toolbar-menu .lv-img-paste-btn,
+.lv-header-toolbar-menu .lv-logo-remove {
+  min-height: 30px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.lv-header-toolbar-menu .lc-toolbar-field--range {
+  grid-template-columns: 50px minmax(0, 1fr) 42px;
 }
 .lv-logo-upload-wrap {
   display: flex;
