@@ -7734,10 +7734,17 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         if (headerToolbarPanel === 'content') {
             return (<div className="lv-header-toolbar-menu lc-toolbar-menu lc-toolbar-menu--panel">
               <div className="lc-toolbar-menu-title">Header content</div>
-              <button type="button" className="lv-header-toolbar-action" onClick={applyHeaderToAll}>
-                <span className="material-symbol" aria-hidden="true">select_all</span>
+              <div className="lv-header-toolbar-row">
                 <span>Apply to all pages</span>
-              </button>
+                <button type="button" className="lv-header-toolbar-secondary" onClick={applyHeaderToAll}>
+                  <span className="material-symbol" aria-hidden="true">select_all</span>
+                  <span>Apply</span>
+                </button>
+              </div>
+              <label className="lv-header-toolbar-toggle">
+                <span>Show header</span>
+                <input type="checkbox" checked={headerShowFor(safePage)} onChange={() => toggleHeaderForPage(safePage)}/>
+              </label>
               <label className="lv-header-toolbar-toggle">
                 <span>Show text</span>
                 <input type="checkbox" checked={hs.showText} onChange={e => setH('showText', e.target.checked)}/>
@@ -7835,6 +7842,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         if (typeof document === 'undefined' || !headerSelected || !headerToolbarPos)
             return null;
         return ReactDOM.createPortal(<div className={`lc-floating-toolbar lc-floating-toolbar--fixed lv-header-floating-toolbar${headerToolbarPos.placeBelow ? ' lc-floating-toolbar--below' : ''}`} style={{ left: headerToolbarPos.left, top: headerToolbarPos.top } as React.CSSProperties} role="toolbar" aria-label="Header quick tools" onPointerDown={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+          {headerToolbarButton(headerShowFor(safePage) ? 'visibility' : 'visibility_off', 'Show header on this page', () => toggleHeaderForPage(safePage), headerShowFor(safePage))}
           {headerToolbarPanelButton('content', 'widgets', 'Header content')}
           {headerToolbarPanelButton('layout', 'aspect_ratio', 'Header layout')}
           {headerToolbarPanelButton('text', 'text_fields', 'Header text')}

@@ -938,41 +938,45 @@ a.lv-card-image-license:hover {
 .lv-header-toolbar-segment button {
   flex: 1;
 }
-.lv-header-toolbar-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 34px;
-  padding: 0 12px;
-  border: 1px solid rgba(73,242,182,.35);
-  border-radius: 6px;
-  background: rgba(73,242,182,.12);
-  color: #d1fae5;
-  font-weight: 800;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.lv-header-toolbar-action .material-symbol {
-  font-size: 18px;
-}
-.lv-header-toolbar-action:hover {
-  background: rgba(73,242,182,.2);
-}
+.lv-header-toolbar-row,
 .lv-header-toolbar-toggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid rgba(73,242,182,.35);
+  border-radius: 6px;
+  background: rgba(15,23,42,.38);
   color: #dbeafe;
   font-size: 13px;
   font-weight: 800;
-  min-height: 34px;
-  padding: 7px 10px;
-  border: 1px solid rgba(148,163,184,.18);
+}
+.lv-header-toolbar-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 84px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(148,163,184,.28);
   border-radius: 6px;
-  background: rgba(15,23,42,.38);
+  background: rgba(255,255,255,.06);
+  color: #e5edff;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.lv-header-toolbar-secondary:hover {
+  border-color: rgba(73,242,182,.44);
+  background: rgba(73,242,182,.12);
+  color: #d1fae5;
+}
+.lv-header-toolbar-secondary .material-symbol {
+  font-size: 17px;
 }
 .lv-header-toolbar-toggle input {
   width: 16px;
@@ -1011,15 +1015,28 @@ a.lv-card-image-license:hover {
   height: 28px;
 }
 .lv-header-toolbar-menu .lv-logo-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: 8px;
 }
 .lv-header-toolbar-menu .lv-img-paste-btn,
 .lv-header-toolbar-menu .lv-logo-remove {
+  flex: 1 1 0;
   min-height: 30px;
   padding: 5px 8px;
+  border: 1px solid rgba(148,163,184,.28);
+  border-radius: 6px;
+  background: rgba(255,255,255,.06);
+  color: #e5edff;
   font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+.lv-header-toolbar-menu .lv-img-paste-btn:hover,
+.lv-header-toolbar-menu .lv-logo-remove:hover {
+  border-color: rgba(73,242,182,.44);
+  background: rgba(73,242,182,.12);
+  color: #d1fae5;
 }
 .lv-header-toolbar-menu .lc-toolbar-field--range {
   grid-template-columns: 50px minmax(0, 1fr) 42px;
