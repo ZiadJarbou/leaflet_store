@@ -3248,7 +3248,6 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     }
     const [openSbSection, setOpenSbSection] = useState<string | null>(null);
     const [currencySearch, setCurrencySearch] = useState('');
-    const [uploadingHdr, setUploadingHdr] = useState(false);
     const [uploadingFtr, setUploadingFtr] = useState(false);
     const coverBackLoadedRef = useRef(false);
     useEffect(() => {
@@ -8400,28 +8399,6 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                     <span className="lv-sb-val">{Number(hs.logoHeight ?? 44)}px</span>
                   </div>
                 </div>)}
-              <div className="lv-sb-row">
-                <span className="lv-sb-label">Align <InfoTooltip text={SB_TOOLTIPS['header.align']}/></span>
-                <div className="lv-sb-tabs">
-                  {(['left', 'center', 'right'] as const).map(a => (<button key={a} className={`lv-sb-tab${hs.textAlign === a ? ' active' : ''}`} onClick={() => setH('textAlign', a)}>
-                      {a === 'left' ? 'Left' : a === 'center' ? 'Center' : 'Right'}
-                    </button>))}
-                </div>
-              </div>
-              <div className="lv-sb-row">
-                <span className="lv-sb-label">Height <InfoTooltip text={SB_TOOLTIPS['header.height']}/></span>
-                <div className="lv-sb-slider-wrap">
-                  <input type="range" min={24} max={120} value={hs.height} onChange={e => setH('height', +e.target.value)}/>
-                  <span className="lv-sb-val">{hs.height}px</span>
-                </div>
-              </div>
-              <div className="lv-sb-row">
-                <span className="lv-sb-label">Width <InfoTooltip text={SB_TOOLTIPS['header.width']}/></span>
-                <div className="lv-sb-slider-wrap">
-                  <input type="range" min={20} max={100} step={1} value={headerWidthPct} onChange={e => setHeaderWidthPct(+e.target.value)}/>
-                  <span className="lv-sb-val">{headerWidthPct}%</span>
-                </div>
-              </div>
               {headerWidthPct < 100 && (<div className="lv-sb-row">
                   <span className="lv-sb-label">Position <InfoTooltip text={SB_TOOLTIPS['header.position']}/></span>
                   <div className="lv-sb-tabs">
@@ -8430,23 +8407,6 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                       </button>))}
                   </div>
                 </div>)}
-              <div className="lv-sb-row">
-                <span className="lv-sb-label">Top Position <InfoTooltip text={SB_TOOLTIPS['header.marginTop']}/></span>
-                <div className="lv-sb-slider-wrap">
-                  <input type="range" min={0} max={100} value={hs.marginTop} onChange={e => setH('marginTop', +e.target.value)}/>
-                  <span className="lv-sb-val">{hs.marginTop}px</span>
-                </div>
-              </div>
-              <div className="lv-sb-row">
-                <span className="lv-sb-label">Margin Bottom <InfoTooltip text={SB_TOOLTIPS['header.marginBottom']}/></span>
-                <div className="lv-sb-slider-wrap">
-                  <input type="range" min={0} max={100} value={hs.marginBottom} onChange={e => setH('marginBottom', +e.target.value)}/>
-                  <span className="lv-sb-val">{hs.marginBottom}px</span>
-                </div>
-              </div>
-              <BgTypeControls s={hs} setter={setH} uploading={uploadingHdr} setUploading={setUploadingHdr}/>
-              <FontControls s={hs} setter={setH}/>
-              <BorderRadiusControls s={hs} setter={setH}/>
             </>)}
           </SbSection>
 
