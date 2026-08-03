@@ -1853,8 +1853,11 @@ function HeaderTextItem({ settings, text, editable = false, fontFamily, onUpdate
     onUpdate?: (patch: Partial<HeaderTextSettings>) => void;
 }) {
     const ref = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
     const [selected, setSelected] = useState(false);
     const [draftBox, setDraftBox] = useState<HeaderTextBox | null>(null);
+    const [editingText, setEditingText] = useState(false);
+    const [draftText, setDraftText] = useState(text);
     const isPositioned = typeof settings.textX === 'number' && typeof settings.textY === 'number';
     const box = draftBox ?? (isPositioned
         ? {
@@ -1868,12 +1871,24 @@ function HeaderTextItem({ settings, text, editable = false, fontFamily, onUpdate
         if (!selected)
             return;
         function handler(e: MouseEvent) {
-            if (ref.current && !ref.current.contains(e.target as Node))
+            if (ref.current && !ref.current.contains(e.target as Node)) {
                 setSelected(false);
+                setEditingText(false);
+            }
         }
         window.addEventListener('mousedown', handler);
         return () => window.removeEventListener('mousedown', handler);
     }, [selected]);
+    useEffect(() => {
+        if (!editingText)
+            setDraftText(text);
+    }, [editingText, text]);
+    useEffect(() => {
+        if (!editingText)
+            return;
+        inputRef.current?.focus();
+        inputRef.current?.select();
+    }, [editingText]);
     function currentBox(header: HTMLElement) {
         const headerRect = header.getBoundingClientRect();
         const textRect = ref.current?.getBoundingClientRect();
@@ -1891,6 +1906,12 @@ function HeaderTextItem({ settings, text, editable = false, fontFamily, onUpdate
             return;
         e.preventDefault();
         e.stopPropagation();
+        if ((e.target as HTMLElement | null)?.closest('.lv-a4-title')) {
+            setSelected(true);
+            setDraftText(text);
+            setEditingText(true);
+            return;
+        }
         setSelected(true);
         const header = getHeaderContainer(ref.current);
         const update = onUpdate;
@@ -1925,6 +1946,13 @@ function HeaderTextItem({ settings, text, editable = false, fontFamily, onUpdate
         }
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
+    }
+    function commitTextEdit() {
+        if (!editingText)
+            return;
+        const nextText = draftText.trim();
+        setEditingText(false);
+        onUpdate?.({ text: nextText || text });
     }
     function startResize(e: React.MouseEvent) {
         if (!editable || !onUpdate)
@@ -1966,10 +1994,17 @@ function HeaderTextItem({ settings, text, editable = false, fontFamily, onUpdate
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
     }
-    return (<div ref={ref} className={cx(`lv-a4-title-box${editable ? ' editable' : ''}${selected ? ' selected' : ''}${box ? ' positioned' : ''}`, cssClass(box ? { left: box.x, top: box.y, width: box.w, height: box.h } : undefined))} onMouseDown={startMove} title={editable ? 'Drag to move header text' : undefined}>
-      <span className={cx("lv-a4-title", cssClass({ fontFamily }))}>
+    return (<div ref={ref} className={cx(`lv-a4-title-box${editable ? ' editable' : ''}${editingText ? ' editing' : ''}${selected ? ' selected' : ''}${box ? ' positioned' : ''}`, cssClass(box ? { left: box.x, top: box.y, width: box.w, height: box.h } : undefined))} onMouseDown={startMove} title={editable ? 'Click text to edit, drag box to move' : undefined}>
+      {editingText ? (<input ref={inputRef} className={cx("lv-a4-title-input", cssClass({ fontFamily }))} value={draftText} onChange={e => setDraftText(e.target.value)} onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onBlur={commitTextEdit} onKeyDown={e => {
+                if (e.key === 'Enter')
+                    commitTextEdit();
+                if (e.key === 'Escape') {
+                    setDraftText(text);
+                    setEditingText(false);
+                }
+            }}/>) : (<span className={cx("lv-a4-title", cssClass({ fontFamily }))}>
         {text}
-      </span>
+      </span>)}
       {editable && selected && (<div className="lv-a4-title-resize" onMouseDown={startResize} title="Drag to resize"/>)}
     </div>);
 }

@@ -1051,6 +1051,9 @@ a.lv-card-image-license:hover {
 .lv-a4-title-box.editable {
   cursor: move;
 }
+.lv-a4-title-box.editing {
+  cursor: text;
+}
 .lv-a4-title-box.editable:hover,
 .lv-a4-title-box.selected {
   outline: 1px solid rgba(37, 99, 235, .7);
@@ -1068,6 +1071,26 @@ a.lv-card-image-license:hover {
   padding: 10px;
   pointer-events: none;
   user-select: none;
+}
+.lv-a4-title-box.editable .lv-a4-title {
+  cursor: text;
+  pointer-events: auto;
+}
+.lv-a4-title-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: rgba(255,255,255,.92);
+  color: inherit;
+  font: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  font-style: inherit;
+  line-height: inherit;
+  padding: 10px;
+  box-sizing: border-box;
 }
 .lv-a4-title-resize {
   position: absolute;
