@@ -2802,7 +2802,6 @@ export function FontPickerSection({ layout, set, }: {
 
       {/* ─── Header ─── */}
       <div className="lc-font-hero">
-        <div className="lc-font-hero-icon" aria-hidden="true">Aa</div>
         <div className="lc-font-hero-copy">
           <div className="lc-font-header">
             <span className="lc-font-header-title">Typography</span>
@@ -2814,7 +2813,6 @@ export function FontPickerSection({ layout, set, }: {
               </svg>
               <span className="lc-font-info-tip">Choose the font style for your leaflet. The selected font will apply to all text elements.</span>
             </span>
-            <span className="lc-font-header-sub">Font Family</span>
           </div>
         </div>
       </div>
