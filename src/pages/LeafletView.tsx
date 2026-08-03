@@ -1716,6 +1716,7 @@ type HeaderTextSettings = {
     textWidth?: number;
     textHeight?: number;
 };
+type HeaderToolbarPosition = { left: number; top: number; placeBelow: boolean };
 function getHeaderContainer(start: HTMLElement | null) {
     let el: HTMLElement | null = start?.parentElement ?? null;
     while (el && !el.classList.contains('lv-a4-header'))
@@ -3185,6 +3186,10 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     function setH(k: string, v: unknown) {
         setHeaderSettings(prev => ({ ...prev, [k]: v }));
     }
+    const headerBarRef = useRef<HTMLDivElement>(null);
+    const [headerSelected, setHeaderSelected] = useState(false);
+    const [headerToolbarPos, setHeaderToolbarPos] = useState<HeaderToolbarPosition | null>(null);
+    const [headerToolbarPanel, setHeaderToolbarPanel] = useState<'layout' | 'text' | 'background' | 'border' | null>(null);
     const [footerSettings, setFooterSettings] = useState({
         show: true,
         text: '',
@@ -3360,6 +3365,57 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     useEffect(() => {
         selectedCoverTemplateRef.current = selectedCoverTemplate;
     }, [selectedCoverTemplate]);
+    function updateHeaderToolbarPosition() {
+        const el = headerBarRef.current;
+        if (!el || !headerSelected) {
+            setHeaderToolbarPos(null);
+            return;
+        }
+        const rect = el.getBoundingClientRect();
+        const estimatedToolbarHeight = 112;
+        const margin = 12;
+        const placeBelow = rect.top < estimatedToolbarHeight + margin;
+        setHeaderToolbarPos({
+            left: Math.max(margin, Math.min(window.innerWidth - margin, rect.left + rect.width / 2)),
+            top: placeBelow ? Math.min(window.innerHeight - margin, rect.bottom + margin) : Math.max(margin, rect.top - margin),
+            placeBelow,
+        });
+    }
+    useEffect(() => {
+        if (!headerSelected)
+            return;
+        let frame = window.requestAnimationFrame(updateHeaderToolbarPosition);
+        const schedule = () => {
+            window.cancelAnimationFrame(frame);
+            frame = window.requestAnimationFrame(updateHeaderToolbarPosition);
+        };
+        window.addEventListener('resize', schedule);
+        window.addEventListener('scroll', schedule, true);
+        return () => {
+            window.cancelAnimationFrame(frame);
+            window.removeEventListener('resize', schedule);
+            window.removeEventListener('scroll', schedule, true);
+        };
+    }, [headerSelected, currentPage, zoom, headerSettings.height, headerSettings.widthPct, headerSettings.marginTop, headerSettings.marginBottom]);
+    useEffect(() => {
+        if (!headerSelected)
+            return;
+        function onDocumentPointerDown(e: PointerEvent) {
+            const target = e.target as HTMLElement | null;
+            if (!target)
+                return;
+            if (target.closest('.lc-floating-toolbar') || target.closest('.lv-a4-header') || target.closest('.cs-popover'))
+                return;
+            setHeaderSelected(false);
+            setHeaderToolbarPanel(null);
+        }
+        document.addEventListener('pointerdown', onDocumentPointerDown);
+        return () => document.removeEventListener('pointerdown', onDocumentPointerDown);
+    }, [headerSelected]);
+    useEffect(() => {
+        if (headerSelected)
+            updateHeaderToolbarPosition();
+    }, [headerSelected, headerSettings, zoom]);
     useEffect(() => {
         if (!coverBuilderOnly || !selectedCoverTemplate || !selectedCoverTemplateId)
             return;
@@ -7673,6 +7729,113 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const footerBarState = fs as unknown as BarState;
     const headerStyle = { ...makeBarStyle(headerBarState, 0), ...makeBarBorder(headerBarState), ...makeBarRadius(headerBarState), ...makeBarAlign(headerBarState), marginTop: headerMarginTop, marginBottom: headerMarginBottom };
     const footerStyle = { ...makeBarStyle(footerBarState, 0), ...makeBarBorder(footerBarState), ...makeBarRadius(footerBarState), ...makeBarAlign(footerBarState), marginTop: flushFullBleedFooter ? 0 : fs.widthMode === 'full' ? 0 : footerMarginTop, marginBottom: footerMarginBottom };
+    function headerToolbarButton(icon: string, title: string, onClick: () => void, active = false) {
+        return (<button type="button" title={title} className={active ? 'active' : ''} onClick={onClick}>
+          <span className="material-symbol" aria-hidden="true">{icon}</span>
+        </button>);
+    }
+    function headerToolbarPanelButton(panel: typeof headerToolbarPanel, icon: string, title: string) {
+        return headerToolbarButton(icon, title, () => setHeaderToolbarPanel(prev => prev === panel ? null : panel), headerToolbarPanel === panel);
+    }
+    function renderHeaderToolbarPanel() {
+        if (!headerToolbarPanel)
+            return null;
+        if (headerToolbarPanel === 'layout') {
+            return (<div className="lv-header-toolbar-menu lc-toolbar-menu lc-toolbar-menu--panel">
+              <div className="lc-toolbar-menu-title">Header layout</div>
+              <label className="lc-toolbar-field lc-toolbar-field--range">
+                <span>Height</span>
+                <input type="range" min={24} max={120} value={hs.height} onChange={e => setH('height', +e.target.value)}/>
+                <em>{hs.height}px</em>
+              </label>
+              <label className="lc-toolbar-field lc-toolbar-field--range">
+                <span>Width</span>
+                <input type="range" min={20} max={100} value={hs.widthPct} onChange={e => setH('widthPct', +e.target.value)}/>
+                <em>{hs.widthPct}%</em>
+              </label>
+              <label className="lc-toolbar-field lc-toolbar-field--range">
+                <span>Top</span>
+                <input type="range" min={0} max={100} value={hs.marginTop} onChange={e => setH('marginTop', +e.target.value)}/>
+                <em>{hs.marginTop}px</em>
+              </label>
+              <label className="lc-toolbar-field lc-toolbar-field--range">
+                <span>Bottom</span>
+                <input type="range" min={0} max={100} value={hs.marginBottom} onChange={e => setH('marginBottom', +e.target.value)}/>
+                <em>{hs.marginBottom}px</em>
+              </label>
+            </div>);
+        }
+        if (headerToolbarPanel === 'text') {
+            return (<div className="lv-header-toolbar-menu lc-toolbar-menu lc-toolbar-menu--panel">
+              <div className="lc-toolbar-menu-title">Header text</div>
+              <div className="lv-header-toolbar-segment">
+                {(['left', 'center', 'right'] as const).map(align => (<button key={align} type="button" className={hs.textAlign === align ? 'active' : ''} title={`Align ${align}`} onClick={() => setH('textAlign', align)}>
+                    <span className="material-symbol" aria-hidden="true">{align === 'left' ? 'format_align_left' : align === 'center' ? 'format_align_center' : 'format_align_right'}</span>
+                  </button>))}
+              </div>
+              <label className="lc-toolbar-field lc-toolbar-field--range">
+                <span>Size</span>
+                <input type="range" min={8} max={48} value={hs.fontSize} onChange={e => setH('fontSize', +e.target.value)}/>
+                <em>{hs.fontSize}px</em>
+              </label>
+              <label className="lc-toolbar-field">
+                <span>Color</span>
+                <ColorSwatch value={hs.fontColor} onChange={v => setH('fontColor', v)}/>
+              </label>
+            </div>);
+        }
+        if (headerToolbarPanel === 'background') {
+            return (<div className="lv-header-toolbar-menu lc-toolbar-menu lc-toolbar-menu--panel">
+              <div className="lc-toolbar-menu-title">Header background</div>
+              <div className="lv-header-toolbar-segment">
+                {(['solid', 'gradient'] as const).map(type => (<button key={type} type="button" className={hs.bgType === type ? 'active' : ''} onClick={() => setH('bgType', type)}>
+                    <span className="material-symbol" aria-hidden="true">{type === 'solid' ? 'format_color_fill' : 'gradient'}</span>
+                  </button>))}
+              </div>
+              {hs.bgType === 'gradient' ? (<>
+                <label className="lc-toolbar-field"><span>From</span><ColorSwatch value={hs.gradFrom} onChange={v => setH('gradFrom', v)}/></label>
+                <label className="lc-toolbar-field"><span>To</span><ColorSwatch value={hs.gradTo} onChange={v => setH('gradTo', v)}/></label>
+                <label className="lc-toolbar-field lc-toolbar-field--range">
+                  <span>Angle</span>
+                  <input type="range" min={0} max={360} value={hs.gradAngle} onChange={e => setH('gradAngle', +e.target.value)}/>
+                  <em>{hs.gradAngle}deg</em>
+                </label>
+              </>) : (<label className="lc-toolbar-field"><span>Color</span><ColorSwatch value={hs.bgColor} onChange={v => setH('bgColor', v)}/></label>)}
+            </div>);
+        }
+        return (<div className="lv-header-toolbar-menu lc-toolbar-menu lc-toolbar-menu--panel">
+          <div className="lc-toolbar-menu-title">Header border</div>
+          <label className="lc-toolbar-field lc-toolbar-field--range">
+            <span>Width</span>
+            <input type="range" min={0} max={20} value={hs.borderWidth} onChange={e => setH('borderWidth', +e.target.value)}/>
+            <em>{hs.borderWidth}px</em>
+          </label>
+          <label className="lc-toolbar-field"><span>Color</span><ColorSwatch value={hs.borderColor} onChange={v => setH('borderColor', v)}/></label>
+          <label className="lc-toolbar-field lc-toolbar-field--range">
+            <span>Radius</span>
+            <input type="range" min={0} max={64} value={hs.radius} onChange={e => setH('radius', +e.target.value)}/>
+            <em>{hs.radius}px</em>
+          </label>
+        </div>);
+    }
+    function renderHeaderFloatingToolbar() {
+        if (typeof document === 'undefined' || !headerSelected || !headerToolbarPos)
+            return null;
+        return ReactDOM.createPortal(<div className={`lc-floating-toolbar lc-floating-toolbar--fixed lv-header-floating-toolbar${headerToolbarPos.placeBelow ? ' lc-floating-toolbar--below' : ''}`} style={{ left: headerToolbarPos.left, top: headerToolbarPos.top } as React.CSSProperties} role="toolbar" aria-label="Header quick tools" onPointerDown={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+          {headerToolbarPanelButton('layout', 'aspect_ratio', 'Header layout')}
+          {headerToolbarPanelButton('text', 'text_fields', 'Header text')}
+          {headerToolbarPanelButton('background', 'format_color_fill', 'Header background')}
+          {headerToolbarPanelButton('border', 'border_outer', 'Header border')}
+          {headerToolbarButton('format_bold', 'Bold', () => setH('fontWeight', hs.fontWeight === 'bold' ? 'normal' : 'bold'), hs.fontWeight === 'bold')}
+          {headerToolbarButton('format_italic', 'Italic', () => setH('fontItalic', !hs.fontItalic), Boolean(hs.fontItalic))}
+          {headerToolbarButton('settings', 'Open header settings', () => setOpenSbSection('header'))}
+          {headerToolbarButton('close', 'Deselect header', () => {
+                setHeaderSelected(false);
+                setHeaderToolbarPanel(null);
+            })}
+          {renderHeaderToolbarPanel()}
+        </div>, document.body);
+    }
     const pages: typeof visible[] = [];
     for (let i = 0; i < visible.length; i += cardsPerPg) {
         pages.push(visible.slice(i, i + cardsPerPg));
@@ -9182,7 +9345,12 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                     height: A4_H,
                 } as React.CSSProperties))}>
                   {headerShowFor(safePage) && (<div className={cssClass({ display: 'flex', justifyContent: hs.blockAlign === 'right' ? 'flex-end' : hs.blockAlign === 'center' ? 'center' : 'flex-start' })}>
-                      <div className={cx(`lv-a4-header${hs.widthMode === 'full' ? ' full-bleed' : ''}`, cssClass({ ...headerStyle, width: `${hs.widthPct ?? 100}%`, justifyContent: hs.textAlign === 'center' ? 'center' : hs.textAlign === 'right' ? 'flex-end' : 'flex-start' }))}>
+                      <div ref={headerBarRef} data-lv-selectable="header" className={cx(`lv-a4-header lv-a4-header--editable${hs.widthMode === 'full' ? ' full-bleed' : ''}${headerSelected ? ' selected' : ''}`, cssClass({ ...headerStyle, width: `${hs.widthPct ?? 100}%`, justifyContent: hs.textAlign === 'center' ? 'center' : hs.textAlign === 'right' ? 'flex-end' : 'flex-start' }))} onMouseDown={e => {
+                            e.stopPropagation();
+                            setHeaderSelected(true);
+                            setHeaderToolbarPanel(null);
+                            window.requestAnimationFrame(updateHeaderToolbarPosition);
+                        }} title="Select header">
                         <HeaderLogoItem settings={hs} editable onUpdate={patch => setHeaderSettings(prev => ({ ...prev, ...patch }))}/>
                         {hs.showText && (<HeaderTextItem settings={hs} text={hs.text || leaflet.title} editable fontFamily={cardLayout?.font_family ? `"${cardLayout.font_family}", sans-serif` : undefined} onUpdate={patch => setHeaderSettings(prev => ({ ...prev, ...patch }))}/>)}
                       </div>
@@ -9218,6 +9386,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
       </div>{/* /lv-layout */}
     </div>{/* /lv-page */}
 
+    {renderHeaderFloatingToolbar()}
     {customizerOpen && id && (<LayoutCustomizer initial={cardLayout ?? {} as CardLayout} onClose={() => setCustomizerOpen(false)} cardAspectRatio={cardW / cardH} onSave={async (layout) => {
                 const r = await saveLeafletLayout(id, completeLayoutForSave(layout));
                 setCardLayout(r.layout);

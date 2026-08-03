@@ -888,6 +888,48 @@ a.lv-card-image-license:hover {
   margin-right: 0;
   width: 100%;
 }
+.lv-a4-header--editable {
+  cursor: pointer;
+}
+.lv-a4-header--editable:hover,
+.lv-a4-header.selected {
+  outline: 2px solid rgba(73, 242, 182, .82);
+  outline-offset: -2px;
+}
+.lv-a4-header.selected::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 1px dashed rgba(15, 23, 42, .42);
+  pointer-events: none;
+}
+.lv-header-floating-toolbar {
+  grid-template-rows: repeat(2, 34px);
+}
+.lv-header-toolbar-menu {
+  text-align: left;
+}
+.lv-header-toolbar-menu .lc-toolbar-field {
+  min-width: 0;
+}
+.lv-header-toolbar-menu .lc-toolbar-field em {
+  color: #bfdbfe;
+  font-style: normal;
+  text-align: right;
+}
+.lv-header-toolbar-menu .lc-toolbar-field .color-swatch,
+.lv-header-toolbar-menu .lc-toolbar-field button.color-swatch {
+  width: 100%;
+  min-height: 30px;
+}
+.lv-header-toolbar-segment {
+  display: flex;
+  gap: 8px;
+}
+.lv-header-toolbar-segment button {
+  flex: 1;
+}
 .lv-logo-upload-wrap {
   display: flex;
   flex-direction: column;
