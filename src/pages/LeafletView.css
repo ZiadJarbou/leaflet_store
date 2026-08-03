@@ -904,6 +904,23 @@ a.lv-card-image-license:hover {
   border: 1px dashed rgba(15, 23, 42, .42);
   pointer-events: none;
 }
+.lv-a4-footer--editable {
+  cursor: pointer;
+  position: relative;
+}
+.lv-a4-footer--editable:hover,
+.lv-a4-footer.selected {
+  outline: 2px solid rgba(73, 242, 182, .82);
+  outline-offset: -2px;
+}
+.lv-a4-footer.selected::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 1px dashed rgba(15, 23, 42, .42);
+  pointer-events: none;
+}
 .lv-header-floating-toolbar {
   grid-template-rows: repeat(2, 34px);
 }

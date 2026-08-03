@@ -1720,7 +1720,7 @@ type HeaderTextSettings = {
 type HeaderToolbarPosition = { left: number; top: number; placeBelow: boolean };
 function getHeaderContainer(start: HTMLElement | null) {
     let el: HTMLElement | null = start?.parentElement ?? null;
-    while (el && !el.classList.contains('lv-a4-header'))
+    while (el && !el.classList.contains('lv-a4-header') && !el.classList.contains('lv-a4-footer'))
         el = el.parentElement;
     return el;
 }
@@ -3192,6 +3192,10 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const [headerSelected, setHeaderSelected] = useState(false);
     const [headerToolbarPos, setHeaderToolbarPos] = useState<HeaderToolbarPosition | null>(null);
     const [headerToolbarPanel, setHeaderToolbarPanel] = useState<'content' | 'layout' | 'text' | 'background' | 'border' | null>(null);
+    const footerBarRef = useRef<HTMLDivElement>(null);
+    const [footerSelected, setFooterSelected] = useState(false);
+    const [footerToolbarPos, setFooterToolbarPos] = useState<HeaderToolbarPosition | null>(null);
+    const [footerToolbarPanel, setFooterToolbarPanel] = useState<'content' | 'layout' | 'text' | 'background' | 'border' | null>(null);
     const [footerSettings, setFooterSettings] = useState({
         show: true,
         text: '',
@@ -3204,6 +3208,12 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         height: 36,
         marginTop: 0,
         marginBottom: 0,
+        logoUrl: '',
+        logoHeight: 28,
+        logoWidth: undefined as number | undefined,
+        logoX: undefined as number | undefined,
+        logoY: undefined as number | undefined,
+        logoGap: 8,
         bgType: 'solid' as 'solid' | 'gradient' | 'image',
         bgColor: '#cccccc',
         gradFrom: '#cccccc',
@@ -3231,6 +3241,14 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     });
     function setF(k: string, v: unknown) {
         setFooterSettings(prev => ({ ...prev, [k]: v }));
+    }
+    function setFooterWidthPct(value: number) {
+        const widthPct = Math.max(20, Math.min(100, value));
+        setFooterSettings(prev => ({
+            ...prev,
+            widthPct,
+            widthMode: widthPct >= 100 ? 'full' : 'grid',
+        }));
     }
     const [pageOverrides, setPageOverrides] = useState<Record<number, {
         header?: boolean;
@@ -3284,7 +3302,6 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     }
     const [openSbSection, setOpenSbSection] = useState<string | null>(null);
     const [currencySearch, setCurrencySearch] = useState('');
-    const [uploadingFtr, setUploadingFtr] = useState(false);
     const coverBackLoadedRef = useRef(false);
     useEffect(() => {
         if (!id)
@@ -3372,6 +3389,22 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             placeBelow,
         });
     }
+    function updateFooterToolbarPosition() {
+        const el = footerBarRef.current;
+        if (!el || !footerSelected) {
+            setFooterToolbarPos(null);
+            return;
+        }
+        const rect = el.getBoundingClientRect();
+        const estimatedToolbarHeight = 112;
+        const margin = 12;
+        const placeBelow = rect.top < estimatedToolbarHeight + margin;
+        setFooterToolbarPos({
+            left: Math.max(margin, Math.min(window.innerWidth - margin, rect.left + rect.width / 2)),
+            top: placeBelow ? Math.min(window.innerHeight - margin, rect.bottom + margin) : Math.max(margin, rect.top - margin),
+            placeBelow,
+        });
+    }
     useEffect(() => {
         if (!headerSelected)
             return;
@@ -3407,6 +3440,41 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         if (headerSelected)
             updateHeaderToolbarPosition();
     }, [headerSelected, headerSettings, zoom]);
+    useEffect(() => {
+        if (!footerSelected)
+            return;
+        let frame = window.requestAnimationFrame(updateFooterToolbarPosition);
+        const schedule = () => {
+            window.cancelAnimationFrame(frame);
+            frame = window.requestAnimationFrame(updateFooterToolbarPosition);
+        };
+        window.addEventListener('resize', schedule);
+        window.addEventListener('scroll', schedule, true);
+        return () => {
+            window.cancelAnimationFrame(frame);
+            window.removeEventListener('resize', schedule);
+            window.removeEventListener('scroll', schedule, true);
+        };
+    }, [footerSelected, currentPage, zoom, footerSettings.height, footerSettings.widthPct, footerSettings.marginTop, footerSettings.marginBottom]);
+    useEffect(() => {
+        if (!footerSelected)
+            return;
+        function onDocumentPointerDown(e: PointerEvent) {
+            const target = e.target as HTMLElement | null;
+            if (!target)
+                return;
+            if (target.closest('.lc-floating-toolbar') || target.closest('.lv-a4-footer') || target.closest('.cs-popover'))
+                return;
+            setFooterSelected(false);
+            setFooterToolbarPanel(null);
+        }
+        document.addEventListener('pointerdown', onDocumentPointerDown);
+        return () => document.removeEventListener('pointerdown', onDocumentPointerDown);
+    }, [footerSelected]);
+    useEffect(() => {
+        if (footerSelected)
+            updateFooterToolbarPosition();
+    }, [footerSelected, footerSettings, zoom]);
     useEffect(() => {
         if (!coverBuilderOnly || !selectedCoverTemplate || !selectedCoverTemplateId)
             return;
@@ -7730,6 +7798,9 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     function headerToolbarPanelButton(panel: typeof headerToolbarPanel, icon: string, title: string) {
         return headerToolbarButton(icon, title, () => setHeaderToolbarPanel(prev => prev === panel ? null : panel), headerToolbarPanel === panel);
     }
+    function footerToolbarPanelButton(panel: typeof footerToolbarPanel, icon: string, title: string) {
+        return headerToolbarButton(icon, title, () => setFooterToolbarPanel(prev => prev === panel ? null : panel), footerToolbarPanel === panel);
+    }
     function renderHeaderToolbarPanel() {
         if (!headerToolbarPanel)
             return null;
@@ -7858,6 +7929,137 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 setHeaderToolbarPanel(null);
             })}
           {renderHeaderToolbarPanel()}
+        </div>, document.body);
+    }
+    function renderFooterToolbarPanel() {
+        if (!footerToolbarPanel)
+            return null;
+        if (footerToolbarPanel === 'content') {
+            return (<div className="lv-header-toolbar-menu lc-toolbar-menu lc-toolbar-menu--panel">
+              <div className="lc-toolbar-menu-title">Footer content</div>
+              <div className="lv-header-toolbar-row">
+                <span>Apply to all pages</span>
+                <button type="button" className="lv-header-toolbar-secondary" onClick={applyFooterToAll}>
+                  <span className="material-symbol" aria-hidden="true">select_all</span>
+                  <span>Apply</span>
+                </button>
+              </div>
+              <label className="lv-header-toolbar-toggle">
+                <span>Show footer</span>
+                <input type="checkbox" checked={footerShowFor(safePage)} onChange={() => toggleFooterForPage(safePage)}/>
+              </label>
+              <label className="lv-header-toolbar-toggle">
+                <span>Show text</span>
+                <input type="checkbox" checked={fs.showText} onChange={e => setF('showText', e.target.checked)}/>
+              </label>
+              <label className="lv-header-toolbar-toggle">
+                <span>Page number</span>
+                <input type="checkbox" checked={fs.showPageNum ?? true} onChange={e => setF('showPageNum', e.target.checked)}/>
+              </label>
+              <div className="lv-header-toolbar-logo">
+                <span className="lv-header-toolbar-label">Logo</span>
+                <HeaderLogoUploader currentUrl={String(fs.logoUrl ?? '')} onUploaded={url => setFooterSettings(prev => ({ ...prev, logoUrl: url, logoWidth: undefined, logoX: undefined, logoY: undefined }))} onRemove={() => setFooterSettings(prev => ({ ...prev, logoUrl: '', logoWidth: undefined, logoX: undefined, logoY: undefined }))}/>
+              </div>
+              {fs.logoUrl && (<label className="lc-toolbar-field lc-toolbar-field--range">
+                <span>Logo</span>
+                <input type="range" min={14} max={72} value={Number(fs.logoHeight ?? 28)} onChange={e => setF('logoHeight', +e.target.value)}/>
+                <em>{Number(fs.logoHeight ?? 28)}px</em>
+              </label>)}
+            </div>);
+        }
+        if (footerToolbarPanel === 'layout') {
+            return (<div className="lv-header-toolbar-menu lc-toolbar-menu lc-toolbar-menu--panel">
+              <div className="lc-toolbar-menu-title">Footer layout</div>
+              <label className="lc-toolbar-field lc-toolbar-field--range">
+                <span>Height</span>
+                <input type="range" min={24} max={120} value={fs.height} onChange={e => setF('height', +e.target.value)}/>
+                <em>{fs.height}px</em>
+              </label>
+              <label className="lc-toolbar-field lc-toolbar-field--range">
+                <span>Width</span>
+                <input type="range" min={20} max={100} value={fs.widthPct} onChange={e => setFooterWidthPct(+e.target.value)}/>
+                <em>{fs.widthPct}%</em>
+              </label>
+              <label className="lc-toolbar-field lc-toolbar-field--range">
+                <span>Top</span>
+                <input type="range" min={0} max={100} value={fs.marginTop} onChange={e => setF('marginTop', +e.target.value)}/>
+                <em>{fs.marginTop}px</em>
+              </label>
+              <label className="lc-toolbar-field lc-toolbar-field--range">
+                <span>Bottom</span>
+                <input type="range" min={0} max={100} value={fs.marginBottom} onChange={e => setF('marginBottom', +e.target.value)}/>
+                <em>{fs.marginBottom}px</em>
+              </label>
+            </div>);
+        }
+        if (footerToolbarPanel === 'text') {
+            return (<div className="lv-header-toolbar-menu lc-toolbar-menu lc-toolbar-menu--panel">
+              <div className="lc-toolbar-menu-title">Footer text</div>
+              <div className="lv-header-toolbar-segment">
+                {(['left', 'center', 'right'] as const).map(align => (<button key={align} type="button" className={fs.textAlign === align ? 'active' : ''} title={`Align ${align}`} onClick={() => setF('textAlign', align)}>
+                    <span className="material-symbol" aria-hidden="true">{align === 'left' ? 'format_align_left' : align === 'center' ? 'format_align_center' : 'format_align_right'}</span>
+                  </button>))}
+              </div>
+              <label className="lc-toolbar-field lc-toolbar-field--range">
+                <span>Size</span>
+                <input type="range" min={8} max={48} value={fs.fontSize} onChange={e => setF('fontSize', +e.target.value)}/>
+                <em>{fs.fontSize}px</em>
+              </label>
+              <label className="lc-toolbar-field"><span>Color</span><ColorSwatch value={fs.fontColor} onChange={v => setF('fontColor', v)}/></label>
+            </div>);
+        }
+        if (footerToolbarPanel === 'background') {
+            return (<div className="lv-header-toolbar-menu lc-toolbar-menu lc-toolbar-menu--panel">
+              <div className="lc-toolbar-menu-title">Footer background</div>
+              <div className="lv-header-toolbar-segment">
+                {(['solid', 'gradient'] as const).map(type => (<button key={type} type="button" className={fs.bgType === type ? 'active' : ''} onClick={() => setF('bgType', type)}>
+                    <span className="material-symbol" aria-hidden="true">{type === 'solid' ? 'format_color_fill' : 'gradient'}</span>
+                  </button>))}
+              </div>
+              {fs.bgType === 'gradient' ? (<>
+                <label className="lc-toolbar-field"><span>From</span><ColorSwatch value={fs.gradFrom} onChange={v => setF('gradFrom', v)}/></label>
+                <label className="lc-toolbar-field"><span>To</span><ColorSwatch value={fs.gradTo} onChange={v => setF('gradTo', v)}/></label>
+                <label className="lc-toolbar-field lc-toolbar-field--range">
+                  <span>Angle</span>
+                  <input type="range" min={0} max={360} value={fs.gradAngle} onChange={e => setF('gradAngle', +e.target.value)}/>
+                  <em>{fs.gradAngle}deg</em>
+                </label>
+              </>) : (<label className="lc-toolbar-field"><span>Color</span><ColorSwatch value={fs.bgColor} onChange={v => setF('bgColor', v)}/></label>)}
+            </div>);
+        }
+        return (<div className="lv-header-toolbar-menu lc-toolbar-menu lc-toolbar-menu--panel">
+          <div className="lc-toolbar-menu-title">Footer border</div>
+          <label className="lc-toolbar-field lc-toolbar-field--range">
+            <span>Width</span>
+            <input type="range" min={0} max={20} value={fs.borderWidth} onChange={e => setF('borderWidth', +e.target.value)}/>
+            <em>{fs.borderWidth}px</em>
+          </label>
+          <label className="lc-toolbar-field"><span>Color</span><ColorSwatch value={fs.borderColor} onChange={v => setF('borderColor', v)}/></label>
+          <label className="lc-toolbar-field lc-toolbar-field--range">
+            <span>Radius</span>
+            <input type="range" min={0} max={64} value={fs.radius} onChange={e => setF('radius', +e.target.value)}/>
+            <em>{fs.radius}px</em>
+          </label>
+        </div>);
+    }
+    function renderFooterFloatingToolbar() {
+        if (typeof document === 'undefined' || !footerSelected || !footerToolbarPos)
+            return null;
+        return ReactDOM.createPortal(<div className={`lc-floating-toolbar lc-floating-toolbar--fixed lv-header-floating-toolbar lv-footer-floating-toolbar${footerToolbarPos.placeBelow ? ' lc-floating-toolbar--below' : ''}`} style={{ left: footerToolbarPos.left, top: footerToolbarPos.top } as React.CSSProperties} role="toolbar" aria-label="Footer quick tools" onPointerDown={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+          {headerToolbarButton(footerShowFor(safePage) ? 'visibility' : 'visibility_off', 'Show footer on this page', () => toggleFooterForPage(safePage), footerShowFor(safePage))}
+          {footerToolbarPanelButton('content', 'widgets', 'Footer content')}
+          {footerToolbarPanelButton('layout', 'aspect_ratio', 'Footer layout')}
+          {footerToolbarPanelButton('text', 'text_fields', 'Footer text')}
+          {footerToolbarPanelButton('background', 'format_color_fill', 'Footer background')}
+          {footerToolbarPanelButton('border', 'border_outer', 'Footer border')}
+          {headerToolbarButton('format_bold', 'Bold', () => setF('fontWeight', fs.fontWeight === 'bold' ? 'normal' : 'bold'), fs.fontWeight === 'bold')}
+          {headerToolbarButton('format_italic', 'Italic', () => setF('fontItalic', !fs.fontItalic), Boolean(fs.fontItalic))}
+          {headerToolbarButton('settings', 'Open footer settings', () => setOpenSbSection('footer'))}
+          {headerToolbarButton('close', 'Deselect footer', () => {
+                setFooterSelected(false);
+                setFooterToolbarPanel(null);
+            })}
+          {renderFooterToolbarPanel()}
         </div>, document.body);
     }
     const pages: typeof visible[] = [];
@@ -8554,51 +8756,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
               </label>
               {pageOverrides[safePage]?.footer !== undefined && (<span className="lv-sb-page-badge">pg {safePage + 1}</span>)}
             </div>
-            <div className="lv-sb-row lv-sb-row--inline">
-              <span className="lv-sb-label"/>
-              <button className="lv-sb-apply-all" onClick={applyFooterToAll}>
-                Apply to all pages
-              </button>
-            </div>
             {footerShowFor(safePage) && (<>
-              <div className="lv-sb-row">
-                <span className="lv-sb-label">Footer text <InfoTooltip text={SB_TOOLTIPS['footer.text']}/></span>
-                <input className="lv-sb-text-input" type="text" placeholder={leaflet?.title ?? 'Footer text...'} value={fs.text} onChange={e => setF('text', e.target.value)}/>
-              </div>
-              <div className="lv-sb-row lv-sb-row--inline">
-                <span className="lv-sb-label">Show text <InfoTooltip text={SB_TOOLTIPS['footer.showText']}/></span>
-                <label className="lv-sb-switch">
-                  <input type="checkbox" checked={fs.showText} onChange={e => setF('showText', e.target.checked)}/>
-                  <span className="lv-sb-switch-track"/>
-                </label>
-              </div>
-              <div className="lv-sb-row lv-sb-row--inline">
-                <span className="lv-sb-label">Page number <InfoTooltip text={SB_TOOLTIPS['footer.showPageNum']}/></span>
-                <label className="lv-sb-switch">
-                  <input type="checkbox" checked={fs.showPageNum ?? true} onChange={e => setF('showPageNum', e.target.checked)}/>
-                  <span className="lv-sb-switch-track"/>
-                </label>
-              </div>
-              <div className="lv-sb-row">
-                <span className="lv-sb-label">Align <InfoTooltip text={SB_TOOLTIPS['footer.align']}/></span>
-                <div className="lv-sb-tabs">
-                  {(['left', 'center', 'right'] as const).map(a => (<button key={a} className={`lv-sb-tab${fs.textAlign === a ? ' active' : ''}`} onClick={() => setF('textAlign', a)}>{a.charAt(0).toUpperCase() + a.slice(1)}</button>))}
-                </div>
-              </div>
-              <div className="lv-sb-row">
-                <span className="lv-sb-label">Height <InfoTooltip text={SB_TOOLTIPS['footer.height']}/></span>
-                <div className="lv-sb-slider-wrap">
-                  <input type="range" min={24} max={120} value={fs.height} onChange={e => setF('height', +e.target.value)}/>
-                  <span className="lv-sb-val">{fs.height}px</span>
-                </div>
-              </div>
-              <div className="lv-sb-row">
-                <span className="lv-sb-label">Width <InfoTooltip text={SB_TOOLTIPS['footer.width']}/></span>
-                <div className="lv-sb-slider-wrap">
-                  <input type="range" min={20} max={100} step={1} value={fs.widthPct} onChange={e => setF('widthPct', +e.target.value)}/>
-                  <span className="lv-sb-val">{fs.widthPct}%</span>
-                </div>
-              </div>
               {fs.widthPct < 100 && (<div className="lv-sb-row">
                   <span className="lv-sb-label">Position <InfoTooltip text={SB_TOOLTIPS['footer.position']}/></span>
                   <div className="lv-sb-tabs">
@@ -8607,23 +8765,6 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                       </button>))}
                   </div>
                 </div>)}
-              <div className="lv-sb-row">
-                <span className="lv-sb-label">Margin Top <InfoTooltip text={SB_TOOLTIPS['footer.marginTop']}/></span>
-                <div className="lv-sb-slider-wrap">
-                  <input type="range" min={0} max={100} value={fs.marginTop} onChange={e => setF('marginTop', +e.target.value)}/>
-                  <span className="lv-sb-val">{fs.marginTop}px</span>
-                </div>
-              </div>
-              <div className="lv-sb-row">
-                <span className="lv-sb-label">Bottom Position</span>
-                <div className="lv-sb-slider-wrap">
-                  <input type="range" min={0} max={100} value={fs.marginBottom} onChange={e => setF('marginBottom', +e.target.value)}/>
-                  <span className="lv-sb-val">{fs.marginBottom}px</span>
-                </div>
-              </div>
-              <BgTypeControls s={fs} setter={setF} uploading={uploadingFtr} setUploading={setUploadingFtr}/>
-              <FontControls s={fs} setter={setF}/>
-              <BorderRadiusControls s={fs} setter={setF}/>
             </>)}
           </SbSection>
 
@@ -9306,6 +9447,8 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                             e.stopPropagation();
                             setHeaderSelected(true);
                             setHeaderToolbarPanel(null);
+                            setFooterSelected(false);
+                            setFooterToolbarPanel(null);
                             window.requestAnimationFrame(updateHeaderToolbarPosition);
                         }} title="Select header">
                         <HeaderLogoItem settings={hs} editable onUpdate={patch => setHeaderSettings(prev => ({ ...prev, ...patch }))}/>
@@ -9329,8 +9472,15 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                         Clear filters
                       </button>
                     </div>)}
-                  {footerShowFor(safePage) && (<div className={cx(`lv-a4-footer${fs.widthMode === 'full' ? ' full-bleed' : ''}`, cssClass({ ...footerStyle }))}>
-                      {fs.showText && <span className={cx("lv-a4-footer-text", cssClass({ flex: 1, maxWidth: 'none', textAlign: fs.textAlign, fontFamily: cardLayout?.font_family ? `"${cardLayout.font_family}", sans-serif` : undefined }))}>{fs.text || leaflet.title}</span>}
+                  {footerShowFor(safePage) && (<div ref={footerBarRef} data-lv-selectable="footer" className={cx(`lv-a4-footer lv-a4-footer--editable${fs.widthMode === 'full' ? ' full-bleed' : ''}${footerSelected ? ' selected' : ''}`, cssClass({ ...footerStyle }))} onMouseDown={e => {
+                            e.stopPropagation();
+                            setHeaderSelected(false);
+                            setHeaderToolbarPanel(null);
+                            setFooterSelected(true);
+                            setFooterToolbarPanel(null);
+                        }}>
+                      <HeaderLogoItem settings={fs} editable onUpdate={patch => setFooterSettings(prev => ({ ...prev, ...patch }))}/>
+                      {fs.showText && <HeaderTextItem settings={fs} text={fs.text || leaflet.title} editable fontFamily={cardLayout?.font_family ? `"${cardLayout.font_family}", sans-serif` : undefined} onUpdate={patch => setFooterSettings(prev => ({ ...prev, ...patch }))}/>}
                       {(fs.showPageNum ?? true) && <span className={cx("lv-a4-footer-pagenum", cssClass({ fontFamily: cardLayout?.font_family ? `"${cardLayout.font_family}", sans-serif` : undefined }))}>Page {safePage + 1} / {pages.length}</span>}
                     </div>)}
                 </div>);
@@ -9344,6 +9494,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     </div>{/* /lv-page */}
 
     {renderHeaderFloatingToolbar()}
+    {renderFooterFloatingToolbar()}
     {customizerOpen && id && (<LayoutCustomizer initial={cardLayout ?? {} as CardLayout} onClose={() => setCustomizerOpen(false)} cardAspectRatio={cardW / cardH} onSave={async (layout) => {
                 const r = await saveLeafletLayout(id, { ...layout, cover_page: coverPage, back_page: backPage, cover_builder: frontCoverBuilder as unknown as Record<string, unknown>, back_cover_builder: backCoverBuilder as unknown as Record<string, unknown> });
                 setCardLayout(r.layout);
@@ -9397,8 +9548,9 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 </div>
               </div>)}
             {footerShowFor(pageIdx) && (<div className={cx(`lv-a4-footer${fs.widthMode === 'full' ? ' full-bleed' : ''}`, cssClass({ ...footerStyle }))}>
-                {fs.showText && <span className={cx("lv-a4-footer-text", cssClass({ flex: 1, maxWidth: 'none', textAlign: fs.textAlign, fontFamily: cardLayout?.font_family ? `"${cardLayout.font_family}", sans-serif` : undefined }))}>{fs.text || leaflet?.title}</span>}
-                <span className={cx("lv-a4-footer-pagenum", cssClass({ fontFamily: cardLayout?.font_family ? `"${cardLayout.font_family}", sans-serif` : undefined }))}>Page {pageIdx + 1} / {pages.length}</span>
+                <HeaderLogoItem settings={fs}/>
+                {fs.showText && <HeaderTextItem settings={fs} text={fs.text || leaflet?.title || ''} fontFamily={cardLayout?.font_family ? `"${cardLayout.font_family}", sans-serif` : undefined}/>}
+                {(fs.showPageNum ?? true) && <span className={cx("lv-a4-footer-pagenum", cssClass({ fontFamily: cardLayout?.font_family ? `"${cardLayout.font_family}", sans-serif` : undefined }))}>Page {pageIdx + 1} / {pages.length}</span>}
               </div>)}
           </div>
         </div>))}
