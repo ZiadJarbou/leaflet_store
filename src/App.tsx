@@ -78,6 +78,7 @@ function AppShell() {
           <Route path="/help" element={<HelpCenterPage />}/>
           {/* Admin CMS — role check is inside AdminPage itself */}
           <Route path="/admin/*" element={<AdminPage />}/>
+          <Route path="/404" element={<NotFoundPage />}/>
           <Route path="*" element={<NotFoundPage />}/>
         </Routes>
     </>);

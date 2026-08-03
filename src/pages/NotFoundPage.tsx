@@ -10,9 +10,9 @@ export default function NotFoundPage() {
         <section className="nf-panel" aria-labelledby="nf-title">
           <span className="nf-code">404</span>
           <h1 id="nf-title">Page not found</h1>
-          <p>The page may have moved, expired, or never existed.</p>
+          <p>We could not find the page you were looking for.</p>
           <Link className="nf-home-btn" to="/">
-            Go to home page
+            Go back to home page
           </Link>
         </section>
       </main>
