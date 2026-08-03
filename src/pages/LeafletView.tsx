@@ -8437,10 +8437,6 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
               {pageOverrides[safePage]?.header !== undefined && (<span className="lv-sb-page-badge">pg {safePage + 1}</span>)}
             </div>
             {headerShowFor(safePage) && (<>
-              <div className="lv-sb-row">
-                <span className="lv-sb-label">Title text <InfoTooltip text={SB_TOOLTIPS['header.text']}/></span>
-                <input className="lv-sb-text-input" type="text" placeholder={leaflet?.title ?? 'Header text...'} value={hs.text} onChange={e => setH('text', e.target.value)}/>
-              </div>
               {headerWidthPct < 100 && (<div className="lv-sb-row">
                   <span className="lv-sb-label">Position <InfoTooltip text={SB_TOOLTIPS['header.position']}/></span>
                   <div className="lv-sb-tabs">
