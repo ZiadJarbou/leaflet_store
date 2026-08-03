@@ -21,6 +21,7 @@ import ColorSwatch from '../components/ColorSwatch';
 import CountryPicker from '../components/CountryPicker';
 import OriginInput from '../components/OriginInput';
 import './LeafletView.css';
+import './NotFoundPage.css';
 const LEAFLET_EDITOR_TOUR_SEEN_KEY = 'leafletai_leaflet_editor_tour_seen';
 const LEAFLET_EDITOR_TOUR_SKIPPED_KEY = 'leafletai_leaflet_editor_tour_skipped';
 const NANO_A4_VISIBILITY_STORAGE_KEY = 'leafletai_nano_a4_enabled';
@@ -3762,9 +3763,10 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     }
     if (error || !data) {
         return (<div className="lv-state-page">
-        <div className={cssClass({ fontSize: 48 })}>Warning</div>
+        <span className="nf-code">404</span>
         <h2>{error ?? 'Leaflet not found'}</h2>
-        <Link to="/" className={cx("btn ghost", cssClass({ marginTop: 12 }))}>Back home</Link>
+        <p>We could not find the leaflet you were looking for.</p>
+        <Link to="/" className="nf-home-btn">Go back to home page</Link>
       </div>);
     }
     const { leaflet, products } = data;
