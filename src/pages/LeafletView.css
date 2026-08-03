@@ -931,6 +931,21 @@ a.lv-card-image-license:hover {
   width: min(360px, calc(100vw - 32px));
   padding: 14px;
 }
+.lv-footer-floating-toolbar:not(.lc-floating-toolbar--below) .lv-header-toolbar-menu {
+  top: auto;
+  bottom: calc(100% + 12px);
+}
+.lv-footer-floating-toolbar:not(.lc-floating-toolbar--below) .lv-header-toolbar-menu::before {
+  top: auto;
+  bottom: -5px;
+  border: 0;
+  border-right: 1px solid #303247;
+  border-bottom: 1px solid #303247;
+}
+.lv-footer-floating-toolbar .lv-header-toolbar-menu.lc-toolbar-menu--panel {
+  max-height: min(340px, calc(100vh - 180px));
+  overflow-y: auto;
+}
 .lv-header-toolbar-menu .lc-toolbar-field {
   min-width: 0;
 }
