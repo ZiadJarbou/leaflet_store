@@ -2806,11 +2806,16 @@ export function FontPickerSection({ layout, set, }: {
         <div className="lc-font-hero-copy">
           <div className="lc-font-header">
             <span className="lc-font-header-title">Typography</span>
+            <span className="lc-font-info-wrap" tabIndex={0} aria-label="Choose the font style for your leaflet. The selected font will apply to all text elements.">
+              <svg className="lc-font-info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+              <span className="lc-font-info-tip">Choose the font style for your leaflet. The selected font will apply to all text elements.</span>
+            </span>
             <span className="lc-font-header-sub">Font Family</span>
           </div>
-          <p className="lc-font-desc">
-            Choose the font style for your leaflet. The selected font will apply to all text elements.
-          </p>
         </div>
       </div>
 

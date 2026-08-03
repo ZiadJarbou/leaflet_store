@@ -7497,11 +7497,12 @@ body.dragging-icon .lv-card-drop-layer {
 }
 
 .lv-sidebar--typography .lv-sb-cpanel-title {
-  font-size: 1.45rem;
+  font-size: 11px;
+  font-weight: 800;
   line-height: 1;
-  text-transform: none;
-  letter-spacing: 0;
-  color: #f7f8ff;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: #e2e8f0;
 }
 
 .lv-sidebar--typography .lv-sb-cpanel-close {
@@ -7567,20 +7568,73 @@ body.dragging-icon .lv-card-drop-layer {
 .lv-sidebar--typography .lc-font-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 2px 0 10px;
+  gap: 7px;
+  margin: 2px 0 0;
 }
 
 .lv-sidebar--typography .lc-font-header-title {
   color: #56f5bd;
-  font-size: 1rem;
-  font-weight: 850;
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.lv-sidebar--typography .lc-font-info-wrap {
+  position: relative;
+  display: inline-flex;
+  color: #64748b;
+  cursor: help;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.lv-sidebar--typography .lc-font-info-wrap:hover,
+.lv-sidebar--typography .lc-font-info-wrap:focus {
+  color: #94a3b8;
+}
+
+.lv-sidebar--typography .lc-font-info-icon {
+  display: block;
+}
+
+.lv-sidebar--typography .lc-font-info-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  z-index: 50;
+  width: 220px;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: #1e293b;
+  color: #cbd5e1;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  font-size: .72rem;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0;
+  text-transform: none;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .12s, visibility .12s;
+}
+
+.lv-sidebar--typography .lc-font-info-wrap:hover .lc-font-info-tip,
+.lv-sidebar--typography .lc-font-info-wrap:focus .lc-font-info-tip {
+  opacity: 1;
+  visibility: visible;
 }
 
 .lv-sidebar--typography .lc-font-header-sub {
+  margin-left: auto;
   color: #9c98d9;
-  font-size: .9rem;
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -7593,11 +7647,14 @@ body.dragging-icon .lv-card-drop-layer {
 }
 
 .lv-sidebar--typography .lc-font-label {
-  color: #dce6ff;
-  font-size: .76rem;
-  font-weight: 850;
-  letter-spacing: .08em;
+  color: var(--text-muted, #888);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
   text-transform: uppercase;
+  margin: 12px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border, #2a2a3a);
 }
 
 .lv-sidebar--typography .lc-font-select-btn {
@@ -7623,10 +7680,11 @@ body.dragging-icon .lv-card-drop-layer {
 
 .lv-sidebar--typography .lc-font-preview-box {
   min-height: 106px;
-  display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
-  align-items: center;
-  gap: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 12px;
   padding: 18px 20px;
   border-radius: 8px;
   border: 1px solid rgba(169,180,223,.2);
@@ -7644,9 +7702,9 @@ body.dragging-icon .lv-card-drop-layer {
 
 .lv-sidebar--typography .lc-font-preview-text {
   color: #f7f8ff;
-  font-size: 1rem;
+  font-size: .95rem;
   font-weight: 700;
-  line-height: 1.65;
+  line-height: 1.55;
 }
 
 .lv-sidebar--typography .lc-font-import {
@@ -7658,12 +7716,14 @@ body.dragging-icon .lv-card-drop-layer {
 }
 
 .lv-sidebar--typography .lc-font-import-label {
-  color: #b9c3e4;
-  font-size: .9rem;
-  font-weight: 850;
+  color: var(--text-muted, #888);
+  font-size: 10px;
+  font-weight: 700;
   letter-spacing: .06em;
   line-height: 1;
   text-transform: uppercase;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border, #2a2a3a);
 }
 
 .lv-sidebar--typography .lc-font-import-tabs {
@@ -7679,15 +7739,16 @@ body.dragging-icon .lv-card-drop-layer {
 
 .lv-sidebar--typography .lc-font-import-tab {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 6px;
   border: 0;
   background: transparent;
   color: #dbe4ff;
   font: inherit;
-  font-size: .9rem;
-  font-weight: 750;
+  font-size: .78rem;
+  font-weight: 900;
   cursor: pointer;
   transition: background .16s, color .16s, box-shadow .16s;
 }
