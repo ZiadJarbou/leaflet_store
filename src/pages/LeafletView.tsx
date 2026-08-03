@@ -3144,6 +3144,14 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     function setH(k: string, v: unknown) {
         setHeaderSettings(prev => ({ ...prev, [k]: v }));
     }
+    function setHeaderWidthPct(value: number) {
+        const widthPct = Math.max(20, Math.min(100, value));
+        setHeaderSettings(prev => ({
+            ...prev,
+            widthPct,
+            widthMode: widthPct >= 100 ? 'full' : 'grid',
+        }));
+    }
     const headerBarRef = useRef<HTMLDivElement>(null);
     const [headerSelected, setHeaderSelected] = useState(false);
     const [headerToolbarPos, setHeaderToolbarPos] = useState<HeaderToolbarPosition | null>(null);
@@ -7672,7 +7680,9 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         const mr = al === 'right' ? 0 : 'auto';
         return { width: `${pct}%`, marginLeft: ml, marginRight: mr, alignSelf: 'center' as const };
     }
-    const headerBarState = hs as unknown as BarState;
+    const headerWidthPct = Number(hs.widthPct ?? 100);
+    const headerBarState = { ...hs, widthPct: headerWidthPct, widthMode: headerWidthPct >= 100 ? hs.widthMode : 'grid' } as unknown as BarState;
+    const headerIsFullBleed = headerBarState.widthMode === 'full' && headerWidthPct >= 100;
     const footerBarState = fs as unknown as BarState;
     const headerStyle = { ...makeBarStyle(headerBarState, 0), ...makeBarBorder(headerBarState), ...makeBarRadius(headerBarState), ...makeBarAlign(headerBarState), marginTop: headerMarginTop, marginBottom: headerMarginBottom };
     const footerStyle = { ...makeBarStyle(footerBarState, 0), ...makeBarBorder(footerBarState), ...makeBarRadius(footerBarState), ...makeBarAlign(footerBarState), marginTop: flushFullBleedFooter ? 0 : fs.widthMode === 'full' ? 0 : footerMarginTop, marginBottom: footerMarginBottom };
@@ -7697,8 +7707,8 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
               </label>
               <label className="lc-toolbar-field lc-toolbar-field--range">
                 <span>Width</span>
-                <input type="range" min={20} max={100} value={hs.widthPct} onChange={e => setH('widthPct', +e.target.value)}/>
-                <em>{hs.widthPct}%</em>
+                <input type="range" min={20} max={100} value={headerWidthPct} onChange={e => setHeaderWidthPct(+e.target.value)}/>
+                <em>{headerWidthPct}%</em>
               </label>
               <label className="lc-toolbar-field lc-toolbar-field--range">
                 <span>Top</span>
@@ -8408,11 +8418,11 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
               <div className="lv-sb-row">
                 <span className="lv-sb-label">Width <InfoTooltip text={SB_TOOLTIPS['header.width']}/></span>
                 <div className="lv-sb-slider-wrap">
-                  <input type="range" min={20} max={100} step={1} value={hs.widthPct} onChange={e => setH('widthPct', +e.target.value)}/>
-                  <span className="lv-sb-val">{hs.widthPct}%</span>
+                  <input type="range" min={20} max={100} step={1} value={headerWidthPct} onChange={e => setHeaderWidthPct(+e.target.value)}/>
+                  <span className="lv-sb-val">{headerWidthPct}%</span>
                 </div>
               </div>
-              {hs.widthPct < 100 && (<div className="lv-sb-row">
+              {headerWidthPct < 100 && (<div className="lv-sb-row">
                   <span className="lv-sb-label">Position <InfoTooltip text={SB_TOOLTIPS['header.position']}/></span>
                   <div className="lv-sb-tabs">
                     {(['left', 'center', 'right'] as const).map(a => (<button key={a} className={`lv-sb-tab${hs.blockAlign === a ? ' active' : ''}`} onClick={() => setH('blockAlign', a)}>
@@ -9292,7 +9302,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                     height: A4_H,
                 } as React.CSSProperties))}>
                   {headerShowFor(safePage) && (<div className={cssClass({ display: 'flex', justifyContent: hs.blockAlign === 'right' ? 'flex-end' : hs.blockAlign === 'center' ? 'center' : 'flex-start' })}>
-                      <div ref={headerBarRef} data-lv-selectable="header" className={cx(`lv-a4-header lv-a4-header--editable${hs.widthMode === 'full' ? ' full-bleed' : ''}${headerSelected ? ' selected' : ''}`, cssClass({ ...headerStyle, width: `${hs.widthPct ?? 100}%`, justifyContent: hs.textAlign === 'center' ? 'center' : hs.textAlign === 'right' ? 'flex-end' : 'flex-start' }))} onMouseDown={e => {
+                      <div ref={headerBarRef} data-lv-selectable="header" className={cx(`lv-a4-header lv-a4-header--editable${headerIsFullBleed ? ' full-bleed' : ''}${headerSelected ? ' selected' : ''}`, cssClass({ ...headerStyle, width: `${headerWidthPct}%`, justifyContent: hs.textAlign === 'center' ? 'center' : hs.textAlign === 'right' ? 'flex-end' : 'flex-start' }))} onMouseDown={e => {
                             e.stopPropagation();
                             setHeaderSelected(true);
                             setHeaderToolbarPanel(null);
@@ -9342,7 +9352,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 setCardLayout(r.layout);
             }}/>)}
     {templateOpen && id && (<CardTemplateModal leafletId={id} onApply={applyCardTemplateToLeafletAndCovers} onClose={() => setTemplateOpen(false)}/>)}
-    {bookBuilderOpen && (<BookBuilder leafletTitle={leaflet?.title ?? 'Leaflet'} pages={pages} coverPage={coverPage} backPage={backPage} cardLayout={cardLayout} a4W={A4_W} a4H={A4_H} gridW={gridW} gridH={gridH} cardWidth={cardW} cardHeight={cardH} colsPerPage={colsPerPage} rowsPerPage={rowsPerPage} colGap={colGap} rowGap={rowGap} pageBg={pageBg} isLandscape={isLandscape} headerStyle={headerStyle} footerStyle={footerStyle} headerSettings={{ show: headerSettings.show, text: headerSettings.text, showText: headerSettings.showText, textAlign: headerSettings.textAlign, blockAlign: headerSettings.blockAlign, widthMode: headerSettings.widthMode, widthPct: headerSettings.widthPct, height: headerSettings.height, logoUrl: headerSettings.logoUrl, logoHeight: headerSettings.logoHeight, logoWidth: headerSettings.logoWidth, logoX: headerSettings.logoX, logoY: headerSettings.logoY, logoGap: headerSettings.logoGap, textWidth: headerSettings.textWidth, textHeight: headerSettings.textHeight, textX: headerSettings.textX, textY: headerSettings.textY }} footerSettings={{ show: footerSettings.show, text: footerSettings.text, showText: footerSettings.showText, textAlign: footerSettings.textAlign, widthMode: footerSettings.widthMode, height: footerSettings.height }} renderProductCard={(p, opts) => (<ProductCard p={p} isTwoLang={isTwoLang} leafletId={id ?? ''} onUpdate={() => { }} onDelete={() => { }} cardLayout={cardLayout} cardWidth={opts.cardWidth} cardHeight={opts.cardHeight} overlays={overlays[p.id] ?? []}/>)} onClose={() => setBookBuilderOpen(false)}/>)}
+    {bookBuilderOpen && (<BookBuilder leafletTitle={leaflet?.title ?? 'Leaflet'} pages={pages} coverPage={coverPage} backPage={backPage} cardLayout={cardLayout} a4W={A4_W} a4H={A4_H} gridW={gridW} gridH={gridH} cardWidth={cardW} cardHeight={cardH} colsPerPage={colsPerPage} rowsPerPage={rowsPerPage} colGap={colGap} rowGap={rowGap} pageBg={pageBg} isLandscape={isLandscape} headerStyle={headerStyle} footerStyle={footerStyle} headerSettings={{ show: headerSettings.show, text: headerSettings.text, showText: headerSettings.showText, textAlign: headerSettings.textAlign, blockAlign: headerSettings.blockAlign, widthMode: String(headerBarState.widthMode), widthPct: headerWidthPct, height: headerSettings.height, logoUrl: headerSettings.logoUrl, logoHeight: headerSettings.logoHeight, logoWidth: headerSettings.logoWidth, logoX: headerSettings.logoX, logoY: headerSettings.logoY, logoGap: headerSettings.logoGap, textWidth: headerSettings.textWidth, textHeight: headerSettings.textHeight, textX: headerSettings.textX, textY: headerSettings.textY }} footerSettings={{ show: footerSettings.show, text: footerSettings.text, showText: footerSettings.showText, textAlign: footerSettings.textAlign, widthMode: footerSettings.widthMode, height: footerSettings.height }} renderProductCard={(p, opts) => (<ProductCard p={p} isTwoLang={isTwoLang} leafletId={id ?? ''} onUpdate={() => { }} onDelete={() => { }} cardLayout={cardLayout} cardWidth={opts.cardWidth} cardHeight={opts.cardHeight} overlays={overlays[p.id] ?? []}/>)} onClose={() => setBookBuilderOpen(false)}/>)}
     {coverBuilderOpen && renderCoverBuilderModal()}
     {coverBuilderEditingProduct && (<EditModal product={coverBuilderEditingProduct} isTwoLang={isTwoLang} leafletId={id ?? ''} onClose={() => setCoverBuilderEditingProduct(null)} onSave={updated => {
                 handleProductUpdate(updated);
@@ -9373,7 +9383,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                     ...(isLandscape ? { width: '297mm', height: '210mm', maxHeight: '210mm' } : {}),
                 } as React.CSSProperties))}>
             {headerShowFor(pageIdx) && (<div className={cssClass({ display: 'flex', justifyContent: hs.blockAlign === 'right' ? 'flex-end' : hs.blockAlign === 'center' ? 'center' : 'flex-start' })}>
-                <div className={cx(`lv-a4-header${hs.widthMode === 'full' ? ' full-bleed' : ''}`, cssClass({ ...headerStyle, width: `${hs.widthPct ?? 100}%`, justifyContent: hs.textAlign === 'center' ? 'center' : hs.textAlign === 'right' ? 'flex-end' : 'flex-start' }))}>
+                <div className={cx(`lv-a4-header${headerIsFullBleed ? ' full-bleed' : ''}`, cssClass({ ...headerStyle, width: `${headerWidthPct}%`, justifyContent: hs.textAlign === 'center' ? 'center' : hs.textAlign === 'right' ? 'flex-end' : 'flex-start' }))}>
                   <HeaderLogoItem settings={hs}/>
                   {hs.showText && (<HeaderTextItem settings={hs} text={hs.text || leaflet?.title || ''} fontFamily={cardLayout?.font_family ? `"${cardLayout.font_family}", sans-serif` : undefined}/>)}
                 </div>
