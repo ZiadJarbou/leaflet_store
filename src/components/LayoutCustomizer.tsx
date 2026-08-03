@@ -2696,6 +2696,7 @@ export function FontPickerSection({ layout, set, }: {
     const [importErr, setImportErr] = useState('');
     const [importOk, setImportOk] = useState('');
     const [fontUrl, setFontUrl] = useState('');
+    const [importMode, setImportMode] = useState<'upload' | 'url'>('upload');
     const [pendingFile, setPendingFile] = useState<{
         name: string;
         url: string;
@@ -2718,10 +2719,7 @@ export function FontPickerSection({ layout, set, }: {
         setQuery('');
     }
     /* ── File upload handler ── */
-    function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-        const file = e.target.files?.[0];
-        if (!file)
-            return;
+    function setPendingFontFile(file: File) {
         const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
         if (!['ttf', 'otf', 'woff', 'woff2'].includes(ext)) {
             setImportErr('Unsupported file format. Use .ttf, .otf, .woff, or .woff2');
@@ -2732,6 +2730,13 @@ export function FontPickerSection({ layout, set, }: {
         setPendingFile({ name: fontName, url: objectUrl });
         setFontUrl('');
         setImportErr('');
+        setImportMode('upload');
+    }
+    function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (!file)
+            return;
+        setPendingFontFile(file);
     }
     /* ── Import & Apply ── */
     async function handleImport() {
@@ -2853,48 +2858,40 @@ export function FontPickerSection({ layout, set, }: {
 
       {/* ─── Import Custom Font ─── */}
       <div className="lc-font-import">
-        <div className="lc-font-import-head">
-          <span className="lc-font-import-icon material-symbol" aria-hidden="true">cloud_upload</span>
-          <span>
-            <span className="lc-font-import-title">Import Custom Font</span>
-            <span className="lc-font-import-desc">Can't find your font in the list? Import it below.</span>
-          </span>
+        <div className="lc-font-import-label">Import Custom Font</div>
+        <div className="lc-font-import-tabs" role="tablist" aria-label="Font import method">
+          <button type="button" role="tab" aria-selected={importMode === 'upload'} className={`lc-font-import-tab${importMode === 'upload' ? ' active' : ''}`} onClick={() => { setImportMode('upload'); setFontUrl(''); setImportErr(''); }}>
+            <span className="material-symbol" aria-hidden="true">cloud_upload</span>
+            Upload Font File
+          </button>
+          <button type="button" role="tab" aria-selected={importMode === 'url'} className={`lc-font-import-tab${importMode === 'url' ? ' active' : ''}`} onClick={() => { setImportMode('url'); setPendingFile(null); setImportErr(''); }}>
+            <span className="material-symbol" aria-hidden="true">link</span>
+            Paste Font URL
+          </button>
         </div>
 
         {/* File upload */}
-        <button type="button" className={`lc-font-upload-btn${pendingFile ? ' has-file' : ''}`} onClick={() => fileInputRef.current?.click()}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/>
-            <line x1="12" y1="3" x2="12" y2="15"/>
-          </svg>
-          <span className="lc-font-upload-copy">
-            <span>{pendingFile ? pendingFile.name : 'Upload Font File'}</span>
-            <small>Drag & drop or click to browse</small>
-          </span>
-        </button>
+        {importMode === 'upload' ? (<button type="button" className={`lc-font-upload-btn${pendingFile ? ' has-file' : ''}`} onClick={() => fileInputRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => {
+                e.preventDefault();
+                const file = e.dataTransfer.files?.[0];
+                if (file)
+                    setPendingFontFile(file);
+            }}>
+            <span className="material-symbol lc-font-upload-main-icon" aria-hidden="true">backup</span>
+            <span className="lc-font-upload-copy">
+              <span>{pendingFile ? pendingFile.name : 'Drag & drop your font file here'}</span>
+              <small>or click to browse</small>
+            </span>
+          </button>) : (<div className="lc-font-url-panel">
+            <span className="material-symbol lc-font-upload-main-icon" aria-hidden="true">link</span>
+            <input className="lc-font-url-input" type="text" placeholder="e.g. https://fonts.googleapis.com/css2?family=Cairo" value={fontUrl} onChange={e => { setFontUrl(e.target.value); setPendingFile(null); setImportErr(''); }} onKeyDown={e => {
+                if (e.key === 'Enter')
+                    handleImport();
+            }}/>
+            <div className="lc-font-url-example">Example: Google Fonts or CDN link</div>
+          </div>)}
         <input ref={fileInputRef} type="file" accept=".ttf,.otf,.woff,.woff2" onChange={handleFileChange} className={cssClass({ display: 'none' })}/>
         <div className="lc-font-upload-hint"><span className="material-symbol" aria-hidden="true">check_circle</span> Supported formats: .ttf, .otf, .woff, .woff2</div>
-
-        {/* Divider */}
-        <div className="lc-font-or">
-          <span className="lc-font-or-line"/>
-          <span className="lc-font-or-text">OR</span>
-          <span className="lc-font-or-line"/>
-        </div>
-
-        {/* URL input */}
-        <div className="lc-font-url-head">
-          <span className="lc-font-import-icon material-symbol" aria-hidden="true">link</span>
-          <span className={cx("lc-font-label", cssClass({ marginTop: 0 }))}>Paste Font URL</span>
-        </div>
-        <input className="lc-font-url-input" type="text" placeholder="e.g. https://fonts.googleapis.com/css2?family=Cairo" value={fontUrl} onChange={e => { setFontUrl(e.target.value); setPendingFile(null); setImportErr(''); }} onKeyDown={e => {
-            if (e.key === 'Enter')
-                handleImport();
-        }}/>
-        <div className={cx("lc-font-upload-hint", cssClass({ marginBottom: 12 }))}>
-          Example: Google Fonts or CDN link
-        </div>
 
         {/* Feedback */}
         {importErr && <div className="lc-font-import-err">{importErr}</div>}
