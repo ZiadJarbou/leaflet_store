@@ -930,6 +930,33 @@ a.lv-card-image-license:hover {
 .lv-header-toolbar-segment button {
   flex: 1;
 }
+.lv-header-toolbar-action {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid rgba(73,242,182,.35);
+  border-radius: 6px;
+  background: rgba(73,242,182,.12);
+  color: #d1fae5;
+  font-weight: 800;
+  cursor: pointer;
+}
+.lv-header-toolbar-action:hover {
+  background: rgba(73,242,182,.2);
+}
+.lv-header-toolbar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #dbeafe;
+  font-size: 13px;
+  font-weight: 800;
+}
+.lv-header-toolbar-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: #49f2b6;
+}
 .lv-logo-upload-wrap {
   display: flex;
   flex-direction: column;

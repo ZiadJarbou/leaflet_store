@@ -3190,7 +3190,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const headerBarRef = useRef<HTMLDivElement>(null);
     const [headerSelected, setHeaderSelected] = useState(false);
     const [headerToolbarPos, setHeaderToolbarPos] = useState<HeaderToolbarPosition | null>(null);
-    const [headerToolbarPanel, setHeaderToolbarPanel] = useState<'layout' | 'text' | 'background' | 'border' | null>(null);
+    const [headerToolbarPanel, setHeaderToolbarPanel] = useState<'content' | 'layout' | 'text' | 'background' | 'border' | null>(null);
     const [footerSettings, setFooterSettings] = useState({
         show: true,
         text: '',
@@ -7731,6 +7731,27 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     function renderHeaderToolbarPanel() {
         if (!headerToolbarPanel)
             return null;
+        if (headerToolbarPanel === 'content') {
+            return (<div className="lv-header-toolbar-menu lc-toolbar-menu lc-toolbar-menu--panel">
+              <div className="lc-toolbar-menu-title">Header content</div>
+              <button type="button" className="lv-header-toolbar-action" onClick={applyHeaderToAll}>
+                Apply to all pages
+              </button>
+              <label className="lv-header-toolbar-toggle">
+                <span>Show text</span>
+                <input type="checkbox" checked={hs.showText} onChange={e => setH('showText', e.target.checked)}/>
+              </label>
+              <label className="lc-toolbar-field">
+                <span>Logo</span>
+                <HeaderLogoUploader currentUrl={String(hs.logoUrl ?? '')} onUploaded={url => setHeaderSettings(prev => ({ ...prev, logoUrl: url, logoWidth: undefined, logoX: undefined, logoY: undefined }))} onRemove={() => setHeaderSettings(prev => ({ ...prev, logoUrl: '', logoWidth: undefined, logoX: undefined, logoY: undefined }))}/>
+              </label>
+              {hs.logoUrl && (<label className="lc-toolbar-field lc-toolbar-field--range">
+                <span>Logo</span>
+                <input type="range" min={18} max={90} value={Number(hs.logoHeight ?? 44)} onChange={e => setH('logoHeight', +e.target.value)}/>
+                <em>{Number(hs.logoHeight ?? 44)}px</em>
+              </label>)}
+            </div>);
+        }
         if (headerToolbarPanel === 'layout') {
             return (<div className="lv-header-toolbar-menu lc-toolbar-menu lc-toolbar-menu--panel">
               <div className="lc-toolbar-menu-title">Header layout</div>
@@ -7813,6 +7834,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         if (typeof document === 'undefined' || !headerSelected || !headerToolbarPos)
             return null;
         return ReactDOM.createPortal(<div className={`lc-floating-toolbar lc-floating-toolbar--fixed lv-header-floating-toolbar${headerToolbarPos.placeBelow ? ' lc-floating-toolbar--below' : ''}`} style={{ left: headerToolbarPos.left, top: headerToolbarPos.top } as React.CSSProperties} role="toolbar" aria-label="Header quick tools" onPointerDown={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+          {headerToolbarPanelButton('content', 'widgets', 'Header content')}
           {headerToolbarPanelButton('layout', 'aspect_ratio', 'Header layout')}
           {headerToolbarPanelButton('text', 'text_fields', 'Header text')}
           {headerToolbarPanelButton('background', 'format_color_fill', 'Header background')}
@@ -8405,35 +8427,11 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
               </label>
               {pageOverrides[safePage]?.header !== undefined && (<span className="lv-sb-page-badge">pg {safePage + 1}</span>)}
             </div>
-            <div className="lv-sb-row lv-sb-row--inline">
-              <span className="lv-sb-label"/>
-              <button className="lv-sb-apply-all" onClick={applyHeaderToAll}>
-                Apply to all pages
-              </button>
-            </div>
             {headerShowFor(safePage) && (<>
               <div className="lv-sb-row">
                 <span className="lv-sb-label">Title text <InfoTooltip text={SB_TOOLTIPS['header.text']}/></span>
                 <input className="lv-sb-text-input" type="text" placeholder={leaflet?.title ?? 'Header text...'} value={hs.text} onChange={e => setH('text', e.target.value)}/>
               </div>
-              <div className="lv-sb-row lv-sb-row--inline">
-                <span className="lv-sb-label">Show text <InfoTooltip text={SB_TOOLTIPS['header.showText']}/></span>
-                <label className="lv-sb-switch">
-                  <input type="checkbox" checked={hs.showText} onChange={e => setH('showText', e.target.checked)}/>
-                  <span className="lv-sb-switch-track"/>
-                </label>
-              </div>
-              <div className="lv-sb-row">
-                <span className="lv-sb-label">Logo</span>
-                <HeaderLogoUploader currentUrl={String(hs.logoUrl ?? '')} onUploaded={url => setHeaderSettings(prev => ({ ...prev, logoUrl: url, logoWidth: undefined, logoX: undefined, logoY: undefined }))} onRemove={() => setHeaderSettings(prev => ({ ...prev, logoUrl: '', logoWidth: undefined, logoX: undefined, logoY: undefined }))}/>
-              </div>
-              {hs.logoUrl && (<div className="lv-sb-row">
-                  <span className="lv-sb-label">Logo size</span>
-                  <div className="lv-sb-slider-wrap">
-                    <input type="range" min={18} max={90} value={Number(hs.logoHeight ?? 44)} onChange={e => setH('logoHeight', +e.target.value)}/>
-                    <span className="lv-sb-val">{Number(hs.logoHeight ?? 44)}px</span>
-                  </div>
-                </div>)}
               {headerWidthPct < 100 && (<div className="lv-sb-row">
                   <span className="lv-sb-label">Position <InfoTooltip text={SB_TOOLTIPS['header.position']}/></span>
                   <div className="lv-sb-tabs">
