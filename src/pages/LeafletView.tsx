@@ -7735,16 +7735,17 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             return (<div className="lv-header-toolbar-menu lc-toolbar-menu lc-toolbar-menu--panel">
               <div className="lc-toolbar-menu-title">Header content</div>
               <button type="button" className="lv-header-toolbar-action" onClick={applyHeaderToAll}>
-                Apply to all pages
+                <span className="material-symbol" aria-hidden="true">select_all</span>
+                <span>Apply to all pages</span>
               </button>
               <label className="lv-header-toolbar-toggle">
                 <span>Show text</span>
                 <input type="checkbox" checked={hs.showText} onChange={e => setH('showText', e.target.checked)}/>
               </label>
-              <label className="lc-toolbar-field">
-                <span>Logo</span>
+              <div className="lv-header-toolbar-logo">
+                <span className="lv-header-toolbar-label">Logo</span>
                 <HeaderLogoUploader currentUrl={String(hs.logoUrl ?? '')} onUploaded={url => setHeaderSettings(prev => ({ ...prev, logoUrl: url, logoWidth: undefined, logoX: undefined, logoY: undefined }))} onRemove={() => setHeaderSettings(prev => ({ ...prev, logoUrl: '', logoWidth: undefined, logoX: undefined, logoY: undefined }))}/>
-              </label>
+              </div>
               {hs.logoUrl && (<label className="lc-toolbar-field lc-toolbar-field--range">
                 <span>Logo</span>
                 <input type="range" min={18} max={90} value={Number(hs.logoHeight ?? 44)} onChange={e => setH('logoHeight', +e.target.value)}/>

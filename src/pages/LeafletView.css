@@ -911,8 +911,8 @@ a.lv-card-image-license:hover {
   text-align: left;
 }
 .lv-header-toolbar-menu.lc-toolbar-menu--panel {
-  width: min(300px, calc(100vw - 32px));
-  padding: 12px;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px;
 }
 .lv-header-toolbar-menu .lc-toolbar-field {
   min-width: 0;
@@ -939,14 +939,23 @@ a.lv-card-image-license:hover {
   flex: 1;
 }
 .lv-header-toolbar-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   width: 100%;
   min-height: 34px;
+  padding: 0 12px;
   border: 1px solid rgba(73,242,182,.35);
   border-radius: 6px;
   background: rgba(73,242,182,.12);
   color: #d1fae5;
   font-weight: 800;
+  white-space: nowrap;
   cursor: pointer;
+}
+.lv-header-toolbar-action .material-symbol {
+  font-size: 18px;
 }
 .lv-header-toolbar-action:hover {
   background: rgba(73,242,182,.2);
@@ -959,23 +968,39 @@ a.lv-card-image-license:hover {
   color: #dbeafe;
   font-size: 13px;
   font-weight: 800;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid rgba(148,163,184,.18);
+  border-radius: 6px;
+  background: rgba(15,23,42,.38);
 }
 .lv-header-toolbar-toggle input {
   width: 16px;
   height: 16px;
   accent-color: #49f2b6;
 }
+.lv-header-toolbar-logo {
+  display: grid;
+  gap: 7px;
+}
+.lv-header-toolbar-label {
+  color: #93c5fd;
+  font-size: 13px;
+  font-weight: 800;
+}
 .lv-header-toolbar-menu .lv-logo-upload-wrap {
   gap: 8px;
+  width: 100%;
 }
 .lv-header-toolbar-menu .lv-logo-dropzone {
-  min-height: 44px;
-  padding: 6px;
+  min-height: 52px;
+  padding: 8px 10px;
   border-radius: 6px;
 }
 .lv-header-toolbar-menu .lv-logo-empty,
 .lv-header-toolbar-menu .lv-logo-preview-row {
   font-size: 12px;
+  line-height: 1.25;
 }
 .lv-header-toolbar-menu .lv-logo-empty-icon {
   width: 18px;
@@ -988,6 +1013,7 @@ a.lv-card-image-license:hover {
 .lv-header-toolbar-menu .lv-logo-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 .lv-header-toolbar-menu .lv-img-paste-btn,
 .lv-header-toolbar-menu .lv-logo-remove {
