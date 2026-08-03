@@ -7495,112 +7495,49 @@ body.dragging-icon .lv-card-drop-layer {
   box-shadow: 0 0 0 1px #818cf8, inset 0 0 8px rgba(99,102,241,.15);
 }
 
-/* ── Typography section inside lv-sidebar ─────── */
-.lv-sb-section .lc-font-section {
-  padding: 0;
-  border-top: none;
-  margin-top: 4px;
-}
-.lv-sb-section .lc-font-header { margin-bottom: 2px; }
-.lv-sb-section .lc-font-desc   { margin-bottom: 8px; }
-.lv-sb-section .lc-font-dropdown {
-  position: static;
-  top: unset;
-  box-shadow: 0 4px 16px rgba(0,0,0,.4);
-}
-
-.lv-sidebar--typography.lv-sidebar--open .lv-sb-cpanel {
-  width: 380px;
-  background:
-    radial-gradient(circle at 14% 18%, rgba(124,92,255,.12), transparent 28%),
-    linear-gradient(180deg, #11152c 0%, #080d1d 100%);
-  border-right: 1px solid rgba(137,153,215,.22);
-}
-
-.lv-layout:has(.lv-sidebar--typography.lv-sidebar--open) .lv-main {
-  margin-left: 460px;
-}
-
-.lv-sidebar--typography .lv-sb-cpanel-head {
-  min-height: 74px;
-  padding: 18px 20px;
-  background: rgba(17,21,44,.82);
-  border-bottom-color: rgba(137,153,215,.18);
-}
-
-.lv-sidebar--typography .lv-sb-cpanel-title {
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1;
-  text-transform: uppercase;
-  letter-spacing: .07em;
-  color: #e2e8f0;
-}
-
-.lv-sidebar--typography .lv-sb-cpanel-close {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  font-size: 0;
-  color: #a9b4df;
-  background: rgba(255,255,255,.06);
-  border-color: rgba(169,180,223,.22);
-}
-
-.lv-sidebar--typography .lv-sb-cpanel-close::before {
-  content: 'x';
-  font-size: 24px;
-  line-height: 1;
-}
-
-.lv-sidebar--typography .lv-sb-section--typography {
-  padding: 18px 18px 22px;
-  gap: 14px;
-}
-
-.lv-sidebar--typography .lv-sb-section--typography > .lv-sb-section-title-row {
-  display: none;
-}
-
+/* Typography section inside lv-sidebar */
+.lv-sb-section .lc-font-section,
 .lv-sidebar--typography .lc-font-section {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
+  padding: 0;
+  border-top: none;
+  margin: 0;
 }
 
 .lv-sidebar--typography .lc-font-hero {
-  display: block;
-  padding-bottom: 14px;
-  border-bottom: 1px solid rgba(169,180,223,.18);
-}
-
-.lv-sidebar--typography .lc-font-import-icon {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 8px;
-  background: rgba(73,242,182,.09);
-  border: 1px solid rgba(73,242,182,.28);
-  color: #56f5bd;
-  box-shadow: inset 0 0 18px rgba(73,242,182,.06);
-  flex-shrink: 0;
+  gap: 6px;
+  min-height: 22px;
+  padding: 0;
+  border: 0;
 }
 
 .lv-sidebar--typography .lc-font-header {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin: 2px 0 0;
+  gap: 6px;
+  margin: 0;
 }
 
-.lv-sidebar--typography .lc-font-header-title {
-  color: #56f5bd;
-  font-size: .68rem;
-  font-weight: 700;
-  letter-spacing: .07em;
+.lv-sidebar--typography .lc-font-header-title,
+.lv-sidebar--typography .lc-font-label,
+.lv-sidebar--typography .lc-font-import-label {
+  color: #64748b;
+  font-size: .71rem;
+  font-weight: 500;
+  letter-spacing: .04em;
+  line-height: 1.2;
   text-transform: uppercase;
+}
+
+.lv-sidebar--typography .lc-font-import-label,
+.lv-sidebar--typography .lc-font-label {
+  margin: 2px 0 -2px;
+  padding: 0;
+  border: 0;
 }
 
 .lv-sidebar--typography .lc-font-info-wrap {
@@ -7614,7 +7551,7 @@ body.dragging-icon .lv-card-drop-layer {
 
 .lv-sidebar--typography .lc-font-info-wrap:hover,
 .lv-sidebar--typography .lc-font-info-wrap:focus {
-  color: #94a3b8;
+  color: #49f2b6;
 }
 
 .lv-sidebar--typography .lc-font-info-icon {
@@ -7624,19 +7561,19 @@ body.dragging-icon .lv-card-drop-layer {
 .lv-sidebar--typography .lc-font-info-tip {
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 10px);
+  bottom: calc(100% + 8px);
   z-index: 50;
-  width: 220px;
+  width: 200px;
   transform: translateX(-50%);
-  padding: 8px 12px;
-  border-radius: 8px;
+  padding: 7px 9px;
+  border-radius: 6px;
   border: 1px solid rgba(255,255,255,.12);
   background: #1e293b;
   color: #cbd5e1;
-  box-shadow: 0 8px 24px rgba(0,0,0,.5);
-  font-size: .72rem;
+  box-shadow: 0 8px 22px rgba(0,0,0,.42);
+  font-size: .7rem;
   font-weight: 400;
-  line-height: 1.5;
+  line-height: 1.4;
   letter-spacing: 0;
   text-transform: none;
   pointer-events: none;
@@ -7652,154 +7589,151 @@ body.dragging-icon .lv-card-drop-layer {
 }
 
 .lv-sidebar--typography .lc-font-desc,
-.lv-sidebar--typography .lc-font-import-desc,
-.lv-sidebar--typography .lc-font-upload-hint {
-  color: #aab5d8;
-  font-size: .72rem;
-  line-height: 1.45;
-}
-
-.lv-sidebar--typography .lc-font-label {
-  color: var(--text-muted, #888);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  margin: 12px 0 6px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--border, #2a2a3a);
+.lv-sidebar--typography .lc-font-import-desc {
+  display: none;
 }
 
 .lv-sidebar--typography .lc-font-select-btn {
-  min-height: 46px;
-  padding: 0 12px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  background:
-    linear-gradient(#171b36, #171b36) padding-box,
-    linear-gradient(90deg, #8b5cf6, #49f2b6) border-box;
-  color: #f7f8ff;
-  font-size: .82rem;
-  font-weight: 700;
-  box-shadow: 0 14px 34px rgba(0,0,0,.26);
+  min-height: 32px;
+  width: 100%;
+  padding: 0 9px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: #e2e8f0;
+  font-size: .8rem;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.lv-sidebar--typography .lc-font-select-btn:hover {
+  border-color: rgba(73,242,182,.35);
+  background: rgba(255,255,255,.08);
 }
 
 .lv-sidebar--typography .lc-font-dropdown {
-  margin-top: 8px;
-  border-radius: 8px;
-  border: 1px solid rgba(137,153,215,.22);
-  background: #10152b;
+  position: static;
+  top: unset;
+  margin-top: 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: #1a1a30;
+  box-shadow: 0 8px 24px rgba(0,0,0,.32);
 }
 
 .lv-sidebar--typography .lc-font-preview-box {
-  min-height: 88px;
+  min-height: 74px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  gap: 8px;
-  padding: 14px 16px;
-  border-radius: 8px;
-  border: 1px solid rgba(169,180,223,.2);
-  background:
-    radial-gradient(circle at 86% 22%, rgba(169,180,223,.16) 1px, transparent 2px) 0 0 / 15px 15px,
-    rgba(255,255,255,.045);
+  gap: 5px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.04);
 }
 
 .lv-sidebar--typography .lc-font-preview-mark {
-  color: #7984c8;
-  font-size: 38px;
+  color: #94a3b8;
+  font-size: 28px;
   font-weight: 650;
   line-height: 1;
 }
 
 .lv-sidebar--typography .lc-font-preview-text {
-  color: #f7f8ff;
-  font-size: .78rem;
-  font-weight: 700;
-  line-height: 1.45;
+  color: #e2e8f0;
+  font-size: .72rem;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .lv-sidebar--typography .lc-font-import {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding-top: 18px;
-  border-top: 1px solid rgba(169,180,223,.16);
-}
-
-.lv-sidebar--typography .lc-font-import-label {
-  color: var(--text-muted, #888);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .06em;
-  line-height: 1;
-  text-transform: uppercase;
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--border, #2a2a3a);
+  gap: 9px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,.08);
 }
 
 .lv-sidebar--typography .lc-font-import-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  overflow: hidden;
-  min-height: 50px;
-  border-radius: 8px;
-  border: 1px solid rgba(169,180,223,.18);
-  background: rgba(255,255,255,.045);
-  box-shadow: inset 0 0 18px rgba(255,255,255,.025);
+  gap: 4px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .lv-sidebar--typography .lc-font-import-tab {
   display: inline-flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  border: 0;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 6px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 6px;
   background: transparent;
-  color: #dbe4ff;
+  color: #64748b;
   font: inherit;
-  font-size: .68rem;
-  font-weight: 900;
+  font-size: .72rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: background .16s, color .16s, box-shadow .16s;
+  transition: background .14s, border-color .14s, color .14s;
 }
 
 .lv-sidebar--typography .lc-font-import-tab + .lc-font-import-tab {
-  border-left: 1px solid rgba(169,180,223,.12);
+  border-left: 1px solid rgba(255,255,255,.1);
 }
 
 .lv-sidebar--typography .lc-font-import-tab .material-symbol {
-  color: #aeb8df;
-  font-size: 18px;
+  color: currentColor;
+  font-size: 16px;
+}
+
+.lv-sidebar--typography .lc-font-import-tab:hover {
+  background: rgba(255,255,255,.06);
+  color: #cbd5e1;
 }
 
 .lv-sidebar--typography .lc-font-import-tab.active {
-  color: #fff;
-  background: linear-gradient(90deg, rgba(124,92,255,.94), rgba(99,64,220,.9));
-  box-shadow: inset 0 0 0 1px rgba(196,181,253,.2);
+  background: rgba(73,242,182,.14);
+  border-color: rgba(73,242,182,.35);
+  color: #49f2b6;
+  box-shadow: none;
 }
 
-.lv-sidebar--typography .lc-font-import-tab.active .material-symbol {
-  color: #d8ceff;
+.lv-sidebar--typography .lc-font-upload-btn,
+.lv-sidebar--typography .lc-font-url-panel {
+  min-height: 86px;
+  width: 100%;
+  border-radius: 6px;
+  border: 1px dashed rgba(255,255,255,.16);
+  background: rgba(255,255,255,.04);
+  box-shadow: none;
+  box-sizing: border-box;
 }
 
 .lv-sidebar--typography .lc-font-upload-btn {
-  min-height: 132px;
-  width: 100%;
   flex-direction: column;
-  gap: 12px;
-  border-radius: 8px;
-  border: 1px dashed rgba(169,180,223,.48);
-  background: rgba(10,15,32,.38);
-  color: #8b5cf6;
-  box-shadow: inset 0 0 26px rgba(124,92,255,.06);
+  gap: 7px;
+  color: #94a3b8;
+}
+
+.lv-sidebar--typography .lc-font-upload-btn:hover {
+  border-color: rgba(73,242,182,.35);
+  background: rgba(73,242,182,.08);
+  color: #49f2b6;
 }
 
 .lv-sidebar--typography .lc-font-upload-main-icon {
-  color: #7c5cff;
-  font-size: 40px;
+  color: currentColor;
+  font-size: 26px;
   line-height: 1;
 }
 
@@ -7807,89 +7741,95 @@ body.dragging-icon .lv-card-drop-layer {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  color: #f7f8ff;
-  font-size: .76rem;
-  font-weight: 800;
+  gap: 2px;
+  color: #cbd5e1;
+  font-size: .72rem;
+  font-weight: 600;
 }
 
 .lv-sidebar--typography .lc-font-upload-copy small {
-  color: #9d78ff;
-  font-size: .72rem;
-  font-weight: 800;
+  color: #64748b;
+  font-size: .68rem;
+  font-weight: 500;
 }
 
 .lv-sidebar--typography .lc-font-upload-hint {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   margin: 0;
+  color: #64748b;
+  font-size: .68rem;
+  line-height: 1.35;
 }
 
 .lv-sidebar--typography .lc-font-upload-hint .material-symbol {
-  color: #35caa4;
-  font-size: 15px;
+  color: #49f2b6;
+  font-size: 14px;
 }
 
 .lv-sidebar--typography .lc-font-url-panel {
-  min-height: 132px;
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 18px;
-  border-radius: 8px;
-  border: 1px dashed rgba(169,180,223,.48);
-  background: rgba(10,15,32,.38);
-  box-sizing: border-box;
+  gap: 7px;
+  padding: 10px;
 }
 
 .lv-sidebar--typography .lc-font-url-input {
   width: 100%;
-  min-height: 42px;
-  border-radius: 8px;
-  border-color: rgba(169,180,223,.18);
-  background: rgba(255,255,255,.045);
-  color: #f7f8ff;
-  font-size: .72rem;
-  padding: 0 12px;
+  min-height: 32px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 6px;
+  background: rgba(255,255,255,.06);
+  color: #e2e8f0;
+  font-size: .76rem;
+  padding: 5px 8px;
+  outline: none;
+}
+
+.lv-sidebar--typography .lc-font-url-input:focus {
+  border-color: rgba(73,242,182,.5);
 }
 
 .lv-sidebar--typography .lc-font-url-example {
   width: 100%;
-  color: #aab5d8;
-  font-size: .7rem;
-  text-align: left;
+  color: #64748b;
+  font-size: .68rem;
 }
 
 .lv-sidebar--typography .lc-font-import-cta {
-  min-height: 46px;
-  border-radius: 8px;
-  background: linear-gradient(90deg, #7246ff, #6d34ef);
-  color: #fff;
-  font-size: .82rem;
-  font-weight: 850;
-  box-shadow: 0 14px 34px rgba(91,49,218,.34);
+  min-height: 32px;
+  border-radius: 6px;
+  border: 1px solid rgba(73,242,182,.35);
+  background: rgba(73,242,182,.14);
+  color: #49f2b6;
+  font-size: .75rem;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.lv-sidebar--typography .lc-font-import-cta:hover:not(:disabled) {
+  background: rgba(73,242,182,.2);
 }
 
 .lv-sidebar--typography .lc-font-import-helper {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 6px;
   margin: 0;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(137,153,215,.16);
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,.08);
   background: rgba(255,255,255,.035);
-  color: #aab5d8;
-  font-size: .72rem;
-  line-height: 1.45;
+  color: #64748b;
+  font-size: .68rem;
+  line-height: 1.4;
 }
 
 .lv-sidebar--typography .lc-font-import-helper .material-symbol {
-  color: #35caa4;
-  font-size: 18px;
+  color: #49f2b6;
+  font-size: 15px;
   flex-shrink: 0;
 }
 
