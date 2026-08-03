@@ -2669,7 +2669,7 @@ function SbSection({ id, title, open, tooltip, children }: {
 }) {
     if (!open)
         return null;
-    return (<div className="lv-sb-section">
+    return (<div className={`lv-sb-section lv-sb-section--${id}`}>
       {(title || tooltip) && (<div className="lv-sb-section-title-row">
           {title && <span className="lv-sb-section-title">{title}</span>}
           {tooltip && <InfoTooltip text={tooltip}/>}
@@ -8346,7 +8346,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
       <div className="lv-layout">
 
         {/* -- Left sidebar -- */}
-        <aside className={`lv-sidebar${openSbSection ? ' lv-sidebar--open' : ''}`}>
+        <aside className={`lv-sidebar${openSbSection ? ' lv-sidebar--open' : ''}${openSbSection === 'typography' ? ' lv-sidebar--typography' : ''}`}>
 
           {/* -- Nav strip (left column) -- */}
           <div className="lv-sb-nav-strip">

@@ -2796,13 +2796,18 @@ export function FontPickerSection({ layout, set, }: {
     return (<div className="lc-font-section">
 
       {/* ─── Header ─── */}
-      <div className="lc-font-header">
-        <span className="lc-font-header-title">Typography</span>
-        <span className="lc-font-header-sub">Font Family</span>
+      <div className="lc-font-hero">
+        <div className="lc-font-hero-icon" aria-hidden="true">Aa</div>
+        <div className="lc-font-hero-copy">
+          <div className="lc-font-header">
+            <span className="lc-font-header-title">Typography</span>
+            <span className="lc-font-header-sub">Font Family</span>
+          </div>
+          <p className="lc-font-desc">
+            Choose the font style for your leaflet. The selected font will apply to all text elements.
+          </p>
+        </div>
       </div>
-      <p className="lc-font-desc">
-        Choose the font style for your leaflet. The selected font will apply to all text elements.
-      </p>
 
       {/* ─── Font Dropdown ─── */}
       <div className="lc-font-label">Font List</div>
@@ -2842,13 +2847,19 @@ export function FontPickerSection({ layout, set, }: {
 
       {/* ─── Live Preview ─── */}
       <div className={cx("lc-font-preview-box", cssClass({ fontFamily: activeFamily }))}>
-        The quick brown fox jumps over the lazy dog
+        <span className="lc-font-preview-mark">Aa</span>
+        <span className="lc-font-preview-text">The quick brown fox<br/>jumps over the lazy dog</span>
       </div>
 
       {/* ─── Import Custom Font ─── */}
       <div className="lc-font-import">
-        <div className="lc-font-import-title">Import Custom Font</div>
-        <p className="lc-font-import-desc">Can't find your font in the list? Import it below.</p>
+        <div className="lc-font-import-head">
+          <span className="lc-font-import-icon material-symbol" aria-hidden="true">cloud_upload</span>
+          <span>
+            <span className="lc-font-import-title">Import Custom Font</span>
+            <span className="lc-font-import-desc">Can't find your font in the list? Import it below.</span>
+          </span>
+        </div>
 
         {/* File upload */}
         <button type="button" className={`lc-font-upload-btn${pendingFile ? ' has-file' : ''}`} onClick={() => fileInputRef.current?.click()}>
@@ -2857,10 +2868,13 @@ export function FontPickerSection({ layout, set, }: {
             <polyline points="17 8 12 3 7 8"/>
             <line x1="12" y1="3" x2="12" y2="15"/>
           </svg>
-          <span>{pendingFile ? `description ${pendingFile.name}` : 'Upload Font File'}</span>
+          <span className="lc-font-upload-copy">
+            <span>{pendingFile ? pendingFile.name : 'Upload Font File'}</span>
+            <small>Drag & drop or click to browse</small>
+          </span>
         </button>
         <input ref={fileInputRef} type="file" accept=".ttf,.otf,.woff,.woff2" onChange={handleFileChange} className={cssClass({ display: 'none' })}/>
-        <div className="lc-font-upload-hint">Supported formats: .ttf, .otf, .woff, .woff2</div>
+        <div className="lc-font-upload-hint"><span className="material-symbol" aria-hidden="true">check_circle</span> Supported formats: .ttf, .otf, .woff, .woff2</div>
 
         {/* Divider */}
         <div className="lc-font-or">
@@ -2870,7 +2884,10 @@ export function FontPickerSection({ layout, set, }: {
         </div>
 
         {/* URL input */}
-        <div className={cx("lc-font-label", cssClass({ marginTop: 0 }))}>Paste Font URL</div>
+        <div className="lc-font-url-head">
+          <span className="lc-font-import-icon material-symbol" aria-hidden="true">link</span>
+          <span className={cx("lc-font-label", cssClass({ marginTop: 0 }))}>Paste Font URL</span>
+        </div>
         <input className="lc-font-url-input" type="text" placeholder="e.g. https://fonts.googleapis.com/css2?family=Cairo" value={fontUrl} onChange={e => { setFontUrl(e.target.value); setPendingFile(null); setImportErr(''); }} onKeyDown={e => {
             if (e.key === 'Enter')
                 handleImport();
@@ -2889,6 +2906,7 @@ export function FontPickerSection({ layout, set, }: {
         </button>
 
         <p className="lc-font-import-helper">
+          <span className="material-symbol" aria-hidden="true">info</span>
           Imported fonts will be added to your font list and applied across the entire leaflet.
         </p>
       </div>
