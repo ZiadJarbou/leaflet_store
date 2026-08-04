@@ -491,7 +491,32 @@
 .cl-toggle-label input[type=checkbox] { accent-color: var(--brand); width: 14px; height: 14px; cursor: pointer; }
 
 /* ── Product table ── */
-.cl-table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid rgba(255,255,255,.07); }
+.cl-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.07);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(73,242,182,.55) rgba(11,15,30,.55);
+}
+.cl-table-wrap::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.cl-table-wrap::-webkit-scrollbar-track {
+  background: rgba(11,15,30,.65);
+  border-radius: 999px;
+}
+.cl-table-wrap::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, rgba(73,242,182,.72), rgba(124,92,255,.58));
+  border: 2px solid rgba(11,15,30,.85);
+  border-radius: 999px;
+}
+.cl-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(90deg, rgba(73,242,182,.95), rgba(124,92,255,.78));
+}
+.cl-table-wrap::-webkit-scrollbar-corner {
+  background: transparent;
+}
 .cl-table { width: 100%; border-collapse: collapse; font-size: 12.5px; white-space: nowrap; }
 .cl-table thead tr { background: rgba(255,255,255,.03); border-bottom: 1px solid rgba(255,255,255,.07); }
 .cl-table th {
