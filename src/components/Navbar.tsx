@@ -24,7 +24,7 @@ export default function Navbar() {
       <div className="container">
         <div className="nav-inner">
           <Link className="brand" to="/" aria-label="LeafletAI home">
-            <img src="/leafletai_logo.png" alt="LeafletAI" className="brand-logo-img" />
+            <img src="/leafletai_logo.webp" alt="LeafletAI" className="brand-logo-img" />
           </Link>
 
           <div className="menu" role="navigation" aria-label="Primary navigation">

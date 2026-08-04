@@ -10,7 +10,7 @@ export default function Footer({ onOpenDemo }: FooterProps) {
         <div className="foot">
           <div>
             <div className={cx("brand", cssClass({ fontSize: 18 }))}>
-              <img src="/leafletai_logo.png" alt="LeafletAI" className="brand-logo-img"/>
+              <img src="/leafletai_logo.webp" alt="LeafletAI" className="brand-logo-img"/>
             </div>
             <p>Empowering creators to design, publish, and sell with confidence.</p>
           </div>
