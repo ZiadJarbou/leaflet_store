@@ -63,7 +63,10 @@ export default function Navbar() {
                 </div>
               </div>
             ) : (
-              <button className="btn ghost" onClick={() => openAuthModal('login')}>Login</button>
+              <>
+                <button className="btn ghost" onClick={() => openAuthModal('login')}>Login</button>
+                <button className="btn primary" onClick={() => openAuthModal('signup')}>Sign up</button>
+              </>
             )}
           </div>
         </div>
