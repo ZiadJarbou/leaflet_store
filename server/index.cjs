@@ -969,6 +969,12 @@ function validateAdminSubscription({ plan = 'free', status = 'active', period = 
   if (!ADMIN_SUBSCRIPTION_PERIODS.has(nextPeriod)) return { error: 'Invalid subscription period' };
   return { plan: nextPlan, status: nextPlan === 'free' ? 'active' : nextStatus, period: nextPeriod };
 }
+function adminSubscriptionEndDate(period, from = new Date()) {
+  const end = new Date(from);
+  if (period === 'annual') end.setFullYear(end.getFullYear() + 1);
+  else end.setMonth(end.getMonth() + 1);
+  return end.toISOString();
+}
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -3714,7 +3720,7 @@ app.get('/api/admin/stats', adminMiddleware, (req, res) => {
 app.get('/api/admin/users/export', adminMiddleware, (req, res) => {
   const { search = '', sort_by = 'created_at', sort_dir = 'desc', format = 'csv' } = req.query;
   const like = `%${search}%`;
-  const ALLOWED_COLS = ['name','email','role','subscription_plan','created_at','leaflet_count','email_verified'];
+  const ALLOWED_COLS = ['name','email','role','subscription_plan','subscription_end','created_at','leaflet_count','email_verified'];
   const col = ALLOWED_COLS.includes(sort_by) ? sort_by : 'created_at';
   const dir = sort_dir === 'asc' ? 'ASC' : 'DESC';
   const orderExpr = col === 'leaflet_count'
@@ -3722,7 +3728,7 @@ app.get('/api/admin/users/export', adminMiddleware, (req, res) => {
     : `u.${col} ${dir}`;
   const rows = db.prepare(`
     SELECT u.id, u.name, u.email, u.role, u.email_verified,
-           u.subscription_plan, u.subscription_status, u.created_at,
+           u.subscription_plan, u.subscription_status, u.subscription_end, u.created_at,
            (SELECT COUNT(*) FROM leaflets WHERE user_id=u.id) as leaflet_count
     FROM users u
     WHERE u.name LIKE ? OR u.email LIKE ?
@@ -3736,6 +3742,7 @@ app.get('/api/admin/users/export', adminMiddleware, (req, res) => {
     Role:                u.role,
     Plan:                u.subscription_plan,
     'Sub Status':        u.subscription_status,
+    'End Date':          u.subscription_end,
     'Email Verified':    u.email_verified ? 'Yes' : 'No',
     Leaflets:            u.leaflet_count,
     'Joined':            u.created_at,
@@ -3777,7 +3784,7 @@ app.get('/api/admin/users', adminMiddleware, (req, res) => {
     : `u.${col} ${dir}`;
   const rows = db.prepare(`
     SELECT u.id,u.name,u.email,u.role,u.email_verified,u.subscription_plan,
-           u.subscription_status,u.subscription_period,u.created_at,
+           u.subscription_status,u.subscription_period,u.subscription_start,u.subscription_end,u.created_at,
            (SELECT COUNT(*) FROM leaflets WHERE user_id=u.id) as leaflet_count
     FROM users u
     WHERE u.name LIKE ? OR u.email LIKE ?
@@ -3820,14 +3827,15 @@ app.post('/api/admin/users', adminMiddleware, async (req, res, next) => {
 
     const passwordHash = await bcrypt.hash(password, 12);
     const isPaid = sub.plan === 'pro' || sub.plan === 'business';
-    const subscriptionStart = isPaid ? new Date().toISOString() : null;
+    const subscriptionStart = isPaid ? new Date() : null;
+    const subscriptionEnd = isPaid ? adminSubscriptionEndDate(sub.period, subscriptionStart) : null;
     const result = db.prepare(`
       INSERT INTO users (
         name, email, password_hash, email_verified, role,
         subscription_plan, subscription_status, subscription_period,
         subscription_start, subscription_end
       )
-      VALUES (?, ?, ?, ?, 'user', ?, ?, ?, ?, NULL)
+      VALUES (?, ?, ?, ?, 'user', ?, ?, ?, ?, ?)
     `).run(
       name,
       email,
@@ -3836,12 +3844,13 @@ app.post('/api/admin/users', adminMiddleware, async (req, res, next) => {
       sub.plan,
       sub.status,
       sub.period,
-      subscriptionStart
+      subscriptionStart ? subscriptionStart.toISOString() : null,
+      subscriptionEnd
     );
 
     const created = db.prepare(`
       SELECT id,name,email,role,email_verified,subscription_plan,subscription_status,
-             subscription_period,created_at,
+             subscription_period,subscription_start,subscription_end,created_at,
              (SELECT COUNT(*) FROM leaflets WHERE user_id=users.id) as leaflet_count
       FROM users WHERE id=?
     `).get(result.lastInsertRowid);
@@ -3853,7 +3862,7 @@ app.post('/api/admin/users', adminMiddleware, async (req, res, next) => {
 app.put('/api/admin/users/:id', adminMiddleware, (req, res) => {
   const { role, subscription_plan, subscription_status, subscription_period, email_verified } = req.body;
   const id = Number(req.params.id);
-  const target = db.prepare('SELECT id,email,subscription_plan,subscription_status,subscription_period FROM users WHERE id=?').get(id);
+  const target = db.prepare('SELECT id,email,subscription_plan,subscription_status,subscription_period,subscription_start,subscription_end FROM users WHERE id=?').get(id);
   if (!target) {
     res.status(404).json({ error: 'User not found' }); return;
   }
@@ -3887,16 +3896,18 @@ app.put('/api/admin/users/:id', adminMiddleware, (req, res) => {
     fields.push('subscription_start=NULL');
     fields.push('subscription_end=NULL');
   }
-  if (subscription_plan !== undefined && sub.plan !== 'free') {
+  if ((subscription_plan !== undefined || subscription_period !== undefined) && sub.plan !== 'free') {
+    const subscriptionStart = target.subscription_start || new Date().toISOString();
     fields.push('subscription_start=COALESCE(subscription_start, ?)');
-    vals.push(new Date().toISOString());
-    fields.push('subscription_end=NULL');
+    vals.push(subscriptionStart);
+    fields.push('subscription_end=?');
+    vals.push(adminSubscriptionEndDate(sub.period));
   }
   if (email_verified     !== undefined) { fields.push('email_verified=?');      vals.push(email_verified ? 1 : 0); }
   if (!fields.length) { res.status(400).json({ error: 'Nothing to update' }); return; }
   vals.push(id);
   db.prepare(`UPDATE users SET ${fields.join(',')} WHERE id=?`).run(...vals);
-  const updated = db.prepare('SELECT id,name,email,role,email_verified,subscription_plan,subscription_status,subscription_period,created_at FROM users WHERE id=?').get(id);
+  const updated = db.prepare('SELECT id,name,email,role,email_verified,subscription_plan,subscription_status,subscription_period,subscription_start,subscription_end,created_at FROM users WHERE id=?').get(id);
   res.json(updated);
 });
 

@@ -23,6 +23,8 @@ interface AdminUser {
     subscription_plan: string;
     subscription_status: string;
     subscription_period: string;
+    subscription_start: string | null;
+    subscription_end: string | null;
     created_at: string;
     leaflet_count: number;
 }
@@ -388,17 +390,19 @@ function AdminUsers() {
             <Th col="name" label="Name / Email"/>
             <Th col="role" label="Role"/>
             <Th col="subscription_plan" label="Plan"/>
+            <Th col="subscription_end" label="End Date"/>
             <Th col="email_verified" label="Verified"/>
             <Th col="leaflet_count" label="Leaflets"/>
             <Th col="created_at" label="Joined"/>
             <th>Actions</th>
           </tr></thead>
           <tbody>
-            {loading && <tr><td colSpan={7} className="cms-loading-row">Loadingâ€¦</td></tr>}
+            {loading && <tr><td colSpan={8} className="cms-loading-row">Loadingâ€¦</td></tr>}
             {!loading && users.map(u => (<tr key={u.id}>
                 <td><div className="cms-user-name">{u.name}</div><div className="cms-muted">{u.email}</div></td>
                 <td>{roleBadge(u.role)}</td>
                 <td>{planBadge(u.subscription_plan)}</td>
+                <td className="cms-muted">{u.subscription_plan === 'free' ? 'â€”' : fmtDate(u.subscription_end || '')}</td>
                 <td>{u.email_verified ? <span className="material-symbol cms-ok" aria-label="Verified">check_circle</span> : <span className="material-symbol cms-warn" aria-label="Not verified">cancel</span>}</td>
                 <td>{u.leaflet_count}</td>
                 <td className="cms-muted">{fmtDate(u.created_at)}</td>
@@ -490,6 +494,10 @@ function AdminUsers() {
                 <option value="monthly">monthly</option>
                 <option value="annual">annual</option>
               </select>
+            </div>)}
+            {editing.subscription_plan !== 'free' && (<div className="cms-form-row">
+              <label>End Date</label>
+              <input type="text" value={fmtDate(editing.subscription_end || '')} readOnly/>
             </div>)}
             <div className="cms-form-row">
               <label>Status</label>
