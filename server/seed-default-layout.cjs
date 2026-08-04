@@ -8,7 +8,8 @@ const Database = require('better-sqlite3');
 const crypto   = require('crypto');
 const path     = require('path');
 
-const DB_PATH = path.join(__dirname, 'leafletai.db');
+const DATA_DIR = path.resolve(process.env.DATA_DIR || __dirname);
+const DB_PATH = path.join(DATA_DIR, 'leafletai.db');
 const db      = new Database(DB_PATH);
 const uuid    = () => crypto.randomUUID();
 const nowIso  = () => new Date().toISOString();

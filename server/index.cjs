@@ -27,7 +27,9 @@ const zlib = require('zlib');
 // Hosting providers can still override this with their assigned PORT.
 const PORT       = Number(process.env.PORT) || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || 'leafletai-dev-secret-change-in-prod';
-const DB_PATH    = path.join(__dirname, 'leafletai.db');
+const DATA_DIR   = path.resolve(process.env.DATA_DIR || __dirname);
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+const DB_PATH    = path.join(DATA_DIR, 'leafletai.db');
 
 const STRIPE_SECRET_KEY            = envValue('STRIPE_SECRET_KEY')            || '';
 const STRIPE_WEBHOOK_SECRET        = process.env.STRIPE_WEBHOOK_SECRET        || '';
@@ -1270,15 +1272,15 @@ function adminMiddleware(req, res, next) {
 }
 
 /* ── File uploads setup ── */
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
+const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-const PDF_EXPORTS_DIR = path.join(__dirname, 'pdf_exports');
+const PDF_EXPORTS_DIR = path.join(DATA_DIR, 'pdf_exports');
 if (!fs.existsSync(PDF_EXPORTS_DIR)) fs.mkdirSync(PDF_EXPORTS_DIR, { recursive: true });
 
 /* ══════════════════════════════════════════════════════════════════
    BACKUP ENGINE
 ═══════════════════════════════════════════════════════════════════ */
-const BACKUPS_DIR = path.join(__dirname, 'backups');
+const BACKUPS_DIR = path.join(DATA_DIR, 'backups');
 if (!fs.existsSync(BACKUPS_DIR)) fs.mkdirSync(BACKUPS_DIR, { recursive: true });
 
 function getSetting(key) {

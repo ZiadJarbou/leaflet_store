@@ -9,6 +9,7 @@ set -e
 DOMAIN="leafletai.ai"
 APP_DIR="/var/www/leafletai"
 REPO_DIR="$APP_DIR/app"
+DATA_DIR="$APP_DIR/data"
 NODE_VERSION="20"
 DEPLOY_BACKUP_DIR="$APP_DIR/deploy-backups/$(date +%Y%m%d-%H%M%S)"
 
@@ -35,6 +36,7 @@ pm2 startup systemd -u root --hp /root | tail -1 | bash || true
 # ── 4. Create app directory ────────────────────────────────
 echo "[4/10] Preparing app directory..."
 mkdir -p "$APP_DIR"
+mkdir -p "$DATA_DIR"
 mkdir -p /var/www/certbot
 
 # ── 5. Upload / pull project files ─────────────────────────
@@ -58,16 +60,36 @@ for item in \
   "$REPO_DIR/server/leafletai.db" \
   "$REPO_DIR/server/leafletai.db-wal" \
   "$REPO_DIR/server/leafletai.db-shm" \
+  "$DATA_DIR/leafletai.db" \
+  "$DATA_DIR/leafletai.db-wal" \
+  "$DATA_DIR/leafletai.db-shm" \
   "$REPO_DIR/server/.env" \
   "$REPO_DIR/server/uploads" \
   "$REPO_DIR/server/pdf_exports" \
-  "$REPO_DIR/server/backups"
+  "$REPO_DIR/server/backups" \
+  "$DATA_DIR/uploads" \
+  "$DATA_DIR/pdf_exports" \
+  "$DATA_DIR/backups"
 do
   if [ -e "$item" ]; then
     cp -a "$item" "$DEPLOY_BACKUP_DIR/"
   fi
 done
 echo "Runtime backup saved to $DEPLOY_BACKUP_DIR"
+
+# Keep runtime data outside the code directory so future deploys cannot replace it.
+echo "[5c/10] Ensuring persistent data directory..."
+for item in leafletai.db leafletai.db-wal leafletai.db-shm; do
+  if [ ! -e "$DATA_DIR/$item" ] && [ -e "$REPO_DIR/server/$item" ]; then
+    cp -a "$REPO_DIR/server/$item" "$DATA_DIR/$item"
+  fi
+done
+for dir in uploads pdf_exports backups; do
+  mkdir -p "$DATA_DIR/$dir"
+  if [ -d "$REPO_DIR/server/$dir" ]; then
+    cp -an "$REPO_DIR/server/$dir/." "$DATA_DIR/$dir/"
+  fi
+done
 
 # ── 6. Install dependencies & build frontend ───────────────
 echo "[6/10] Installing dependencies and building frontend..."
@@ -86,9 +108,14 @@ cp -r "$REPO_DIR/dist/." "$APP_DIR/dist/"
 echo "[7/10] Setting up .env for server..."
 if [ -f "$REPO_DIR/server/.env" ]; then
   echo "Existing $REPO_DIR/server/.env found; preserving production secrets."
+  if ! grep -q '^DATA_DIR=' "$REPO_DIR/server/.env"; then
+    printf '\nDATA_DIR=%s\n' "$DATA_DIR" >> "$REPO_DIR/server/.env"
+    echo "Added DATA_DIR=$DATA_DIR to existing server/.env"
+  fi
 else
   cat > "$REPO_DIR/server/.env" <<'ENVEOF'
 PORT=4000
+DATA_DIR=/var/www/leafletai/data
 JWT_SECRET=CHANGE_ME_TO_A_STRONG_RANDOM_SECRET
 STRIPE_SECRET_KEY=sk_live_YOUR_STRIPE_SECRET
 STRIPE_WEBHOOK_SECRET=whsec_YOUR_WEBHOOK_SECRET

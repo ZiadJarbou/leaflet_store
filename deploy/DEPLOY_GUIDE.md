@@ -84,6 +84,7 @@ Fill in real values:
 
 ```env
 PORT=4000
+DATA_DIR=/var/www/leafletai/data
 JWT_SECRET=your_strong_random_secret_here
 STRIPE_SECRET_KEY=sk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
@@ -144,11 +145,16 @@ Open https://leafletai.ai in a browser — the platform should load.
 
 ## Re-deploying after code changes
 
-The upload command below preserves production runtime data. Do not remove the
-excludes for `server/*.db`, `server/uploads`, `server/pdf_exports`,
-`server/backups`, or env files unless you intentionally want to replace live
-data. The deploy script also creates a timestamped safety copy at
-`/var/www/leafletai/deploy-backups/`.
+Production runtime data is stored outside the code folder in
+`/var/www/leafletai/data`. This includes users, user plans, user-created
+leaflets, uploaded images, PDF exports, and backups. Do not delete or overwrite
+that folder during deployment.
+
+The upload command below also preserves old deployments that still have runtime
+data under `server/`. Do not remove the excludes for `server/*.db`,
+`server/uploads`, `server/pdf_exports`, `server/backups`, or env files unless
+you intentionally want to replace live data. The deploy script creates a
+timestamped safety copy at `/var/www/leafletai/deploy-backups/` before restart.
 
 On your **local machine**, push updated files:
 
@@ -204,11 +210,15 @@ pm2 restart leafletai
 ├── app/              ← full project source
 │   ├── server/
 │   │   ├── index.cjs
-│   │   ├── leafletai.db
 │   │   └── .env
 │   ├── src/
 │   ├── deploy/
 │   └── ...
+├── data/             ← persistent production runtime data
+│   ├── leafletai.db
+│   ├── uploads/
+│   ├── pdf_exports/
+│   └── backups/
 └── dist/             ← built React frontend (served by nginx)
 ```
 
