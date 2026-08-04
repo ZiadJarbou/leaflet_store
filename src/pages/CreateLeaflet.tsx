@@ -968,6 +968,11 @@ export default function CreateLeaflet() {
                   <button className="cl-btn-add-product" onClick={() => { setNewProduct(EMPTY_PRODUCT()); setShowAddModal(true); }} title="Add a new product manually">
                     <span className="material-symbol" aria-hidden="true">add</span> Add Product
                   </button>
+                  <div className="cl-actions-right">
+                    <button className="btn primary big" disabled={!canProceed || submitting} title={!canProceed ? 'At least 1 valid row is required' : undefined} onClick={() => handleSubmit(true)}>
+                      {submitting ? <><span className="material-symbol" aria-hidden="true">progress_activity</span> Creating...</> : <>Continue to create <span className="material-symbol" aria-hidden="true">arrow_forward</span></>}
+                    </button>
+                  </div>
                 </div>
               </div>
 
