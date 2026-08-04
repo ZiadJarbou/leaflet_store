@@ -55,6 +55,7 @@ export const adminGetMe       = ()             => adminFetch('/me');
 export const adminCheck       = ()             => fetch('/api/admin/check').then(r => r.json()) as Promise<{ hasAdmin: boolean }>;
 export const adminSetup       = ()             => adminFetch('/setup', { method: 'POST' });
 export const adminGetUsers    = (p: Record<string,string>) => adminFetch('/users?' + new URLSearchParams(p));
+export const adminCreateUser  = (body: object) => adminFetch('/users', { method: 'POST', body: JSON.stringify(body) });
 export const adminUpdateUser  = (id: number, body: object) => adminFetch(`/users/${id}`, { method: 'PUT',  body: JSON.stringify(body) });
 export const adminDeleteUser  = (id: number)  => adminFetch(`/users/${id}`, { method: 'DELETE' });
 export const adminGetLeaflets = (p: Record<string,string>) => adminFetch('/leaflets?' + new URLSearchParams(p));

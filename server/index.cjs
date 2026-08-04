@@ -957,6 +957,18 @@ function validatePasswordRules(password) {
   }
   return errs;
 }
+const ADMIN_SUBSCRIPTION_PLANS = new Set(['free', 'pro', 'business']);
+const ADMIN_SUBSCRIPTION_STATUSES = new Set(['active', 'cancelled', 'past_due']);
+const ADMIN_SUBSCRIPTION_PERIODS = new Set(['monthly', 'annual']);
+function validateAdminSubscription({ plan = 'free', status = 'active', period = 'monthly' } = {}) {
+  const nextPlan = String(plan || 'free').trim().toLowerCase();
+  const nextStatus = String(status || 'active').trim().toLowerCase();
+  const nextPeriod = String(period || 'monthly').trim().toLowerCase();
+  if (!ADMIN_SUBSCRIPTION_PLANS.has(nextPlan)) return { error: 'Invalid subscription plan' };
+  if (!ADMIN_SUBSCRIPTION_STATUSES.has(nextStatus)) return { error: 'Invalid subscription status' };
+  if (!ADMIN_SUBSCRIPTION_PERIODS.has(nextPeriod)) return { error: 'Invalid subscription period' };
+  return { plan: nextPlan, status: nextPlan === 'free' ? 'active' : nextStatus, period: nextPeriod };
+}
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -3765,7 +3777,7 @@ app.get('/api/admin/users', adminMiddleware, (req, res) => {
     : `u.${col} ${dir}`;
   const rows = db.prepare(`
     SELECT u.id,u.name,u.email,u.role,u.email_verified,u.subscription_plan,
-           u.subscription_status,u.created_at,
+           u.subscription_status,u.subscription_period,u.created_at,
            (SELECT COUNT(*) FROM leaflets WHERE user_id=u.id) as leaflet_count
     FROM users u
     WHERE u.name LIKE ? OR u.email LIKE ?
@@ -3775,11 +3787,73 @@ app.get('/api/admin/users', adminMiddleware, (req, res) => {
   res.json({ users: rows, total, page: Number(page), limit: Number(limit) });
 });
 
+/* ── POST /api/admin/users ── */
+app.post('/api/admin/users', adminMiddleware, async (req, res, next) => {
+  try {
+    const name = normalizeName(req.body.name || '');
+    const email = normalizeEmail(req.body.email || '');
+    const password = req.body.password || '';
+    const role = String(req.body.role || 'user').trim().toLowerCase();
+    const sub = validateAdminSubscription({
+      plan: req.body.subscription_plan || 'free',
+      status: req.body.subscription_status || 'active',
+      period: req.body.subscription_period || 'monthly',
+    });
+    if (sub.error) { res.status(400).json({ error: sub.error }); return; }
+
+    const errors = {};
+    if (name.length < 2) errors.name = 'Name must be at least 2 characters.';
+    if (name.length > 120) errors.name = 'Name is too long.';
+    if (!email) errors.email = 'Email is required.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Please enter a valid email.';
+    else if (email.length > 190) errors.email = 'Email is too long.';
+    Object.assign(errors, validatePasswordRules(password));
+    if (role !== 'user') errors.role = 'Admin-created accounts must use the user role.';
+    if (Object.keys(errors).length) {
+      res.status(422).json({ error: Object.values(errors)[0], errors }); return;
+    }
+
+    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    if (existing) {
+      res.status(422).json({ error: 'This email is already registered.', errors: { email: 'This email is already registered.' } }); return;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const isPaid = sub.plan === 'pro' || sub.plan === 'business';
+    const subscriptionStart = isPaid ? new Date().toISOString() : null;
+    const result = db.prepare(`
+      INSERT INTO users (
+        name, email, password_hash, email_verified, role,
+        subscription_plan, subscription_status, subscription_period,
+        subscription_start, subscription_end
+      )
+      VALUES (?, ?, ?, ?, 'user', ?, ?, ?, ?, NULL)
+    `).run(
+      name,
+      email,
+      passwordHash,
+      req.body.email_verified === false ? 0 : 1,
+      sub.plan,
+      sub.status,
+      sub.period,
+      subscriptionStart
+    );
+
+    const created = db.prepare(`
+      SELECT id,name,email,role,email_verified,subscription_plan,subscription_status,
+             subscription_period,created_at,
+             (SELECT COUNT(*) FROM leaflets WHERE user_id=users.id) as leaflet_count
+      FROM users WHERE id=?
+    `).get(result.lastInsertRowid);
+    res.status(201).json(created);
+  } catch (err) { next(err); }
+});
+
 /* ── PUT /api/admin/users/:id ── */
 app.put('/api/admin/users/:id', adminMiddleware, (req, res) => {
-  const { role, subscription_plan, subscription_status, email_verified } = req.body;
+  const { role, subscription_plan, subscription_status, subscription_period, email_verified } = req.body;
   const id = Number(req.params.id);
-  const target = db.prepare('SELECT id,email FROM users WHERE id=?').get(id);
+  const target = db.prepare('SELECT id,email,subscription_plan,subscription_status,subscription_period FROM users WHERE id=?').get(id);
   if (!target) {
     res.status(404).json({ error: 'User not found' }); return;
   }
@@ -3793,16 +3867,36 @@ app.put('/api/admin/users/:id', adminMiddleware, (req, res) => {
   if (targetIsPrimaryAdmin && role && role !== 'admin') {
     res.status(400).json({ error: 'Cannot remove admin access from this account' }); return;
   }
+  const sub = validateAdminSubscription({
+    plan: subscription_plan !== undefined ? subscription_plan : target.subscription_plan,
+    status: subscription_status !== undefined ? subscription_status : target.subscription_status,
+    period: subscription_period !== undefined ? subscription_period : target.subscription_period,
+  });
+  if (sub.error) { res.status(400).json({ error: sub.error }); return; }
   const fields = [];
   const vals   = [];
   if (role               !== undefined) { fields.push('role=?');                vals.push(role); }
-  if (subscription_plan  !== undefined) { fields.push('subscription_plan=?');   vals.push(subscription_plan); }
-  if (subscription_status!== undefined) { fields.push('subscription_status=?'); vals.push(subscription_status); }
+  if (subscription_plan  !== undefined) { fields.push('subscription_plan=?');   vals.push(sub.plan); }
+  if (subscription_plan  !== undefined || subscription_status !== undefined) {
+    fields.push('subscription_status=?'); vals.push(sub.status);
+  }
+  if (subscription_plan  !== undefined || subscription_period !== undefined) {
+    fields.push('subscription_period=?'); vals.push(sub.period);
+  }
+  if (subscription_plan !== undefined && sub.plan === 'free') {
+    fields.push('subscription_start=NULL');
+    fields.push('subscription_end=NULL');
+  }
+  if (subscription_plan !== undefined && sub.plan !== 'free') {
+    fields.push('subscription_start=COALESCE(subscription_start, ?)');
+    vals.push(new Date().toISOString());
+    fields.push('subscription_end=NULL');
+  }
   if (email_verified     !== undefined) { fields.push('email_verified=?');      vals.push(email_verified ? 1 : 0); }
   if (!fields.length) { res.status(400).json({ error: 'Nothing to update' }); return; }
   vals.push(id);
   db.prepare(`UPDATE users SET ${fields.join(',')} WHERE id=?`).run(...vals);
-  const updated = db.prepare('SELECT id,name,email,role,email_verified,subscription_plan,subscription_status,created_at FROM users WHERE id=?').get(id);
+  const updated = db.prepare('SELECT id,name,email,role,email_verified,subscription_plan,subscription_status,subscription_period,created_at FROM users WHERE id=?').get(id);
   res.json(updated);
 });
 

@@ -4,7 +4,7 @@ import { useNavigate, useLocation, Routes, Route } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getStoredToken } from '../../services/authService';
 import { PRESET_ICON_URLS } from '../../data/editorIcons';
-import { adminGetMe, adminCheck, adminGetStats, adminGetUsers, adminUpdateUser, adminDeleteUser, adminGetLeaflets, adminDeleteLeaflet, adminBulkDeleteLeaflets, adminGetUploads, adminDeleteUpload, adminGetSettings, adminSaveSettings, adminGetCoverTemplates, adminCreateCoverTemplate, adminDeleteCoverTemplate, adminGetPresetIcons, adminUpdatePresetIcon, adminDeletePresetIcon, adminGetIcons, adminUploadIcon, adminUpdateIcon, adminDeleteIcon, } from './adminApi';
+import { adminGetMe, adminCheck, adminGetStats, adminGetUsers, adminCreateUser, adminUpdateUser, adminDeleteUser, adminGetLeaflets, adminDeleteLeaflet, adminBulkDeleteLeaflets, adminGetUploads, adminDeleteUpload, adminGetSettings, adminSaveSettings, adminGetCoverTemplates, adminCreateCoverTemplate, adminDeleteCoverTemplate, adminGetPresetIcons, adminUpdatePresetIcon, adminDeletePresetIcon, adminGetIcons, adminUploadIcon, adminUpdateIcon, adminDeleteIcon, } from './adminApi';
 import AdminSEO from './AdminSEO';
 import AdminBackup from './AdminBackup';
 import AdminPages from './AdminPages';
@@ -23,8 +23,17 @@ interface AdminUser {
     email_verified: number;
     subscription_plan: string;
     subscription_status: string;
+    subscription_period: string;
     created_at: string;
     leaflet_count: number;
+}
+interface AdminCreateUserForm {
+    name: string;
+    email: string;
+    password: string;
+    subscription_plan: 'pro' | 'business';
+    subscription_period: 'monthly' | 'annual';
+    email_verified: boolean;
 }
 interface AdminLeaflet {
     id: number;
@@ -91,7 +100,7 @@ function fmtSize(b: number) { if (b < 1024)
     return b + 'B'; if (b < 1048576)
     return (b / 1024).toFixed(1) + 'KB'; return (b / 1048576).toFixed(1) + 'MB'; }
 function planBadge(plan: string) {
-    const map: Record<string, string> = { free: 'badge-free', pro: 'badge-pro', enterprise: 'badge-ent' };
+    const map: Record<string, string> = { free: 'badge-free', pro: 'badge-pro', business: 'badge-business', enterprise: 'badge-business' };
     return <span className={`cms-badge ${map[plan] ?? 'badge-free'}`}>{plan}</span>;
 }
 function roleBadge(role: string) {
@@ -236,6 +245,15 @@ function AdminUsers() {
     const [loading, setLoading] = useState(false);
     const [err, setErr] = useState('');
     const [editing, setEditing] = useState<AdminUser | null>(null);
+    const [creating, setCreating] = useState(false);
+    const [createForm, setCreateForm] = useState<AdminCreateUserForm>({
+        name: '',
+        email: '',
+        password: '',
+        subscription_plan: 'pro',
+        subscription_period: 'monthly',
+        email_verified: true,
+    });
     const [confirmDel, setConfirmDel] = useState<number | null>(null);
     const PER = 15;
     const load = useCallback(async () => {
@@ -305,6 +323,7 @@ function AdminUsers() {
                 role: editing.role,
                 subscription_plan: editing.subscription_plan,
                 subscription_status: editing.subscription_status,
+                subscription_period: editing.subscription_period,
                 email_verified: editing.email_verified,
             });
             setEditing(null);
@@ -312,6 +331,29 @@ function AdminUsers() {
         }
         catch (e: any) {
             alert(e.message);
+        }
+    }
+    async function createUser() {
+        try {
+            await adminCreateUser({
+                ...createForm,
+                subscription_status: 'active',
+            });
+            setCreating(false);
+            setCreateForm({
+                name: '',
+                email: '',
+                password: '',
+                subscription_plan: 'pro',
+                subscription_period: 'monthly',
+                email_verified: true,
+            });
+            setPage(1);
+            load();
+        }
+        catch (e: any) {
+            const details = e?.message || 'Failed to create user.';
+            alert(details);
         }
     }
     async function doDelete(id: number) {
@@ -329,6 +371,9 @@ function AdminUsers() {
         <h2 className="cms-section-title">Users <span className="cms-count">({total})</span></h2>
         <div className={cssClass({ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' })}>
           <input className="cms-search" placeholder="Search name / emailâ€¦" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}/>
+          <button className="cms-btn cms-btn-sm cms-btn-primary" onClick={() => setCreating(true)}>
+            <span className="material-symbol" aria-hidden="true">person_add</span> Add user
+          </button>
           <button className="cms-btn cms-btn-sm cms-btn-export" title="Download as CSV" onClick={() => downloadExport('csv')}>
             download CSV
           </button>
@@ -372,6 +417,48 @@ function AdminUsers() {
         <button disabled={page >= Math.ceil(total / PER)} onClick={() => setPage(p => p + 1)} className="cms-btn cms-btn-sm">Next <span className="material-symbol" aria-hidden="true">arrow_forward</span></button>
       </div>
 
+      {/* Create modal */}
+      {creating && (<div className="cms-modal-bg" onClick={e => e.target === e.currentTarget && setCreating(false)}>
+          <div className="cms-modal">
+            <div className="cms-modal-title">Add User</div>
+            <p className="cms-modal-body cms-modal-body--tight">Create a registered user and activate their subscription immediately.</p>
+            <div className="cms-form-row">
+              <label>Name</label>
+              <input type="text" value={createForm.name} onChange={e => setCreateForm({ ...createForm, name: e.target.value })} placeholder="Customer name"/>
+            </div>
+            <div className="cms-form-row">
+              <label>Email</label>
+              <input type="email" value={createForm.email} onChange={e => setCreateForm({ ...createForm, email: e.target.value })} placeholder="customer@example.com"/>
+            </div>
+            <div className="cms-form-row">
+              <label>Password</label>
+              <input type="password" value={createForm.password} onChange={e => setCreateForm({ ...createForm, password: e.target.value })} placeholder="Temporary password"/>
+            </div>
+            <div className="cms-form-row">
+              <label>Plan</label>
+              <select value={createForm.subscription_plan} onChange={e => setCreateForm({ ...createForm, subscription_plan: e.target.value as 'pro' | 'business' })}>
+                <option value="pro">pro</option>
+                <option value="business">business</option>
+              </select>
+            </div>
+            <div className="cms-form-row">
+              <label>Billing Period</label>
+              <select value={createForm.subscription_period} onChange={e => setCreateForm({ ...createForm, subscription_period: e.target.value as 'monthly' | 'annual' })}>
+                <option value="monthly">monthly</option>
+                <option value="annual">annual</option>
+              </select>
+            </div>
+            <div className="cms-form-row">
+              <label>Email Verified</label>
+              <input type="checkbox" checked={createForm.email_verified} onChange={e => setCreateForm({ ...createForm, email_verified: e.target.checked })}/>
+            </div>
+            <div className="cms-modal-footer">
+              <button className="cms-btn" onClick={() => setCreating(false)}>Cancel</button>
+              <button className="cms-btn cms-btn-primary" onClick={createUser}>Create active user</button>
+            </div>
+          </div>
+        </div>)}
+
       {/* Edit modal */}
       {editing && (<div className="cms-modal-bg" onClick={e => e.target === e.currentTarget && setEditing(null)}>
           <div className="cms-modal">
@@ -385,15 +472,29 @@ function AdminUsers() {
             </div>
             <div className="cms-form-row">
               <label>Plan</label>
-              <select value={editing.subscription_plan} onChange={e => setEditing({ ...editing, subscription_plan: e.target.value })}>
+              <select value={editing.subscription_plan} onChange={e => {
+                const nextPlan = e.target.value;
+                setEditing({
+                    ...editing,
+                    subscription_plan: nextPlan,
+                    subscription_status: nextPlan === 'free' ? 'active' : editing.subscription_status || 'active',
+                });
+            }}>
                 <option value="free">free</option>
                 <option value="pro">pro</option>
-                <option value="enterprise">enterprise</option>
+                <option value="business">business</option>
               </select>
             </div>
+            {editing.subscription_plan !== 'free' && (<div className="cms-form-row">
+              <label>Billing Period</label>
+              <select value={editing.subscription_period || 'monthly'} onChange={e => setEditing({ ...editing, subscription_period: e.target.value })}>
+                <option value="monthly">monthly</option>
+                <option value="annual">annual</option>
+              </select>
+            </div>)}
             <div className="cms-form-row">
               <label>Status</label>
-              <select value={editing.subscription_status} onChange={e => setEditing({ ...editing, subscription_status: e.target.value })}>
+              <select value={editing.subscription_status} disabled={editing.subscription_plan === 'free'} onChange={e => setEditing({ ...editing, subscription_status: e.target.value })}>
                 <option value="active">active</option>
                 <option value="cancelled">cancelled</option>
                 <option value="past_due">past_due</option>
