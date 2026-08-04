@@ -38,7 +38,7 @@ export default function Footer({ onOpenDemo }: FooterProps) {
         </div>
 
         <div className="foot-bottom">
-          <div>© {year} Responsyve Company. All rights reserved. Created in Dubai, UAE.</div>
+          <div>© {year} <a href="https://responsyve.co/" target="_blank" rel="noreferrer">Responsyve Company</a>. All rights reserved. Created in Dubai, UAE.</div>
           <div className="legal">
             <Link to="/privacy">Privacy</Link>
             <Link to="/terms">Terms</Link>
