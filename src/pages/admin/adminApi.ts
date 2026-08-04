@@ -2,6 +2,14 @@ import { getStoredToken } from '../../services/authService';
 
 const BASE = '/api/admin';
 
+export type AdminApiError = Error & { status?: number };
+
+function createAdminApiError(status: number, body: any): AdminApiError {
+  const err = new Error(body.error ?? `HTTP ${status}`) as AdminApiError;
+  err.status = status;
+  return err;
+}
+
 function authHeaders(): Record<string, string> {
   const token = getStoredToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -14,7 +22,7 @@ export async function adminFetch(path: string, opts: RequestInit = {}) {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? `HTTP ${res.status}`);
+    throw createAdminApiError(res.status, body);
   }
   return res.json();
 }
@@ -27,7 +35,7 @@ export async function adminUpload(path: string, form: FormData) {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? `HTTP ${res.status}`);
+    throw createAdminApiError(res.status, body);
   }
   return res.json();
 }
@@ -37,7 +45,7 @@ export async function adminDownloadFile(path: string, filename: string) {
   const res = await fetch(BASE + path, { headers: { ...authHeaders() } });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? `HTTP ${res.status}`);
+    throw createAdminApiError(res.status, body);
   }
   const blob = await res.blob();
   const url  = URL.createObjectURL(blob);

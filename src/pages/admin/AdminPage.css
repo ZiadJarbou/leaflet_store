@@ -24,6 +24,13 @@
 .cms-setup-desc  { color: #94a3b8; font-size: .88rem; line-height: 1.7; margin: 0; }
 .cms-setup-note  { display: block; color: #475569; font-size: .78rem; margin-top: 6px; }
 .cms-setup-btn   { padding: 10px 32px; font-size: .9rem; margin-top: 6px; }
+.cms-setup-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
 
 /* ── Root layout ─────────────────────────────────────────────────── */
 .cms-root {

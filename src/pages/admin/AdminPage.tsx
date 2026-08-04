@@ -4,7 +4,7 @@ import { useNavigate, useLocation, Routes, Route, Navigate } from 'react-router-
 import { useAuth } from '../../context/AuthContext';
 import { getStoredToken } from '../../services/authService';
 import { PRESET_ICON_URLS } from '../../data/editorIcons';
-import { adminGetMe, adminCheck, adminGetStats, adminGetUsers, adminCreateUser, adminUpdateUser, adminDeleteUser, adminGetLeaflets, adminDeleteLeaflet, adminBulkDeleteLeaflets, adminGetUploads, adminDeleteUpload, adminGetSettings, adminSaveSettings, adminGetCoverTemplates, adminCreateCoverTemplate, adminDeleteCoverTemplate, adminGetPresetIcons, adminUpdatePresetIcon, adminDeletePresetIcon, adminGetIcons, adminUploadIcon, adminUpdateIcon, adminDeleteIcon, } from './adminApi';
+import { adminGetMe, adminCheck, adminGetStats, adminGetUsers, adminCreateUser, adminUpdateUser, adminDeleteUser, adminGetLeaflets, adminDeleteLeaflet, adminBulkDeleteLeaflets, adminGetUploads, adminDeleteUpload, adminGetSettings, adminSaveSettings, adminGetCoverTemplates, adminCreateCoverTemplate, adminDeleteCoverTemplate, adminGetPresetIcons, adminUpdatePresetIcon, adminDeletePresetIcon, adminGetIcons, adminUploadIcon, adminUpdateIcon, adminDeleteIcon, type AdminApiError, } from './adminApi';
 import AdminSEO from './AdminSEO';
 import AdminBackup from './AdminBackup';
 import AdminPages from './AdminPages';
@@ -12,7 +12,6 @@ import AdminHelpCenter from './AdminHelpCenter';
 import AdminCardTemplates from './AdminCardTemplates';
 import LeafletView from '../LeafletView';
 import './AdminPage.css';
-const PRIMARY_ADMIN_EMAIL = 'ziad.jarbou@gmail.com';
 const NANO_A4_VISIBILITY_STORAGE_KEY = 'leafletai_nano_a4_enabled';
 /* â”€â”€ types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 interface AdminUser {
@@ -1503,16 +1502,22 @@ function AdminSetup() {
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function AdminForbidden() {
     const navigate = useNavigate();
+    const { openAuthModal } = useAuth();
     return (<div className="cms-splash-center">
       <div className="cms-setup-box">
         <div className="cms-setup-icon">block</div>
         <h2 className="cms-setup-title">Page Not Available</h2>
         <p className="cms-setup-desc">
-          This page is not available for your account.
+          This page is available only for the admin account.
         </p>
-        <button className="cms-btn cms-btn-primary" onClick={() => navigate('/')}>
-          Back to App
-        </button>
+        <div className="cms-setup-actions">
+          <button className="cms-btn cms-btn-primary" onClick={() => openAuthModal('login')}>
+            Login as Admin
+          </button>
+          <button className="cms-btn" onClick={() => navigate('/')}>
+            Back to App
+          </button>
+        </div>
       </div>
     </div>);
 }
@@ -1548,7 +1553,12 @@ export default function AdminPage() {
             await adminGetMe();
             setBoot('allowed');
         }
-        catch {
+        catch (e) {
+            const status = (e as AdminApiError).status;
+            if (status === 401) {
+                setBoot('no-session');
+                return;
+            }
             try {
                 const { hasAdmin } = await adminCheck();
                 setBoot(hasAdmin ? 'forbidden' : 'setup');
@@ -1563,10 +1573,6 @@ export default function AdminPage() {
             return;
         if (!user) {
             setBoot('no-session');
-            return;
-        }
-        if (user.email.trim().toLowerCase() !== PRIMARY_ADMIN_EMAIL) {
-            setBoot('forbidden');
             return;
         }
         checkAccess();
