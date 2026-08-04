@@ -65,6 +65,7 @@
   top: 0;
   height: 100vh;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 .cms-logo {
   display: flex;
@@ -78,6 +79,7 @@
 .cms-logo-text {
   font-size: .9rem;
   font-weight: 700;
+  min-width: 0;
   color: #f1f5f9;
   letter-spacing: .3px;
 }
