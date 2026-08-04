@@ -12,7 +12,7 @@
     "start": "node server.js",
     "server": "node server/index.cjs",
     "build": "vite build",
-    "postbuild": "node scripts/compat-assets.cjs && node scripts/inline-entry-js.cjs",
+    "postbuild": "node scripts/compat-assets.cjs && node scripts/inline-entry-js.cjs && node scripts/create-spa-fallbacks.cjs",
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "preview": "vite preview"
