@@ -1,6 +1,6 @@
 ﻿import { cssClass, cx } from '../../utils/styleClass';
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useLocation, Routes, Route } from 'react-router-dom';
+import { useNavigate, useLocation, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getStoredToken } from '../../services/authService';
 import { PRESET_ICON_URLS } from '../../data/editorIcons';
@@ -1520,16 +1520,16 @@ function AdminForbidden() {
    NOT-LOGGED-IN SCREEN
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function AdminLogin() {
-    const navigate = useNavigate();
+    const { openAuthModal } = useAuth();
     return (<div className="cms-splash-center">
       <div className="cms-setup-box">
         <div className="cms-setup-icon">encrypted</div>
         <h2 className="cms-setup-title">Login Required</h2>
         <p className="cms-setup-desc">
-          You must be logged in to access the admin panel.
+          Sign in with ziad.jarbou@gmail.com to access the admin panel.
         </p>
-        <button className="cms-btn cms-btn-primary cms-setup-btn" onClick={() => navigate('/')}>
-          Go to Login
+        <button className="cms-btn cms-btn-primary cms-setup-btn" onClick={() => openAuthModal('login')}>
+          Login
         </button>
       </div>
     </div>);
@@ -1599,6 +1599,7 @@ export default function AdminPage() {
           <Route path="help-center" element={<AdminHelpCenter />}/>
           <Route path="backup" element={<AdminBackup />}/>
           <Route path="settings" element={<AdminSettings />}/>
+          <Route path="*" element={<Navigate to="/admin/dashboard" replace />}/>
         </Routes>
       </main>
     </div>);

@@ -46,7 +46,7 @@ function AppShell() {
     return (<>
       {!isAdmin && <Navbar />}
       {!isAdmin && <NoticeBanner />}
-      {!isAdmin && <AuthModal />}
+      <AuthModal />
       {!isAdmin && <ChatBot />}
       <Routes>
           <Route path="/" element={<HomePage />}/>
@@ -77,6 +77,7 @@ function AppShell() {
           <Route path="/terms" element={<TermsPage />}/>
           <Route path="/help" element={<HelpCenterPage />}/>
           {/* Admin CMS — role check is inside AdminPage itself */}
+          <Route path="/admin" element={<AdminPage />}/>
           <Route path="/admin/*" element={<AdminPage />}/>
           <Route path="/404" element={<NotFoundPage />}/>
           <Route path="*" element={<NotFoundPage />}/>
