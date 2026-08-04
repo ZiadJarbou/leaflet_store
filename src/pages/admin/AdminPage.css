@@ -945,6 +945,13 @@
 .bk-num-input:focus { outline: none; border-color: #49f2b6; }
 
 /* backup list */
+.bk-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.bk-import-input { display: none; }
 .bk-empty {
   color: #4a5568;
   font-size: .88rem;

@@ -87,6 +87,7 @@ export const adminGetSEOPages = ()             => adminFetch('/seo');
 export const adminUpdateSEO   = (id: number, body: object) => adminFetch(`/seo/${id}`, { method: 'PUT', body: JSON.stringify(body) });
 export const adminListBackups    = ()             => adminFetch('/backup/list');
 export const adminCreateBackup   = ()             => adminFetch('/backup/create', { method: 'POST' });
+export const adminImportBackup   = (form: FormData) => adminUpload('/backup/import', form);
 export const adminDeleteBackup   = (name: string) => adminFetch(`/backup/${encodeURIComponent(name)}`, { method: 'DELETE' });
 export const adminGetBackupSettings  = ()             => adminFetch('/backup/settings');
 export const adminSaveBackupSettings = (body: object) => adminFetch('/backup/settings', { method: 'PUT', body: JSON.stringify(body) });

@@ -1366,6 +1366,14 @@ const pdfExportUpload = multer({
     else cb(new Error('Only PDF files are allowed.'));
   },
 });
+const backupImportUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 250 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (/\.db\.gz$/i.test(file.originalname || '')) cb(null, true);
+    else cb(new Error('Only .db.gz backup files are allowed.'));
+  },
+});
 
 app.use('/uploads', (req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -4492,6 +4500,70 @@ app.post('/api/admin/backup/create', adminMiddleware, async (req, res) => {
   } catch (e) {
     console.error('[backup create]', e);
     res.status(500).json({ error: e.message });
+  }
+});
+
+/* POST /api/admin/backup/import -- restore uploaded database backup */
+app.post('/api/admin/backup/import', adminMiddleware, backupImportUpload.single('backup'), async (req, res) => {
+  const cleanup = [];
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'Backup file is required.' });
+      return;
+    }
+
+    const importedDb = zlib.gunzipSync(req.file.buffer);
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const tempDb = path.join(BACKUPS_DIR, `_import_${stamp}.db`);
+    const restoreDb = path.join(BACKUPS_DIR, `_restore_${stamp}.db`);
+    const previousDb = path.join(BACKUPS_DIR, `_previous_${stamp}.db`);
+    cleanup.push(tempDb);
+    fs.writeFileSync(tempDb, importedDb, { mode: 0o600 });
+
+    const imported = new Database(tempDb, { readonly: true, fileMustExist: true });
+    try {
+      const requiredTables = ['users', 'leaflets', 'leaflet_products', 'site_settings'];
+      const rows = imported.prepare(`
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name IN (${requiredTables.map(() => '?').join(',')})
+      `).all(...requiredTables);
+      const found = new Set(rows.map(r => r.name));
+      const missing = requiredTables.filter(name => !found.has(name));
+      if (missing.length) {
+        throw Object.assign(new Error(`Invalid backup. Missing table: ${missing[0]}`), { statusCode: 422 });
+      }
+      const quickCheck = imported.pragma('quick_check');
+      if (!quickCheck.some(row => Object.values(row).includes('ok'))) {
+        throw Object.assign(new Error('Invalid backup. SQLite quick check failed.'), { statusCode: 422 });
+      }
+    } finally {
+      imported.close();
+    }
+
+    const safetyBackup = await createBackup();
+    fs.copyFileSync(tempDb, restoreDb);
+    cleanup.push(restoreDb);
+    db.close();
+    if (fs.existsSync(DB_PATH)) fs.renameSync(DB_PATH, previousDb);
+    for (const suffix of ['', '-wal', '-shm']) {
+      const target = `${DB_PATH}${suffix}`;
+      if (fs.existsSync(target)) fs.unlinkSync(target);
+    }
+    fs.renameSync(restoreDb, DB_PATH);
+    try { if (fs.existsSync(previousDb)) fs.unlinkSync(previousDb); } catch {}
+    cleanup.forEach(file => { try { if (fs.existsSync(file)) fs.unlinkSync(file); } catch {} });
+
+    res.json({
+      ok: true,
+      restored: true,
+      safety_backup: safetyBackup,
+      message: 'Backup imported. Server is restarting to load restored data.',
+    });
+    setTimeout(() => process.exit(0), 800);
+  } catch (e) {
+    cleanup.forEach(file => { try { if (fs.existsSync(file)) fs.unlinkSync(file); } catch {} });
+    console.error('[backup import]', e);
+    res.status(e.statusCode || 500).json({ error: e.message || 'Failed to import backup.' });
   }
 });
 

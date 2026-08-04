@@ -1,6 +1,6 @@
 ﻿import { cssClass, cx } from '../../utils/styleClass';
-import React, { useState, useEffect, useCallback } from 'react';
-import { adminListBackups, adminCreateBackup, adminDeleteBackup, adminGetBackupSettings, adminSaveBackupSettings, adminDownloadFile, } from './adminApi';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { adminListBackups, adminCreateBackup, adminImportBackup, adminDeleteBackup, adminGetBackupSettings, adminSaveBackupSettings, adminDownloadFile, } from './adminApi';
 import './AdminPage.css';
 /* â”€â”€ types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 interface BackupFile {
@@ -48,11 +48,13 @@ export default function AdminBackup() {
     const [settings, setSettings] = useState<BackupSettings>({ auto_enabled: '0', auto_hours: '24', max_keep: '20' });
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
+    const [importing, setImporting] = useState(false);
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState<string | null>(null);
     const [confirmDel, setConfirmDel] = useState<string | null>(null);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const importInputRef = useRef<HTMLInputElement | null>(null);
     const load = useCallback(async () => {
         setLoading(true);
         try {
@@ -89,6 +91,36 @@ export default function AdminBackup() {
         }
         finally {
             setCreating(false);
+        }
+    }
+    async function handleImportBackup(file: File | null) {
+        if (!file)
+            return;
+        if (!window.confirm('Importing a backup will replace the current database. A safety backup will be created first. Continue?')) {
+            if (importInputRef.current)
+                importInputRef.current.value = '';
+            return;
+        }
+        setImporting(true);
+        setError('');
+        setSuccess('');
+        try {
+            const form = new FormData();
+            form.append('backup', file);
+            const result = await adminImportBackup(form) as {
+                message?: string;
+                safety_backup?: string;
+            };
+            setSuccess(result.message || `Backup imported. Safety backup: ${result.safety_backup || 'created'}.`);
+            setTimeout(() => window.location.reload(), 1800);
+        }
+        catch (e: any) {
+            setError(e.message);
+        }
+        finally {
+            setImporting(false);
+            if (importInputRef.current)
+                importInputRef.current.value = '';
         }
     }
     function handleDelete(name: string) {
@@ -143,9 +175,15 @@ export default function AdminBackup() {
           Backup &amp; Restore
           <span className="cms-count"> â€” {files.length} backup{files.length !== 1 ? 's' : ''}</span>
         </h2>
-        <button className="cms-btn cms-btn-primary" onClick={handleCreate} disabled={creating}>
-          {creating ? <><span className="material-symbol" aria-hidden="true">progress_activity</span> Creating...</> : <><span className="material-symbol" aria-hidden="true">download</span> Create Backup Now</>}
-        </button>
+        <div className="bk-header-actions">
+          <input ref={importInputRef} className="bk-import-input" type="file" accept=".db.gz,application/gzip" onChange={e => handleImportBackup(e.target.files?.[0] || null)}/>
+          <button className="cms-btn" type="button" onClick={() => importInputRef.current?.click()} disabled={importing || creating}>
+            {importing ? <><span className="material-symbol" aria-hidden="true">progress_activity</span> Importing...</> : <><span className="material-symbol" aria-hidden="true">upload_file</span> Import Backup Data</>}
+          </button>
+          <button className="cms-btn cms-btn-primary" onClick={handleCreate} disabled={creating || importing}>
+            {creating ? <><span className="material-symbol" aria-hidden="true">progress_activity</span> Creating...</> : <><span className="material-symbol" aria-hidden="true">download</span> Create Backup Now</>}
+          </button>
+        </div>
       </div>
 
       {error && <div className={cx("cms-error", cssClass({ marginBottom: 12 }))}>{error}</div>}
