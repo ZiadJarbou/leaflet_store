@@ -2093,9 +2093,9 @@ function ProductCard({ p, isTwoLang, leafletId, onUpdate, onDelete, cardLayout, 
     }
     const hasPositions = !!cl?.positions;
     const pos = cl?.positions;
-    const cardActions = (<div className="lv-card-actions" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+    const cardActions = (<div className="lv-card-actions" data-html2canvas-ignore="true" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
       <button className="lv-edit-btn" onClick={e => { e.stopPropagation(); setEditing(true); }} aria-label={`Edit ${p.product_name_lan1}`} title="Edit product">
-        Edit Edit
+        <span className="material-symbol" aria-hidden="true">edit</span>
       </button>
       {confirmDel ? (<div className="lv-confirm-del">
           <span>Delete?</span>
@@ -9542,7 +9542,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             {pageProd.length > 0 && (<div className="lv-a4-grid-wrap">
                 <div className={cx("lv-a4-grid", cssClass({ width: gridW, height: flushFullBleedFooter && footerShowFor(pageIdx) ? '100%' : gridHFor(pageIdx) }))}>
                   {pageProd.map(p => (<div key={p.id} className={cx("lv-card-wrap", cssClass({ width: cardW, height: flushFullBleedFooter && footerShowFor(pageIdx) ? '100%' : cardHFor(pageIdx) }))}>
-                      <ProductCard p={p} isTwoLang={isTwoLang} leafletId={id!} onUpdate={() => { }} onDelete={() => { }} cardLayout={cardLayout} cardWidth={cardW} cardHeight={flushFullBleedFooter && footerShowFor(pageIdx) ? undefined : cardHFor(pageIdx)} overlays={overlays[p.id] ?? []} showShapes={false} imageLoading="eager"/>
+                      <ProductCard p={p} isTwoLang={isTwoLang} leafletId={id!} onUpdate={() => { }} onDelete={() => { }} cardLayout={cardLayout} cardWidth={cardW} cardHeight={flushFullBleedFooter && footerShowFor(pageIdx) ? undefined : cardHFor(pageIdx)} overlays={overlays[p.id] ?? []} showShapes={false} showActions={false} imageLoading="eager"/>
                       <CardShapes layout={cardLayout}/>
                     </div>))}
                 </div>

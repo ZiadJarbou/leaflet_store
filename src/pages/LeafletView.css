@@ -22,16 +22,25 @@
 }
 
 .lv-edit-btn {
-  padding: 5px 11px;
-  border-radius: 20px;
-  font-size: 12px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 0;
   font-weight: 600;
   background: rgba(15, 15, 20, 0.82);
   color: #fff;
   border: 1px solid rgba(255,255,255,.18);
   cursor: pointer;
   backdrop-filter: blur(6px);
-  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.lv-edit-btn .material-symbol {
+  font-size: 18px;
+  line-height: 1;
 }
 .lv-edit-btn:hover {
   background: var(--brand, #49f2b6);
@@ -3322,6 +3331,12 @@ body.dragging-icon .lv-card-drop-layer {
   box-shadow: none;
   border-radius: 0;
 }
+#lv-print-root .lv-card-actions,
+#lv-print-root .lv-confirm-del,
+#lv-print-root .lv-edit-btn,
+#lv-print-root .lv-delete-btn {
+  display: none !important;
+}
 
 /* ── Print / Save as PDF ─────────────────────────────────────────── */
 @media print {
@@ -3395,6 +3410,13 @@ body.dragging-icon .lv-card-drop-layer {
   .lv-pdf-page .lv-card {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+  }
+
+  .lv-pdf-page .lv-card-actions,
+  .lv-pdf-page .lv-confirm-del,
+  .lv-pdf-page .lv-edit-btn,
+  .lv-pdf-page .lv-delete-btn {
+    display: none !important;
   }
 
   /* Cover/back: full-bleed */
