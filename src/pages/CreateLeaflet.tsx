@@ -15,11 +15,40 @@ import { Link, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { parseFile, generateErrorReportCSV } from '../services/parseImport';
-import { createLeaflet, saveLeafletLayout } from '../services/api';
+import { createLeaflet, getSubscription, saveLeafletLayout } from '../services/api';
 import type { ImportResult, ParsedProduct } from '../types/leaflet';
 import './CreateLeaflet.css';
 const CREATE_LEAFLET_TOUR_SEEN_KEY = 'leafletai_create_leaflet_tour_seen';
 const CREATE_LEAFLET_TOUR_SKIPPED_KEY = 'leafletai_create_leaflet_tour_skipped';
+const PRODUCT_LIMIT_BY_PLAN: Record<string, number> = {
+    free: 20,
+    starter: 100,
+};
+function productLimitForPlan(plan?: string) {
+    const key = String(plan || 'free').toLowerCase();
+    return PRODUCT_LIMIT_BY_PLAN[key] ?? Infinity;
+}
+function planLabel(plan?: string) {
+    const key = String(plan || 'free').toLowerCase();
+    if (key === 'pro')
+        return 'Professional';
+    return key.charAt(0).toUpperCase() + key.slice(1);
+}
+function limitImportResult(result: ImportResult, limit: number): ImportResult {
+    if (!Number.isFinite(limit) || result.products.length <= limit)
+        return result;
+    const products = result.products.slice(0, limit);
+    return {
+        ...result,
+        products,
+        summary: {
+            ...result.summary,
+            total: products.length,
+            valid: products.filter(p => p.isValid).length,
+            invalid: products.filter(p => !p.isValid).length,
+        },
+    };
+}
 function defaultLeafletTitle(fileName?: string) {
     const base = String(fileName || '')
         .replace(/\.[^.]+$/, '')
@@ -543,6 +572,14 @@ export default function CreateLeaflet() {
     });
     const [showAddModal, setShowAddModal] = useState(false);
     const [newProduct, setNewProduct] = useState<ParsedProduct>(EMPTY_PRODUCT);
+    const [subscriptionPlan, setSubscriptionPlan] = useState('free');
+    const [subscriptionLoaded, setSubscriptionLoaded] = useState(false);
+    const [limitNotice, setLimitNotice] = useState<{
+        plan: string;
+        limit: number;
+        uploaded: number;
+        imported: number;
+    } | null>(null);
     /* â”€â”€ Step 3: create form â”€â”€ */
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
@@ -580,6 +617,12 @@ export default function CreateLeaflet() {
         }
     }, []);
     useEffect(() => {
+        getSubscription()
+            .then(info => setSubscriptionPlan(info.subscription_plan || 'free'))
+            .catch(() => setSubscriptionPlan('free'))
+            .finally(() => setSubscriptionLoaded(true));
+    }, []);
+    useEffect(() => {
         const token = localStorage.getItem('leafletai_token') || localStorage.getItem('token');
         if (!token)
             return;
@@ -599,8 +642,33 @@ export default function CreateLeaflet() {
         setParseError(null);
         setParsing(true);
         try {
+            let activePlan = subscriptionPlan;
+            if (!subscriptionLoaded) {
+                try {
+                    const info = await getSubscription();
+                    activePlan = info.subscription_plan || 'free';
+                    setSubscriptionPlan(activePlan);
+                }
+                catch {
+                    activePlan = 'free';
+                    setSubscriptionPlan('free');
+                }
+                finally {
+                    setSubscriptionLoaded(true);
+                }
+            }
             const result = await parseFile(f);
-            setImportResult(result);
+            const limit = productLimitForPlan(activePlan);
+            const limitedResult = limitImportResult(result, limit);
+            setImportResult(limitedResult);
+            if (Number.isFinite(limit) && result.products.length > limit) {
+                setLimitNotice({
+                    plan: activePlan,
+                    limit,
+                    uploaded: result.products.length,
+                    imported: limitedResult.products.length,
+                });
+            }
             setStep(2);
         }
         catch (e) {
@@ -610,7 +678,7 @@ export default function CreateLeaflet() {
         finally {
             setParsing(false);
         }
-    }, []);
+    }, [subscriptionLoaded, subscriptionPlan]);
     function onFileInput(e: ChangeEvent<HTMLInputElement>) {
         const f = e.target.files?.[0];
         if (f)
@@ -648,6 +716,16 @@ export default function CreateLeaflet() {
     function handleAddProduct() {
         if (!importResult || !newProduct.name.trim())
             return;
+        const limit = productLimitForPlan(subscriptionPlan);
+        if (Number.isFinite(limit) && importResult.products.length >= limit) {
+            setLimitNotice({
+                plan: subscriptionPlan,
+                limit,
+                uploaded: importResult.products.length + 1,
+                imported: importResult.products.length,
+            });
+            return;
+        }
         const product: ParsedProduct = {
             ...newProduct,
             rowIndex: Date.now(),
@@ -693,6 +771,8 @@ export default function CreateLeaflet() {
         const validProducts = importAll
             ? importResult.products
             : importResult.products.filter(p => p.isValid);
+        const limit = productLimitForPlan(subscriptionPlan);
+        const cappedProducts = Number.isFinite(limit) ? validProducts.slice(0, limit) : validProducts;
         setSubmitting(true);
         setSubmitError(null);
         try {
@@ -700,7 +780,7 @@ export default function CreateLeaflet() {
                 title: finalTitle,
                 description: description.trim(),
                 languageMode: importResult.languageMode,
-                products: validProducts,
+                products: cappedProducts,
             });
             // Apply default leaflet layout if user opted in
             if (false && applyDefault && defaultLeaflet?.layout_json) {
@@ -1049,6 +1129,30 @@ export default function CreateLeaflet() {
               <div className="cl-modal-footer">
                 <button className="cl-btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
                 <button className="cl-btn-primary" disabled={!newProduct.name.trim()} onClick={handleAddProduct}>Add Product</button>
+              </div>
+            </div>
+          </div>)}
+
+        {limitNotice && (<div className="cl-modal-overlay" onClick={e => { if (e.target === e.currentTarget)
+            setLimitNotice(null); }}>
+            <div className="cl-modal-box cl-limit-modal" role="dialog" aria-modal="true" aria-label="Product import limit">
+              <div className="cl-modal-header">
+                <h3>Product import limit</h3>
+                <button className="cl-modal-close material-symbol" onClick={() => setLimitNotice(null)} aria-label="Close">close</button>
+              </div>
+              <div className="cl-modal-body cl-limit-modal-body">
+                <div className="cl-limit-icon material-symbol" aria-hidden="true">inventory_2</div>
+                <div>
+                  <p className="cl-limit-title">{planLabel(limitNotice.plan)} plan allows {limitNotice.limit} products per leaflet.</p>
+                  <p className="cl-limit-text">
+                    Your file has {limitNotice.uploaded} product rows, so only the first {limitNotice.imported} product{limitNotice.imported !== 1 ? 's' : ''} will be imported.
+                  </p>
+                  <p className="cl-limit-subtext">Upgrade your plan to import larger product files into one leaflet.</p>
+                </div>
+              </div>
+              <div className="cl-modal-footer">
+                <Link className="cl-btn-secondary" to="/pricing">View plans</Link>
+                <button className="cl-btn-primary" onClick={() => setLimitNotice(null)}>Continue</button>
               </div>
             </div>
           </div>)}

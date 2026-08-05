@@ -114,6 +114,17 @@ const DEFAULT_PRICING_ANNUAL_ITEMS = [
   'Agency: Custom annual pricing',
 ];
 
+const PRODUCT_IMPORT_LIMIT_BY_PLAN = {
+  free: 20,
+  starter: 100,
+};
+
+function productImportLimitForUser(user) {
+  if (isUnlimitedUser(user)) return Infinity;
+  const plan = String(user?.subscription_plan || 'free').trim().toLowerCase();
+  return PRODUCT_IMPORT_LIMIT_BY_PLAN[plan] ?? Infinity;
+}
+
 function parsePlanAmount(value) {
   const n = typeof value === 'number'
     ? value
@@ -2010,6 +2021,12 @@ app.post('/api/leaflets', authMiddleware, (req, res, next) => {
     if (!title || !String(title).trim()) {
       res.status(422).json({ error: 'Title is required.' }); return;
     }
+    const user = db.prepare('SELECT email, subscription_plan FROM users WHERE id = ?').get(req.user.id);
+    const productLimit = productImportLimitForUser(user);
+    const incomingProducts = Array.isArray(products) ? products : [];
+    const productsToInsert = Number.isFinite(productLimit)
+      ? incomingProducts.slice(0, productLimit)
+      : incomingProducts;
 
     const leafletStmt   = db.prepare(`INSERT INTO leaflets (user_id, title, description, language_mode, layout_json) VALUES (?, ?, ?, ?, ?)`);
     const leafletResult = leafletStmt.run(
@@ -2039,10 +2056,17 @@ app.post('/api/leaflets', authMiddleware, (req, res, next) => {
         );
       }
     });
-    if (Array.isArray(products) && products.length > 0) insertAll(products);
+    if (productsToInsert.length > 0) insertAll(productsToInsert);
 
     const leaflet = db.prepare('SELECT * FROM leaflets WHERE id = ?').get(leafletId);
-    res.status(201).json({ id: leaflet.id, title: leaflet.title, createdAt: leaflet.created_at });
+    res.status(201).json({
+      id: leaflet.id,
+      title: leaflet.title,
+      createdAt: leaflet.created_at,
+      productsImported: productsToInsert.length,
+      productsRequested: incomingProducts.length,
+      productLimit: Number.isFinite(productLimit) ? productLimit : null,
+    });
   } catch (err) { next(err); }
 });
 
