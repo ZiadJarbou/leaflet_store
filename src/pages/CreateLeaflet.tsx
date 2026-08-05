@@ -15,7 +15,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { parseFile, generateErrorReportCSV } from '../services/parseImport';
-import { createLeaflet, getSubscription, saveLeafletLayout } from '../services/api';
+import { createLeaflet, getProductImportLimit, saveLeafletLayout } from '../services/api';
 import type { ImportResult, ParsedProduct } from '../types/leaflet';
 import './CreateLeaflet.css';
 const CREATE_LEAFLET_TOUR_SEEN_KEY = 'leafletai_create_leaflet_tour_seen';
@@ -24,10 +24,6 @@ const PRODUCT_LIMIT_BY_PLAN: Record<string, number> = {
     free: 20,
     starter: 100,
 };
-function productLimitForPlan(plan?: string) {
-    const key = String(plan || 'free').toLowerCase();
-    return PRODUCT_LIMIT_BY_PLAN[key] ?? Infinity;
-}
 function planLabel(plan?: string) {
     const key = String(plan || 'free').toLowerCase();
     if (key === 'pro')
@@ -574,6 +570,7 @@ export default function CreateLeaflet() {
     const [newProduct, setNewProduct] = useState<ParsedProduct>(EMPTY_PRODUCT);
     const [subscriptionPlan, setSubscriptionPlan] = useState('free');
     const [subscriptionLoaded, setSubscriptionLoaded] = useState(false);
+    const [productLimit, setProductLimit] = useState<number>(PRODUCT_LIMIT_BY_PLAN.free);
     const [limitNotice, setLimitNotice] = useState<{
         plan: string;
         limit: number;
@@ -617,9 +614,15 @@ export default function CreateLeaflet() {
         }
     }, []);
     useEffect(() => {
-        getSubscription()
-            .then(info => setSubscriptionPlan(info.subscription_plan || 'free'))
-            .catch(() => setSubscriptionPlan('free'))
+        getProductImportLimit()
+            .then(info => {
+            setSubscriptionPlan(info.plan || 'free');
+            setProductLimit(info.limit ?? Infinity);
+        })
+            .catch(() => {
+            setSubscriptionPlan('free');
+            setProductLimit(PRODUCT_LIMIT_BY_PLAN.free);
+        })
             .finally(() => setSubscriptionLoaded(true));
     }, []);
     useEffect(() => {
@@ -643,28 +646,32 @@ export default function CreateLeaflet() {
         setParsing(true);
         try {
             let activePlan = subscriptionPlan;
+            let activeLimit = productLimit;
             if (!subscriptionLoaded) {
                 try {
-                    const info = await getSubscription();
-                    activePlan = info.subscription_plan || 'free';
+                    const info = await getProductImportLimit();
+                    activePlan = info.plan || 'free';
+                    activeLimit = info.limit ?? Infinity;
                     setSubscriptionPlan(activePlan);
+                    setProductLimit(activeLimit);
                 }
                 catch {
                     activePlan = 'free';
+                    activeLimit = PRODUCT_LIMIT_BY_PLAN.free;
                     setSubscriptionPlan('free');
+                    setProductLimit(activeLimit);
                 }
                 finally {
                     setSubscriptionLoaded(true);
                 }
             }
             const result = await parseFile(f);
-            const limit = productLimitForPlan(activePlan);
-            const limitedResult = limitImportResult(result, limit);
+            const limitedResult = limitImportResult(result, activeLimit);
             setImportResult(limitedResult);
-            if (Number.isFinite(limit) && result.products.length > limit) {
+            if (Number.isFinite(activeLimit) && result.products.length > activeLimit) {
                 setLimitNotice({
                     plan: activePlan,
-                    limit,
+                    limit: activeLimit,
                     uploaded: result.products.length,
                     imported: limitedResult.products.length,
                 });
@@ -678,7 +685,7 @@ export default function CreateLeaflet() {
         finally {
             setParsing(false);
         }
-    }, [subscriptionLoaded, subscriptionPlan]);
+    }, [productLimit, subscriptionLoaded, subscriptionPlan]);
     function onFileInput(e: ChangeEvent<HTMLInputElement>) {
         const f = e.target.files?.[0];
         if (f)
@@ -716,11 +723,10 @@ export default function CreateLeaflet() {
     function handleAddProduct() {
         if (!importResult || !newProduct.name.trim())
             return;
-        const limit = productLimitForPlan(subscriptionPlan);
-        if (Number.isFinite(limit) && importResult.products.length >= limit) {
+        if (Number.isFinite(productLimit) && importResult.products.length >= productLimit) {
             setLimitNotice({
                 plan: subscriptionPlan,
-                limit,
+                limit: productLimit,
                 uploaded: importResult.products.length + 1,
                 imported: importResult.products.length,
             });
@@ -771,8 +777,7 @@ export default function CreateLeaflet() {
         const validProducts = importAll
             ? importResult.products
             : importResult.products.filter(p => p.isValid);
-        const limit = productLimitForPlan(subscriptionPlan);
-        const cappedProducts = Number.isFinite(limit) ? validProducts.slice(0, limit) : validProducts;
+        const cappedProducts = Number.isFinite(productLimit) ? validProducts.slice(0, productLimit) : validProducts;
         setSubmitting(true);
         setSubmitError(null);
         try {

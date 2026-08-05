@@ -671,6 +671,16 @@ export async function getSubscription(): Promise<SubscriptionInfo> {
   return request<SubscriptionInfo>('/stripe/subscription');
 }
 
+export interface ProductImportLimit {
+  plan: string;
+  limit: number | null;
+  unlimited: boolean;
+}
+
+export async function getProductImportLimit(): Promise<ProductImportLimit> {
+  return request<ProductImportLimit>('/user/product-import-limit');
+}
+
 function detectBillingLocale() {
   const locale = navigator.languages?.[0] || navigator.language || '';
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';

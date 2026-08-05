@@ -120,9 +120,17 @@ const PRODUCT_IMPORT_LIMIT_BY_PLAN = {
 };
 
 function productImportLimitForUser(user) {
-  if (isUnlimitedUser(user)) return Infinity;
   const plan = String(user?.subscription_plan || 'free').trim().toLowerCase();
   return PRODUCT_IMPORT_LIMIT_BY_PLAN[plan] ?? Infinity;
+}
+
+function productImportLimitPayload(user) {
+  const limit = productImportLimitForUser(user);
+  return {
+    plan: String(user?.subscription_plan || 'free').trim().toLowerCase() || 'free',
+    limit: Number.isFinite(limit) ? limit : null,
+    unlimited: !Number.isFinite(limit),
+  };
 }
 
 function parsePlanAmount(value) {
@@ -2269,6 +2277,19 @@ app.post('/api/leaflets/:lid/products', authMiddleware, (req, res, next) => {
   try {
     const leaflet = db.prepare('SELECT id FROM leaflets WHERE id = ? AND user_id = ?').get(req.params.lid, req.user.id);
     if (!leaflet) { res.status(404).json({ error: 'Leaflet not found.' }); return; }
+    const user = db.prepare('SELECT subscription_plan FROM users WHERE id = ?').get(req.user.id);
+    const productLimit = productImportLimitForUser(user);
+    if (Number.isFinite(productLimit)) {
+      const currentCount = db.prepare('SELECT COUNT(*) AS n FROM leaflet_products WHERE leaflet_id = ?').get(leaflet.id)?.n || 0;
+      if (currentCount >= productLimit) {
+        res.status(403).json({
+          error: `Your ${productImportLimitPayload(user).plan} plan allows ${productLimit} products per leaflet.`,
+          productLimit,
+          productsImported: currentCount,
+        });
+        return;
+      }
+    }
 
     const {
       product_name_lan1 = '', product_name_lan2 = '',
@@ -3307,6 +3328,11 @@ app.get('/api/stripe/subscription', authMiddleware, (req, res) => {
     subscription_end: row.subscription_end ?? null,
     unlimited: isUnlimitedUser(row),
   });
+});
+
+app.get('/api/user/product-import-limit', authMiddleware, (req, res) => {
+  const row = db.prepare('SELECT subscription_plan FROM users WHERE id = ?').get(req.user.id);
+  res.json(productImportLimitPayload(row));
 });
 
 app.post('/api/stripe/confirm-session', authMiddleware, async (req, res) => {
