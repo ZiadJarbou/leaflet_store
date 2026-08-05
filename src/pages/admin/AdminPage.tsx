@@ -1,6 +1,6 @@
 ﻿import { cssClass, cx } from '../../utils/styleClass';
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useLocation, Routes, Route, Navigate } from 'react-router-dom';
+import { useNavigate, useLocation, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getStoredToken } from '../../services/authService';
 import { PRESET_ICON_URLS } from '../../data/editorIcons';
@@ -764,13 +764,16 @@ function AdminCoverPages() {
     return <div className="cms-error">{err}</div>;
 }
 function AdminCoverPageEditor() {
+    const { id } = useParams<{ id: string }>();
     const [nanoA4Enabled, setNanoA4Enabled] = useState(true);
     useEffect(() => {
         adminGetSettings()
             .then(settings => setNanoA4Enabled(String(settings.nano_a4_enabled ?? '1') !== '0'))
             .catch(() => setNanoA4Enabled(true));
     }, []);
-    return <div className="cms-cover-builder-main"><LeafletView coverBuilderOnly nanoA4VisibleOverride={nanoA4Enabled}/></div>;
+    if (!id)
+        return <Navigate to="/admin/cover-pages" replace/>;
+    return <div className="cms-cover-builder-main"><LeafletView coverBuilderOnly leafletId={id} nanoA4VisibleOverride={nanoA4Enabled}/></div>;
 }
 const COVER_TEMPLATE_BASES = [
     { id: 'hero-left', name: 'Hero left' },
