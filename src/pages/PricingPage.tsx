@@ -376,7 +376,7 @@ export default function PricingPage() {
           </button>
           <span className={annual ? 'pp-toggle-label active' : 'pp-toggle-label'}>
             Annual
-            {annualSavings > 0 && <span className="pp-save-badge">Save {annualSavings}%</span>}
+            {annualSavings > 0 && <span className="pp-save-badge">Save up to 17%</span>}
           </span>
         </div>
       </section>
