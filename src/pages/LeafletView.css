@@ -49,16 +49,25 @@
 }
 
 .lv-delete-btn {
-  padding: 5px 9px;
-  border-radius: 20px;
-  font-size: 12px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 0;
   background: rgba(15, 15, 20, 0.82);
   color: #fff;
   border: 1px solid rgba(255,255,255,.18);
   cursor: pointer;
   backdrop-filter: blur(6px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
   margin-left: auto;
+}
+.lv-delete-btn .material-symbol {
+  font-size: 19px;
+  line-height: 1;
 }
 .lv-delete-btn:hover { background: #ef4444; border-color: transparent; }
 

@@ -2101,7 +2101,9 @@ function ProductCard({ p, isTwoLang, leafletId, onUpdate, onDelete, cardLayout, 
           <span>Delete?</span>
           <button className="lv-del-yes" onClick={e => { e.stopPropagation(); void handleDelete(); }} disabled={deleting}>{deleting ? '...' : 'Yes'}</button>
           <button className="lv-del-no" onClick={e => { e.stopPropagation(); setConfirmDel(false); }} disabled={deleting}>No</button>
-        </div>) : (<button className="lv-delete-btn" onClick={e => { e.stopPropagation(); setConfirmDel(true); }} aria-label={`Delete ${p.product_name_lan1}`} title="Delete product">{'\u{1F5D1}'}</button>)}
+        </div>) : (<button className="lv-delete-btn" onClick={e => { e.stopPropagation(); setConfirmDel(true); }} aria-label={`Delete ${p.product_name_lan1}`} title="Delete product">
+          <span className="material-symbol" aria-hidden="true">delete</span>
+        </button>)}
     </div>);
     const imageLicense = (p.product_image_license || '').trim();
     const imageLicenseNode = imageLicense ? (/^https?:\/\//i.test(imageLicense) ? (<a href={imageLicense} target="_blank" rel="noreferrer" className="lv-card-image-license">
