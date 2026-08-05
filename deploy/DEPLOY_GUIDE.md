@@ -185,6 +185,10 @@ npm install
 npm run build
 cp -r dist/. /var/www/leafletai/dist/
 
+# Re-apply the SPA fallback config so direct refreshes load React
+cp deploy/nginx.conf /etc/nginx/sites-available/leafletai.ai
+nginx -t && systemctl reload nginx
+
 # Restart server
 pm2 restart leafletai
 ```

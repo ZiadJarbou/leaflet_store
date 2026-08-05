@@ -11,6 +11,27 @@ if (!fs.existsSync(indexPath)) {
 
 const indexHtml = fs.readFileSync(indexPath);
 const fallbackDirs = [
+  'why',
+  'features',
+  'faq',
+  'pricing',
+  'payment',
+  'payment/success',
+  'forgot-password',
+  'verify-email',
+  'oauth',
+  'oauth/callback',
+  'create-leaflet',
+  'my-leaflets',
+  'dashboard',
+  'settings',
+  'privacy',
+  'terms',
+  'help',
+  '404',
+  'app',
+  'app/leaflet',
+  ...Array.from({ length: 500 }, (_, i) => `app/leaflet/${i + 1}`),
   'admin',
   'admin/dashboard',
   'admin/users',
@@ -34,4 +55,4 @@ for (const route of fallbackDirs) {
 }
 
 fs.writeFileSync(path.join(distDir, '404.html'), indexHtml);
-console.log(`create-spa-fallbacks: wrote ${fallbackDirs.length} admin route fallbacks and 404.html`);
+console.log(`create-spa-fallbacks: wrote ${fallbackDirs.length} SPA route fallbacks and 404.html`);
