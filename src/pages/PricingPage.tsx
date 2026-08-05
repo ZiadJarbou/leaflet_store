@@ -333,7 +333,7 @@ export default function PricingPage() {
   }
 
   function displayPrice(planId: string, baseMonthlyAmount: number, billedAnnually: boolean) {
-    const planQuote = (planId === 'starter' || planId === 'pro' || planId === 'business') ? localizedPricing?.plans?.[planId] : undefined;
+    const planQuote = (planId === 'starter' || planId === 'pro' || planId === 'business' || planId === 'agency') ? localizedPricing?.plans?.[planId] : undefined;
     const quote = billedAnnually ? planQuote?.annual : planQuote?.monthly;
     const annualQuote = billedAnnually ? planQuote?.annual : undefined;
     const currency = quote?.currency || '';

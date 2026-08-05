@@ -85,6 +85,7 @@ const DEFAULT_STRIPE_PLAN_PRICES = {
   starter:  { monthlyPrice: 13.34, yearlyPrice: 133.42 / 12, annualPrice: 133.42, name: 'Starter' },
   pro:      { monthlyPrice: 26.96, yearlyPrice: 269.57 / 12, annualPrice: 269.57, name: 'Professional' },
   business: { monthlyPrice: 67.80, yearlyPrice: 677.99 / 12, annualPrice: 677.99, name: 'Business' },
+  agency:   { monthlyPrice: 163.10, yearlyPrice: 0, name: 'Agency' },
 };
 
 const DEFAULT_PRICING_PLANS = [
@@ -3373,23 +3374,26 @@ app.get('/api/stripe/localized-pricing', async (req, res) => {
   const quoteCountry = detectCheckoutCountry(req, queryCountry);
   const plans = {};
   try {
-    for (const plan of ['starter', 'pro', 'business']) {
+    for (const plan of ['starter', 'pro', 'business', 'agency']) {
       const monthlyBase = getCheckoutPlanPrice(plan, 'monthly');
       const annualBase = getCheckoutPlanPrice(plan, 'annual');
-      if (!monthlyBase || !annualBase) continue;
+      if (!monthlyBase) continue;
       const monthly = await quoteLocalizedPlanPrice(monthlyBase, quoteCountry);
-      const annualTotal = await quoteLocalizedPlanPrice(annualBase, quoteCountry);
-      plans[plan] = {
+      const quote = {
         monthly: {
           currency: monthly.currency,
           amount: monthly.amount,
-        },
-        annual: {
+        }
+      };
+      if (annualBase) {
+        const annualTotal = await quoteLocalizedPlanPrice(annualBase, quoteCountry);
+        quote.annual = {
           currency: annualTotal.currency,
           amount: annualTotal.amount / 12,
           totalAmount: annualTotal.amount,
-        },
-      };
+        };
+      }
+      plans[plan] = quote;
     }
     res.json({
       country: quoteCountry === ['U', 'S'].join('') ? '' : (quoteCountry || ''),

@@ -661,9 +661,9 @@ export interface LocalizedAnnualPlanPrice extends LocalizedPlanPrice {
 export interface LocalizedPricing {
   country: string;
   currency: string;
-  plans: Partial<Record<'starter' | 'pro' | 'business', {
+  plans: Partial<Record<'starter' | 'pro' | 'business' | 'agency', {
     monthly: LocalizedPlanPrice;
-    annual: LocalizedAnnualPlanPrice;
+    annual?: LocalizedAnnualPlanPrice;
   }>>;
 }
 

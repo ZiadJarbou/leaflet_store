@@ -172,7 +172,7 @@ export default function HomePage() {
         }).format(rounded);
     }
     function displayPrice(planId: string, baseMonthlyAmount: number, billedAnnually: boolean) {
-        const planQuote = planId === 'starter' || planId === 'pro' || planId === 'business'
+        const planQuote = planId === 'starter' || planId === 'pro' || planId === 'business' || planId === 'agency'
             ? localizedPricing?.plans?.[planId]
             : undefined;
         const quote = billedAnnually ? planQuote?.annual : planQuote?.monthly;
