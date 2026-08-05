@@ -236,6 +236,7 @@ export default function PricingPage() {
   const bannerCta   = cms(c,'banner','cta_label',"Get started free");
   const showBanner  = cmsVisible(c,'banner');
   const [planStart, setPlanStart] = useState(0);
+  const [planDirection, setPlanDirection] = useState<'next' | 'prev'>('next');
   const visiblePlanCount = 3;
   const maxPlanStart = Math.max(0, PLANS.length - visiblePlanCount);
   const visiblePlans = PLANS.slice(planStart, planStart + visiblePlanCount);
@@ -243,6 +244,13 @@ export default function PricingPage() {
   useEffect(() => {
     setPlanStart(start => Math.min(start, Math.max(0, PLANS.length - visiblePlanCount)));
   }, [PLANS.length]);
+
+  function movePlans(direction: 'next' | 'prev') {
+    setPlanDirection(direction);
+    setPlanStart(start => direction === 'next'
+      ? Math.min(maxPlanStart, start + 1)
+      : Math.max(0, start - 1));
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -419,7 +427,7 @@ export default function PricingPage() {
               <button
                 className="pp-carousel-btn material-symbol"
                 type="button"
-                onClick={() => setPlanStart(start => Math.max(0, start - 1))}
+                onClick={() => movePlans('prev')}
                 disabled={planStart === 0}
                 aria-label="Previous pricing plans"
               >
@@ -429,7 +437,7 @@ export default function PricingPage() {
               <button
                 className="pp-carousel-btn material-symbol"
                 type="button"
-                onClick={() => setPlanStart(start => Math.min(maxPlanStart, start + 1))}
+                onClick={() => movePlans('next')}
                 disabled={planStart >= maxPlanStart}
                 aria-label="Next pricing plans"
               >
@@ -437,7 +445,7 @@ export default function PricingPage() {
               </button>
             </div>
           )}
-          <div className="pp-cards">
+          <div key={planStart} className={`pp-cards pp-cards--slide-${planDirection}`}>
           {visiblePlans.map(plan => {
             const price   = annual ? Number(plan.yearlyPrice ?? plan.monthlyPrice) : Number(plan.monthlyPrice);
             const period  = annual ? 'annual' : 'monthly';

@@ -222,6 +222,39 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 24px;
   align-items: start;
+  will-change: transform, opacity;
+}
+.pp-cards--slide-next {
+  animation: pp-slide-next .42s cubic-bezier(.22, 1, .36, 1);
+}
+.pp-cards--slide-prev {
+  animation: pp-slide-prev .42s cubic-bezier(.22, 1, .36, 1);
+}
+@keyframes pp-slide-next {
+  from {
+    opacity: .35;
+    transform: translateX(34px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes pp-slide-prev {
+  from {
+    opacity: .35;
+    transform: translateX(-34px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-cards--slide-next,
+  .pp-cards--slide-prev {
+    animation: none;
+  }
 }
 @media (max-width: 860px) {
   .pp-cards { grid-template-columns: 1fr; max-width: 420px; }

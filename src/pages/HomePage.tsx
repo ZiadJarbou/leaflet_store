@@ -93,6 +93,7 @@ export default function HomePage() {
     const [localizedPricing, setLocalizedPricing] = useState<LocalizedPricing | null>(null);
     const [demoVideoUrl, setDemoVideoUrl] = useState('');
     const [planStart, setPlanStart] = useState(0);
+    const [planDirection, setPlanDirection] = useState<'next' | 'prev'>('next');
     const c = useCmsContent('home');
     const cp = useCmsContent('pricing'); // pricing page data â€” single source of truth
     useEffect(() => { closeAuthModal(); }, [closeAuthModal]);
@@ -216,6 +217,12 @@ export default function HomePage() {
     useEffect(() => {
         setPlanStart(start => Math.min(start, Math.max(0, plans.length - visiblePlanCount)));
     }, [plans.length]);
+    function movePlans(direction: 'next' | 'prev') {
+        setPlanDirection(direction);
+        setPlanStart(start => direction === 'next'
+            ? Math.min(maxPlanStart, start + 1)
+            : Math.max(0, start - 1));
+    }
     const faqTitle = cms(c, 'faq', 'section_title', "Frequently asked questions");
     const faqSub = cms(c, 'faq', 'section_subtitle', "Quick answers to reduce friction and help you launch faster.");
     const showFaq = cmsVisible(c, 'faq');
@@ -308,7 +315,7 @@ export default function HomePage() {
                   <button
                     className="pp-carousel-btn material-symbol"
                     type="button"
-                    onClick={() => setPlanStart(start => Math.max(0, start - 1))}
+                    onClick={() => movePlans('prev')}
                     disabled={planStart === 0}
                     aria-label="Previous pricing plans"
                   >
@@ -318,7 +325,7 @@ export default function HomePage() {
                   <button
                     className="pp-carousel-btn material-symbol"
                     type="button"
-                    onClick={() => setPlanStart(start => Math.min(maxPlanStart, start + 1))}
+                    onClick={() => movePlans('next')}
                     disabled={planStart >= maxPlanStart}
                     aria-label="Next pricing plans"
                   >
@@ -326,7 +333,7 @@ export default function HomePage() {
                   </button>
                 </div>
               )}
-              <div className="pp-cards">
+              <div key={planStart} className={`pp-cards pp-cards--slide-${planDirection}`}>
               {visiblePlans.map((plan: any) => {
                 const price = annual ? plan.yearlyPrice : plan.monthlyPrice;
                 const current = isCurrentPlan(plan);
