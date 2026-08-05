@@ -32,7 +32,7 @@ interface AdminCreateUserForm {
     name: string;
     email: string;
     password: string;
-    subscription_plan: 'pro' | 'business';
+    subscription_plan: 'starter' | 'pro' | 'business';
     subscription_period: 'monthly' | 'annual';
     email_verified: boolean;
 }
@@ -101,8 +101,9 @@ function fmtSize(b: number) { if (b < 1024)
     return b + 'B'; if (b < 1048576)
     return (b / 1024).toFixed(1) + 'KB'; return (b / 1048576).toFixed(1) + 'MB'; }
 function planBadge(plan: string) {
-    const map: Record<string, string> = { free: 'badge-free', pro: 'badge-pro', business: 'badge-business', enterprise: 'badge-business' };
-    return <span className={`cms-badge ${map[plan] ?? 'badge-free'}`}>{plan}</span>;
+    const map: Record<string, string> = { free: 'badge-free', starter: 'badge-pro', pro: 'badge-pro', business: 'badge-business', enterprise: 'badge-business' };
+    const labels: Record<string, string> = { pro: 'professional' };
+    return <span className={`cms-badge ${map[plan] ?? 'badge-free'}`}>{labels[plan] ?? plan}</span>;
 }
 function roleBadge(role: string) {
     return <span className={`cms-badge ${role === 'admin' ? 'badge-admin' : 'badge-user'}`}>{role}</span>;
@@ -439,8 +440,9 @@ function AdminUsers() {
             </div>
             <div className="cms-form-row">
               <label>Plan</label>
-              <select value={createForm.subscription_plan} onChange={e => setCreateForm({ ...createForm, subscription_plan: e.target.value as 'pro' | 'business' })}>
-                <option value="pro">pro</option>
+              <select value={createForm.subscription_plan} onChange={e => setCreateForm({ ...createForm, subscription_plan: e.target.value as 'starter' | 'pro' | 'business' })}>
+                <option value="starter">starter</option>
+                <option value="pro">professional</option>
                 <option value="business">business</option>
               </select>
             </div>
@@ -484,7 +486,8 @@ function AdminUsers() {
                 });
             }}>
                 <option value="free">free</option>
-                <option value="pro">pro</option>
+                <option value="starter">starter</option>
+                <option value="pro">professional</option>
                 <option value="business">business</option>
               </select>
             </div>

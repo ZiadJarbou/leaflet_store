@@ -180,7 +180,7 @@
 }
 .pp-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 24px;
   align-items: start;
 }
@@ -241,8 +241,9 @@
 .pp-price-row {
   display: flex;
   align-items: baseline;
-  gap: 2px;
+  gap: 5px;
   margin-top: 8px;
+  flex-wrap: wrap;
 }
 .pp-price-amount {
   font-size: 3rem;
@@ -252,8 +253,16 @@
   color: var(--text);
 }
 .pp-price-amount--localized {
-  font-size: clamp(2rem, 4vw, 2.6rem);
+  font-size: clamp(1.9rem, 4vw, 2.45rem);
   letter-spacing: 0;
+}
+.pp-price-prefix {
+  width: 100%;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted2);
 }
 .pp-price-period {
   font-size: .9rem;
@@ -340,6 +349,7 @@
 }
 .pp-table {
   width: 100%;
+  min-width: 820px;
   border-collapse: collapse;
   font-size: .875rem;
 }
@@ -373,6 +383,50 @@
 .pp-check { color: var(--brand); font-weight: 700; font-size: 1rem; }
 .pp-dash { color: rgba(255,255,255,.2); font-size: 1.1rem; }
 .pp-text-val { font-weight: 600; color: var(--text); }
+
+.pp-annual {
+  padding: 0 0 72px;
+}
+.pp-annual-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(280px, .95fr);
+  gap: 28px;
+  align-items: start;
+  background: rgba(255,255,255,.035);
+  border: 1px solid var(--border);
+  border-radius: var(--radius2);
+  padding: 28px;
+}
+.pp-annual-title {
+  margin: 0 0 10px;
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.pp-annual-sub {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+.pp-annual-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.pp-annual-list li {
+  color: var(--muted);
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  padding-bottom: 10px;
+}
+.pp-annual-list li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+@media (max-width: 760px) {
+  .pp-annual-inner { grid-template-columns: 1fr; }
+}
 
 /* ── FAQ ── */
 .pp-faq {

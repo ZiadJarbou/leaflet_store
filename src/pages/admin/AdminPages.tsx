@@ -95,6 +95,12 @@ const PAGES: PageDef[] = [
             { key: 'features', label: 'Feature Comparison', fields: [
                     { key: 'items', label: 'Feature Rows (JSON)', type: 'json-list' },
                 ] },
+            { key: 'annual', label: 'Annual Billing', fields: [
+                    { key: 'title', label: 'Section Title', type: 'text' },
+                    { key: 'subtitle', label: 'Section Subtitle', type: 'textarea' },
+                    { key: 'items', label: 'Annual Price Items', type: 'json-list' },
+                    { key: 'visible', label: 'Section Visible', type: 'toggle' },
+                ] },
             { key: 'faq', label: 'FAQ', fields: [
                     { key: 'items', label: 'FAQ Items', type: 'json-list' },
                 ] },
@@ -158,6 +164,7 @@ function JsonListEditor({ value, onChange, sectionKey, fieldKey }: {
     const isFaq = sectionKey === 'faq';
     const isPlan = sectionKey === 'plans';
     const isComparison = sectionKey === 'features' && fieldKey === 'items';
+    const isStringList = sectionKey === 'annual' && fieldKey === 'items';
     let parsed: any[] = [];
     try {
         parsed = JSON.parse(value || '[]');
@@ -165,19 +172,24 @@ function JsonListEditor({ value, onChange, sectionKey, fieldKey }: {
     catch {
         parsed = [];
     }
-    function update(idx: number, field: string, val: string) {
+    function update(idx: number, field: string, val: any) {
         const next = [...parsed];
         next[idx] = { ...next[idx], [field]: val };
         onChange(JSON.stringify(next));
     }
+    function updateFeatures(idx: number, value: string) {
+        update(idx, 'features', value.split('\n').map(line => line.trim()).filter(Boolean));
+    }
     function addRow() {
         let row: any;
-        if (isFaq)
+        if (isStringList)
+            row = '';
+        else if (isFaq)
             row = { q: '', a: '' };
         else if (isPlan)
-            row = { id: '', name: '', badge: '', monthlyPrice: 0, yearlyPrice: 0, desc: '', cta: '', ctaVariant: 'ghost', highlight: false };
+            row = { id: '', name: '', badge: '', monthlyPrice: 0, yearlyPrice: 0, annualPrice: 0, annualPriceLabel: '', pricePrefix: '', desc: '', cta: '', ctaVariant: 'ghost', checkoutPlanId: '', highlight: false, features: [] };
         else if (isComparison)
-            row = { label: '', free: false, pro: false, business: false };
+            row = { label: '', free: false, starter: false, pro: false, business: false, agency: false };
         else
             row = { ic: '', title: '', desc: '' };
         onChange(JSON.stringify([...parsed, row]));
@@ -202,7 +214,14 @@ function JsonListEditor({ value, onChange, sectionKey, fieldKey }: {
       {parsed.map((row: any, idx: number) => (<div key={idx} className="cms-json-row">
           <button className="cms-json-del material-symbol" onClick={() => removeRow(idx)} title="Remove" aria-label="Remove">close</button>
 
-          {isFaq ? (<>
+          {isStringList ? (<div className="cms-field-group">
+              <label>Line Text</label>
+              <input className="cms-input" type="text" value={typeof row === 'string' ? row : ''} onChange={e => {
+                const next = [...parsed];
+                next[idx] = e.target.value;
+                onChange(JSON.stringify(next));
+              }}/>
+            </div>) : isFaq ? (<>
               <div className="cms-field-group">
                 <label>Question</label>
                 <input className="cms-input" type="text" value={row.q || ''} onChange={e => update(idx, 'q', e.target.value)}/>
@@ -212,16 +231,25 @@ function JsonListEditor({ value, onChange, sectionKey, fieldKey }: {
                 <textarea className="cms-input" rows={2} value={row.a || ''} onChange={e => update(idx, 'a', e.target.value)}/>
               </div>
             </>) : isPlan ? (<div className="cms-json-plan-grid">
-              <div className="cms-field-group"><label>ID</label><input className="cms-input" type="text" placeholder="free/pro/business" value={row.id || ''} onChange={e => update(idx, 'id', e.target.value)}/></div>
+              <div className="cms-field-group"><label>ID</label><input className="cms-input" type="text" placeholder="free/starter/pro/business/agency" value={row.id || ''} onChange={e => update(idx, 'id', e.target.value)}/></div>
               <div className="cms-field-group"><label>Name</label><input className="cms-input" type="text" value={row.name || ''} onChange={e => update(idx, 'name', e.target.value)}/></div>
               <div className="cms-field-group"><label>Badge (optional)</label><input className="cms-input" type="text" value={row.badge || ''} onChange={e => update(idx, 'badge', e.target.value)}/></div>
               <div className="cms-field-group"><label>Monthly Price ($)</label><input className="cms-input" type="number" value={row.monthlyPrice ?? 0} onChange={e => update(idx, 'monthlyPrice', Number(e.target.value))}/></div>
-              <div className="cms-field-group"><label>Yearly Price ($)</label><input className="cms-input" type="number" value={row.yearlyPrice ?? 0} onChange={e => update(idx, 'yearlyPrice', Number(e.target.value))}/></div>
+              <div className="cms-field-group"><label>Annual Monthly Rate ($)</label><input className="cms-input" type="number" step="0.01" value={row.yearlyPrice ?? 0} onChange={e => update(idx, 'yearlyPrice', Number(e.target.value))}/></div>
+              <div className="cms-field-group"><label>Annual Total ($)</label><input className="cms-input" type="number" step="0.01" value={row.annualPrice ?? 0} onChange={e => update(idx, 'annualPrice', Number(e.target.value))}/></div>
+              <div className="cms-field-group"><label>Price Prefix</label><input className="cms-input" type="text" placeholder="Starting from" value={row.pricePrefix || ''} onChange={e => update(idx, 'pricePrefix', e.target.value)}/></div>
+              <div className="cms-field-group"><label>Annual Label</label><input className="cms-input" type="text" placeholder="Custom annual pricing" value={row.annualPriceLabel || ''} onChange={e => update(idx, 'annualPriceLabel', e.target.value)}/></div>
               <div className="cms-field-group cms-span2"><label>Description</label><textarea className="cms-input" rows={2} value={row.desc || ''} onChange={e => update(idx, 'desc', e.target.value)}/></div>
+              <div className="cms-field-group cms-span2"><label>Features (one per line)</label><textarea className="cms-input" rows={5} value={Array.isArray(row.features) ? row.features.join('\n') : ''} onChange={e => updateFeatures(idx, e.target.value)}/></div>
               <div className="cms-field-group"><label>CTA Label</label><input className="cms-input" type="text" value={row.cta || ''} onChange={e => update(idx, 'cta', e.target.value)}/></div>
               <div className="cms-field-group"><label>CTA Variant</label>
                 <select className="cms-input" value={row.ctaVariant || 'ghost'} onChange={e => update(idx, 'ctaVariant', e.target.value)}>
                   <option value="ghost">Ghost</option><option value="primary">Primary</option><option value="brand2">Brand2</option>
+                </select>
+              </div>
+              <div className="cms-field-group"><label>Checkout Plan</label>
+                <select className="cms-input" value={row.checkoutPlanId || ''} onChange={e => update(idx, 'checkoutPlanId', e.target.value)}>
+                  <option value="">Same as ID</option><option value="free">Free</option><option value="starter">Starter</option><option value="pro">Professional</option><option value="business">Business</option><option value="contact">Contact Sales</option>
                 </select>
               </div>
               <div className="cms-field-group"><label>Highlight?</label>
@@ -233,7 +261,7 @@ function JsonListEditor({ value, onChange, sectionKey, fieldKey }: {
               </div>
             </div>) : isComparison ? (<div className="cms-json-plan-grid">
               <div className="cms-field-group cms-span3"><label>Feature Label</label><input className="cms-input" type="text" value={row.label || ''} onChange={e => update(idx, 'label', e.target.value)}/></div>
-              {(['free', 'pro', 'business'] as const).map(tier => (<div key={tier} className="cms-field-group">
+              {(['free', 'starter', 'pro', 'business', 'agency'] as const).map(tier => (<div key={tier} className="cms-field-group">
                   <label>{tier.charAt(0).toUpperCase() + tier.slice(1)}</label>
                   <div className={cssClass({ display: 'flex', gap: 6, alignItems: 'center' })}>
                     <button className={cx("cms-btn cms-btn-sm", cssClass({ minWidth: 42 }))} onClick={() => toggle3(idx, tier, row[tier])}>{val3Label(row[tier])}</button>

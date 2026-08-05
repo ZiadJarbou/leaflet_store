@@ -82,9 +82,36 @@ const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 
 const DEFAULT_STRIPE_PLAN_PRICES = {
-  pro:      { monthlyPrice: 19, yearlyPrice: 14, name: 'Pro' },
-  business: { monthlyPrice: 49, yearlyPrice: 39, name: 'Business' },
+  starter:  { monthlyPrice: 13.34, yearlyPrice: 133.42 / 12, annualPrice: 133.42, name: 'Starter' },
+  pro:      { monthlyPrice: 26.96, yearlyPrice: 269.57 / 12, annualPrice: 269.57, name: 'Professional' },
+  business: { monthlyPrice: 67.80, yearlyPrice: 677.99 / 12, annualPrice: 677.99, name: 'Business' },
 };
+
+const DEFAULT_PRICING_PLANS = [
+  { id:'free', name:'Free', badge:null, monthlyPrice:0, yearlyPrice:0, annualPrice:0, desc:'Explore LeafletAI and create your first promotional leaflet.', cta:'Start for Free', ctaVariant:'ghost', highlight:false, checkoutPlanId:'free', features:['1 leaflet per month','Up to 20 products per leaflet','Basic leaflet templates','CSV and XLSX product import','2-language support','Standard-quality export','LeafletAI watermark','1 user'] },
+  { id:'starter', name:'Starter', badge:null, monthlyPrice:13.34, yearlyPrice:133.42 / 12, annualPrice:133.42, desc:'Perfect for small shops and businesses that create promotional leaflets occasionally.', cta:'Choose Starter', ctaVariant:'ghost', highlight:false, checkoutPlanId:'starter', features:['Up to 5 leaflets per month','Up to 100 products per leaflet','CSV and XLSX product import','2-language layouts','Basic template library','PDF and PNG export','No LeafletAI watermark','Save and edit your leaflets','1 user'] },
+  { id:'pro', name:'Professional', badge:'Most Popular', monthlyPrice:26.96, yearlyPrice:269.57 / 12, annualPrice:269.57, desc:'The best choice for supermarkets and active retailers that regularly create promotional campaigns.', cta:'Choose Professional', ctaVariant:'primary', highlight:true, checkoutPlanId:'pro', features:['Up to 25 leaflets per month','Large product imports','Access to all premium templates','High-quality print-ready PDF export','2-language layouts','Custom fonts','Brand kit with logos, colors, and fonts','Background removal tools','Custom reusable templates','Priority support','1 user'] },
+  { id:'business', name:'Business', badge:null, monthlyPrice:67.80, yearlyPrice:677.99 / 12, annualPrice:677.99, desc:'Designed for marketing teams, multi-branch retailers, and businesses managing frequent promotional campaigns.', cta:'Choose Business', ctaVariant:'brand2', highlight:false, checkoutPlanId:'business', features:['Up to 100 leaflets per month','Up to 5 team members','Multiple brands and branches','Shared product library','Shared brand assets and templates','Team collaboration','User roles and permissions','High-quality PDF and PNG export','Advanced AI tools','Higher AI usage limits','Priority customer support','Branch-specific logos and contact details'] },
+  { id:'agency', name:'Agency', badge:null, monthlyPrice:163.10, yearlyPrice:0, annualPriceLabel:'Custom annual pricing', pricePrefix:'Starting from', desc:'Built for agencies and large organizations managing multiple brands, stores, or clients.', cta:'Contact Sales', ctaVariant:'ghost', highlight:false, checkoutPlanId:'contact', features:['High-volume or unlimited leaflet creation','Multiple client workspaces','10 or more team members','Separate brand kits for each client','White-label leaflet exports','Advanced team permissions','Bulk product and design management','Custom templates for each client','Batch export tools','Premium customer support','Custom onboarding and training'] },
+];
+
+const DEFAULT_PRICING_FEATURES = [
+  { label:'Leaflets per month', free:'1', starter:'5', pro:'25', business:'100', agency:'High-volume' },
+  { label:'Products per leaflet', free:'20', starter:'100', pro:'Large imports', business:true, agency:true },
+  { label:'CSV and XLSX import', free:true, starter:true, pro:true, business:true, agency:true },
+  { label:'2-language layouts', free:true, starter:true, pro:true, business:true, agency:true },
+  { label:'PDF and PNG export', free:false, starter:true, pro:true, business:true, agency:true },
+  { label:'Watermark removed', free:false, starter:true, pro:true, business:true, agency:true },
+  { label:'Brand kits and templates', free:false, starter:false, pro:true, business:true, agency:true },
+  { label:'Team members', free:'1', starter:'1', pro:'1', business:'5', agency:'10+' },
+];
+
+const DEFAULT_PRICING_ANNUAL_ITEMS = [
+  'Starter: $133.42 per year',
+  'Professional: $269.57 per year',
+  'Business: $677.99 per year',
+  'Agency: Custom annual pricing',
+];
 
 function parsePlanAmount(value) {
   const n = typeof value === 'number'
@@ -196,14 +223,14 @@ function getCheckoutPlanPrice(plan, period) {
   if (row?.value) {
     try {
       const plans = JSON.parse(row.value);
-      if (Array.isArray(plans)) planDef = plans.find(p => p?.id === plan) || null;
+      if (Array.isArray(plans)) planDef = plans.find(p => p?.id === plan || p?.checkoutPlanId === plan) || null;
     } catch {}
   }
   const source = planDef || fallback;
   const monthlyRate = parsePlanAmount(period === 'annual' ? source?.yearlyPrice : source?.monthlyPrice);
   if (!monthlyRate) return null;
   return {
-    name: source?.name || (plan === 'pro' ? 'Pro' : 'Business'),
+    name: source?.name || fallback?.name || plan,
     unitAmount: Math.round((period === 'annual' ? monthlyRate * 12 : monthlyRate) * 100),
     currency: 'usd',
   };
@@ -247,15 +274,16 @@ function getPricingDefinitionsFromPlansValue(rawValue) {
   const plans = JSON.parse(rawValue || '[]');
   if (!Array.isArray(plans)) throw new Error('Pricing plans must be a JSON array.');
   const defs = [];
-  for (const plan of ['pro', 'business']) {
-    const source = plans.find(p => p?.id === plan) || DEFAULT_STRIPE_PLAN_PRICES[plan];
+  for (const plan of ['starter', 'pro', 'business']) {
+    const source = plans.find(p => p?.id === plan || p?.checkoutPlanId === plan) || DEFAULT_STRIPE_PLAN_PRICES[plan];
     const name = source?.name || DEFAULT_STRIPE_PLAN_PRICES[plan].name;
     const monthly = parsePlanAmount(source?.monthlyPrice);
     const annualMonthly = parsePlanAmount(source?.yearlyPrice);
+    const annualTotal = parsePlanAmount(source?.annualPrice);
     if (!monthly) throw new Error(`Monthly price for ${name} is missing or invalid.`);
     if (!annualMonthly) throw new Error(`Yearly price for ${name} is missing or invalid.`);
     defs.push({ plan, period: 'monthly', name, amountCents: Math.round(monthly * 100), currency: 'usd', interval: 'month' });
-    defs.push({ plan, period: 'annual',  name, amountCents: Math.round(annualMonthly * 12 * 100), currency: 'usd', interval: 'year' });
+    defs.push({ plan, period: 'annual',  name, amountCents: Math.round((annualTotal || annualMonthly * 12) * 100), currency: 'usd', interval: 'year' });
   }
   return defs;
 }
@@ -715,25 +743,12 @@ const pcDefaults = [
   ['pricing','hero','title',       "Simple, transparent pricing"],
   ['pricing','hero','subtitle',    "Start free. Upgrade when you're ready. No hidden fees, cancel anytime."],
   ['pricing','hero','visible',     "1"],
-  ['pricing','plans','items', JSON.stringify([
-    { id:'free',     name:'Free',     badge:null,           monthlyPrice:0,  yearlyPrice:0,  desc:'Perfect to get started and explore the platform.',                    cta:'Get started free', ctaVariant:'ghost',   highlight:false },
-    { id:'pro',      name:'Pro',      badge:'Most popular', monthlyPrice:19, yearlyPrice:14, desc:'Everything you need for professional leaflet campaigns.',             cta:'Start Pro trial',  ctaVariant:'primary', highlight:true  },
-    { id:'business', name:'Business', badge:null,           monthlyPrice:49, yearlyPrice:39, desc:'Advanced tools and collaboration for growing teams.',                cta:'Contact sales',    ctaVariant:'brand2',  highlight:false },
-  ])],
-  ['pricing','features','items', JSON.stringify([
-    { label:'Leaflets',             free:'1',   pro:'10',  business:'Unlimited' },
-    { label:'Products per leaflet', free:'150', pro:'150', business:'Unlimited' },
-    { label:'PDF export',           free:true,  pro:true,  business:true        },
-    { label:'Flipbook export',      free:false, pro:true,  business:true        },
-    { label:'Custom card layout',   free:true,  pro:true,  business:true        },
-    { label:'Cover & back page',    free:false, pro:true,  business:true        },
-    { label:'Gradient backgrounds', free:false, pro:true,  business:true        },
-    { label:'Remove watermark',     free:false, pro:true,  business:true        },
-    { label:'Team members',         free:'1',   pro:'3',   business:'Unlimited' },
-    { label:'Priority support',     free:false, pro:false, business:true        },
-    { label:'Custom branding',      free:false, pro:false, business:true        },
-    { label:'API access',           free:false, pro:false, business:true        },
-  ])],
+  ['pricing','plans','items', JSON.stringify(DEFAULT_PRICING_PLANS)],
+  ['pricing','features','items', JSON.stringify(DEFAULT_PRICING_FEATURES)],
+  ['pricing','annual','title',    "Annual Billing"],
+  ['pricing','annual','subtitle', "Save up to 17% with annual billing. Get two months free when you pay annually."],
+  ['pricing','annual','items',    JSON.stringify(DEFAULT_PRICING_ANNUAL_ITEMS)],
+  ['pricing','annual','visible',  "1"],
   ['pricing','faq','items', JSON.stringify([
     { q:'Can I change plans at any time?',                     a:"Yes. You can upgrade or downgrade at any time. Changes take effect immediately and we'll prorate any charges." },
     { q:'Is there a free trial for paid plans?',               a:"Pro comes with a 14-day free trial — no credit card required. Business plans get a personalised demo." },
@@ -748,6 +763,26 @@ const pcDefaults = [
   ['pricing','banner','visible',  "1"],
 ];
 for (const [page,section,field,value] of pcDefaults) insPC.run(page,section,field,value);
+
+if (!hasMigration('pricing_tiers_2026_08_05_v1')) {
+  const upsertPricingContent = db.prepare(`
+    INSERT INTO page_content (page, section, field, value)
+    VALUES ('pricing', ?, ?, ?)
+    ON CONFLICT(page, section, field) DO UPDATE SET value = excluded.value
+  `);
+  const migratePricing = db.transaction(() => {
+    upsertPricingContent.run('hero', 'title', "Simple, transparent pricing");
+    upsertPricingContent.run('hero', 'subtitle', "Start free. Upgrade when you're ready. No hidden fees, cancel anytime.");
+    upsertPricingContent.run('plans', 'items', JSON.stringify(DEFAULT_PRICING_PLANS));
+    upsertPricingContent.run('features', 'items', JSON.stringify(DEFAULT_PRICING_FEATURES));
+    upsertPricingContent.run('annual', 'title', 'Annual Billing');
+    upsertPricingContent.run('annual', 'subtitle', 'Save up to 17% with annual billing. Get two months free when you pay annually.');
+    upsertPricingContent.run('annual', 'items', JSON.stringify(DEFAULT_PRICING_ANNUAL_ITEMS));
+    upsertPricingContent.run('annual', 'visible', '1');
+    markMigration('pricing_tiers_2026_08_05_v1');
+  });
+  migratePricing();
+}
 
 const app = express();
 app.use((req, res, next) => {
@@ -959,7 +994,7 @@ function validatePasswordRules(password) {
   }
   return errs;
 }
-const ADMIN_SUBSCRIPTION_PLANS = new Set(['free', 'pro', 'business']);
+const ADMIN_SUBSCRIPTION_PLANS = new Set(['free', 'starter', 'pro', 'business']);
 const ADMIN_SUBSCRIPTION_STATUSES = new Set(['active', 'cancelled', 'past_due']);
 const ADMIN_SUBSCRIPTION_PERIODS = new Set(['monthly', 'annual']);
 function validateAdminSubscription({ plan = 'free', status = 'active', period = 'monthly' } = {}) {
@@ -3338,7 +3373,7 @@ app.get('/api/stripe/localized-pricing', async (req, res) => {
   const quoteCountry = detectCheckoutCountry(req, queryCountry);
   const plans = {};
   try {
-    for (const plan of ['pro', 'business']) {
+    for (const plan of ['starter', 'pro', 'business']) {
       const monthlyBase = getCheckoutPlanPrice(plan, 'monthly');
       const annualBase = getCheckoutPlanPrice(plan, 'annual');
       if (!monthlyBase || !annualBase) continue;
@@ -3358,7 +3393,7 @@ app.get('/api/stripe/localized-pricing', async (req, res) => {
     }
     res.json({
       country: quoteCountry === ['U', 'S'].join('') ? '' : (quoteCountry || ''),
-      currency: plans.pro?.monthly?.currency || 'USD',
+      currency: plans.pro?.monthly?.currency || plans.starter?.monthly?.currency || 'USD',
       plans,
     });
   } catch (err) {
@@ -3406,7 +3441,7 @@ app.post('/api/stripe/create-checkout-session', authMiddleware, async (req, res)
   }
 
   const { plan, period, country } = req.body;
-  if (!plan || !['pro', 'business'].includes(plan)) {
+  if (!plan || !['starter', 'pro', 'business'].includes(plan)) {
     res.status(400).json({ error: 'Invalid plan.' });
     return;
   }

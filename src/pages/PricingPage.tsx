@@ -15,63 +15,181 @@ import { useCmsContent, cms, cmsVisible, cmsJson } from '../hooks/useCmsContent'
 import { getMaximumAnnualSavings } from '../utils/pricing';
 import './PricingPage.css';
 
+type CheckoutPlanId = 'starter' | 'pro' | 'business';
+
 interface PlanFeature {
   label: string;
-  free: string | boolean;
-  pro: string | boolean;
-  business: string | boolean;
+  [planId: string]: string | boolean;
+}
+
+interface PricingPlan {
+  id: 'free' | 'starter' | 'pro' | 'business' | 'agency';
+  name: string;
+  badge?: string | null;
+  monthlyPrice: number;
+  yearlyPrice?: number;
+  annualPrice?: number;
+  annualPriceLabel?: string;
+  pricePrefix?: string;
+  desc: string;
+  cta: string;
+  ctaVariant: 'ghost' | 'primary' | 'brand2';
+  highlight?: boolean;
+  features?: string[];
+  checkoutPlanId?: CheckoutPlanId | 'contact' | 'free';
 }
 
 const DEFAULT_FEATURES: PlanFeature[] = [
-  { label: 'Leaflets',             free: '1',        pro: '10',        business: 'Unlimited' },
-  { label: 'Products per leaflet', free: '150',      pro: '150',       business: 'Unlimited' },
-  { label: 'PDF export',           free: true,       pro: true,        business: true        },
-  { label: 'Flipbook export',      free: false,      pro: true,        business: true        },
-  { label: 'Custom card layout',   free: true,       pro: true,        business: true        },
-  { label: 'Cover & back page',    free: false,      pro: true,        business: true        },
-  { label: 'Gradient backgrounds', free: false,      pro: true,        business: true        },
-  { label: 'Remove watermark',     free: false,      pro: true,        business: true        },
-  { label: 'Team members',         free: '1',        pro: '3',         business: 'Unlimited' },
-  { label: 'Priority support',     free: false,      pro: false,       business: true        },
-  { label: 'Custom branding',      free: false,      pro: false,       business: true        },
-  { label: 'API access',           free: false,      pro: false,       business: true        },
+  { label: 'Leaflets per month',       free: '1', starter: '5',  pro: '25', business: '100', agency: 'High-volume' },
+  { label: 'Products per leaflet',     free: '20', starter: '100', pro: 'Large imports', business: true, agency: true },
+  { label: 'CSV and XLSX import',      free: true, starter: true, pro: true, business: true, agency: true },
+  { label: '2-language layouts',       free: true, starter: true, pro: true, business: true, agency: true },
+  { label: 'PDF and PNG export',       free: false, starter: true, pro: true, business: true, agency: true },
+  { label: 'Watermark removed',        free: false, starter: true, pro: true, business: true, agency: true },
+  { label: 'Brand kits and templates', free: false, starter: false, pro: true, business: true, agency: true },
+  { label: 'Team members',             free: '1', starter: '1', pro: '1', business: '5', agency: '10+' },
 ];
 
-const DEFAULT_PLANS = [
+const DEFAULT_PLANS: PricingPlan[] = [
   {
-    id:           'free' as const,
+    id:           'free',
     name:         'Free',
-    badge:        null as string | null,
+    badge:        null,
     monthlyPrice: 0,
     yearlyPrice:  0,
-    desc:         'Perfect to get started and explore the platform.',
-    cta:          'Get started free',
+    annualPrice:  0,
+    desc:         'Explore LeafletAI and create your first promotional leaflet.',
+    cta:          'Start for Free',
     ctaVariant:   'ghost' as const,
     highlight:    false,
+    checkoutPlanId: 'free',
+    features: [
+      '1 leaflet per month',
+      'Up to 20 products per leaflet',
+      'Basic leaflet templates',
+      'CSV and XLSX product import',
+      '2-language support',
+      'Standard-quality export',
+      'LeafletAI watermark',
+      '1 user',
+    ],
   },
   {
-    id:           'pro' as const,
-    name:         'Pro',
-    badge:        'Most popular' as string | null,
-    monthlyPrice: 19,
-    yearlyPrice:  14,
-    desc:         'Everything you need for professional leaflet campaigns.',
-    cta:          'Start Pro',
+    id:           'starter',
+    name:         'Starter',
+    badge:        null,
+    monthlyPrice: 13.34,
+    yearlyPrice:  133.42 / 12,
+    annualPrice:  133.42,
+    desc:         'Perfect for small shops and businesses that create promotional leaflets occasionally.',
+    cta:          'Choose Starter',
+    ctaVariant:   'ghost' as const,
+    highlight:    false,
+    checkoutPlanId: 'starter',
+    features: [
+      'Up to 5 leaflets per month',
+      'Up to 100 products per leaflet',
+      'CSV and XLSX product import',
+      '2-language layouts',
+      'Basic template library',
+      'PDF and PNG export',
+      'No LeafletAI watermark',
+      'Save and edit your leaflets',
+      '1 user',
+    ],
+  },
+  {
+    id:           'pro',
+    name:         'Professional',
+    badge:        'Most Popular',
+    monthlyPrice: 26.96,
+    yearlyPrice:  269.57 / 12,
+    annualPrice:  269.57,
+    desc:         'The best choice for supermarkets and active retailers that regularly create promotional campaigns.',
+    cta:          'Choose Professional',
     ctaVariant:   'primary' as const,
     highlight:    true,
+    checkoutPlanId: 'pro',
+    features: [
+      'Up to 25 leaflets per month',
+      'Large product imports',
+      'Access to all premium templates',
+      'High-quality print-ready PDF export',
+      '2-language layouts',
+      'Custom fonts',
+      'Brand kit with logos, colors, and fonts',
+      'Background removal tools',
+      'Custom reusable templates',
+      'Priority support',
+      '1 user',
+    ],
   },
   {
-    id:           'business' as const,
+    id:           'business',
     name:         'Business',
-    badge:        null as string | null,
-    monthlyPrice: 49,
-    yearlyPrice:  39,
-    desc:         'Advanced tools and collaboration for growing teams.',
-    cta:          'Upgrade plan',
+    badge:        null,
+    monthlyPrice: 67.80,
+    yearlyPrice:  677.99 / 12,
+    annualPrice:  677.99,
+    desc:         'Designed for marketing teams, multi-branch retailers, and businesses managing frequent promotional campaigns.',
+    cta:          'Choose Business',
     ctaVariant:   'brand2' as const,
     highlight:    false,
+    checkoutPlanId: 'business',
+    features: [
+      'Up to 100 leaflets per month',
+      'Up to 5 team members',
+      'Multiple brands and branches',
+      'Shared product library',
+      'Shared brand assets and templates',
+      'Team collaboration',
+      'User roles and permissions',
+      'High-quality PDF and PNG export',
+      'Advanced AI tools',
+      'Higher AI usage limits',
+      'Priority customer support',
+      'Branch-specific logos and contact details',
+    ],
+  },
+  {
+    id:           'agency',
+    name:         'Agency',
+    badge:        null,
+    monthlyPrice: 163.10,
+    yearlyPrice:  0,
+    annualPriceLabel: 'Custom annual pricing',
+    pricePrefix:  'Starting from',
+    desc:         'Built for agencies and large organizations managing multiple brands, stores, or clients.',
+    cta:          'Contact Sales',
+    ctaVariant:   'ghost' as const,
+    highlight:    false,
+    checkoutPlanId: 'contact',
+    features: [
+      'High-volume or unlimited leaflet creation',
+      'Multiple client workspaces',
+      '10 or more team members',
+      'Separate brand kits for each client',
+      'White-label leaflet exports',
+      'Advanced team permissions',
+      'Bulk product and design management',
+      'Custom templates for each client',
+      'Batch export tools',
+      'Premium customer support',
+      'Custom onboarding and training',
+    ],
   },
 ];
+
+const DEFAULT_ANNUAL_BILLING = {
+  title: 'Annual Billing',
+  subtitle: 'Save up to 17% with annual billing. Get two months free when you pay annually.',
+  items: [
+    'Starter: $133.42 per year',
+    'Professional: $269.57 per year',
+    'Business: $677.99 per year',
+    'Agency: Custom annual pricing',
+  ],
+};
 
 const DEFAULT_FAQ = [
   { q: 'Can I change plans at any time?',                      a: "Yes. You can upgrade or downgrade at any time. Changes take effect immediately and we'll prorate any charges." },
@@ -82,7 +200,8 @@ const DEFAULT_FAQ = [
   { q: 'Can I cancel anytime?',                                a: "Absolutely. Cancel from your account settings with one click. You keep access until the end of your billing period." },
 ];
 
-function FeatureValue({ val }: { val: string | boolean }) {
+function FeatureValue({ val }: { val: string | boolean | undefined }) {
+  if (val === undefined || val === null || val === '') return <span className="pp-dash" aria-label="Not included">remove</span>;
   if (val === true)  return <span className="pp-check" aria-label="Included">check</span>;
   if (val === false) return <span className="pp-dash"  aria-label="Not included">remove</span>;
   return <span className="pp-text-val">{val}</span>;
@@ -104,9 +223,13 @@ export default function PricingPage() {
   const heroTitle   = cms(c,'hero','title',    "Simple, transparent pricing");
   const heroSub     = cms(c,'hero','subtitle', "Start free. Upgrade when you're ready. No hidden fees, cancel anytime.");
   const showHero    = cmsVisible(c,'hero');
-  const PLANS       = cmsJson<any>(c,'plans','items', DEFAULT_PLANS);
+  const PLANS       = cmsJson<PricingPlan>(c,'plans','items', DEFAULT_PLANS);
   const annualSavings = getMaximumAnnualSavings(PLANS);
   const FEATURES    = cmsJson<PlanFeature>(c,'features','items', DEFAULT_FEATURES);
+  const annualItems = cmsJson<string>(c,'annual','items', DEFAULT_ANNUAL_BILLING.items);
+  const annualTitle = cms(c,'annual','title', DEFAULT_ANNUAL_BILLING.title);
+  const annualSub   = cms(c,'annual','subtitle', DEFAULT_ANNUAL_BILLING.subtitle);
+  const showAnnual  = cmsVisible(c,'annual');
   const faqItems    = cmsJson<{q:string;a:string}>(c,'faq','items', DEFAULT_FAQ);
   const bannerTitle = cms(c,'banner','title',    "Ready to create stunning leaflets?");
   const bannerSub   = cms(c,'banner','subtitle', "Join thousands of businesses already using LeafletAI.");
@@ -122,34 +245,31 @@ export default function PricingPage() {
     getLocalizedPricing().then(setLocalizedPricing).catch(() => setLocalizedPricing(null));
   }, []);
 
-  async function handleCta(planId: 'free' | 'pro' | 'business') {
-    setErrorMsg('');
+  function planCheckoutId(plan: PricingPlan): PricingPlan['checkoutPlanId'] {
+    return plan.checkoutPlanId || (plan.id === 'agency' ? 'contact' : plan.id);
+  }
 
-    if (planId === 'free') {
+  async function handleCta(plan: PricingPlan) {
+    setErrorMsg('');
+    const checkoutPlan = planCheckoutId(plan);
+
+    if (checkoutPlan === 'free') {
       if (!user) { openAuthModal('register'); return; }
+      return;
+    }
+
+    if (checkoutPlan === 'contact') {
+      window.location.href = 'mailto:sales@leafletai.ai?subject=LeafletAI Agency Plan';
       return;
     }
 
     if (!user) { openAuthModal('register'); return; }
 
-    if (planId === 'business') {
-      const period = annual ? 'annual' : 'monthly';
-      setLoading(`business_${period}`);
-      try {
-        const url = await createCheckoutSession('business', period);
-        window.location.href = url;
-      } catch (err: unknown) {
-        setErrorMsg(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
-        setLoading(null);
-      }
-      return;
-    }
-
     const period = annual ? 'annual' : 'monthly';
-    const key = `${planId}_${period}`;
+    const key = `${plan.id}_${period}`;
     setLoading(key);
     try {
-      const url = await createCheckoutSession(planId, period);
+      const url = await createCheckoutSession(checkoutPlan, period);
       window.location.href = url;
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
@@ -171,14 +291,19 @@ export default function PricingPage() {
   function ctaLabel(plan: typeof PLANS[number]): string {
     if (!user) return plan.cta;
     if (!subscription) return plan.cta;
-    if (subscription.subscription_plan === plan.id) return 'Current plan âœ“';
+    const checkoutPlan = planCheckoutId(plan);
+    if (subscription.subscription_plan === checkoutPlan) return 'Current plan';
     if (plan.id === 'business' && subscription.subscription_plan === 'pro') return 'Upgrade now';
     if (plan.id === 'free' && subscription.subscription_plan !== 'free') return 'Downgrade to Free';
     return plan.cta;
   }
 
-  function isCurrentPlan(planId: string) {
-    return user && subscription?.subscription_plan === planId;
+  function isCurrentPlan(plan: PricingPlan) {
+    return user && subscription?.subscription_plan === planCheckoutId(plan);
+  }
+
+  function planDisplayName(planId: string) {
+    return planId === 'pro' ? 'Professional' : planId.charAt(0).toUpperCase() + planId.slice(1);
   }
 
   function formatMoney(amount: number, currency: string) {
@@ -200,15 +325,15 @@ export default function PricingPage() {
   }
 
   function displayPrice(planId: string, baseMonthlyAmount: number, billedAnnually: boolean) {
-    const planQuote = (planId === 'pro' || planId === 'business') ? localizedPricing?.plans?.[planId] : undefined;
+    const planQuote = (planId === 'starter' || planId === 'pro' || planId === 'business') ? localizedPricing?.plans?.[planId] : undefined;
     const quote = billedAnnually ? planQuote?.annual : planQuote?.monthly;
     const annualQuote = billedAnnually ? planQuote?.annual : undefined;
     const currency = quote?.currency || '';
     const monthlyAmount = quote?.amount ?? baseMonthlyAmount;
     const annualTotal = billedAnnually ? (annualQuote?.totalAmount ?? baseMonthlyAmount * 12) : null;
     return {
-      monthlyLabel: currency ? formatMoney(monthlyAmount, currency) : `$${monthlyAmount}`,
-      annualLabel: annualTotal !== null ? (currency ? formatMoney(annualTotal, currency) : `$${annualTotal}`) : '',
+      monthlyLabel: formatMoney(monthlyAmount, currency || 'USD'),
+      annualLabel: annualTotal !== null ? formatMoney(annualTotal, currency || 'USD') : '',
     };
   }
 
@@ -261,7 +386,7 @@ export default function PricingPage() {
       {user && subscription && subscription.subscription_plan !== 'free' && (
         <div className="pp-current-banner container">
           <span>
-            You're on the <strong>{subscription.subscription_plan.charAt(0).toUpperCase() + subscription.subscription_plan.slice(1)}</strong> plan
+            You're on the <strong>{planDisplayName(subscription.subscription_plan)}</strong> plan
             ({subscription.subscription_period})
             {subscription.subscription_status === 'cancelled' && ' - cancels at period end'}
           </span>
@@ -282,11 +407,13 @@ export default function PricingPage() {
       <section className="pp-cards-wrap">
         <div className="container pp-cards">
           {PLANS.map(plan => {
-            const price   = annual ? plan.yearlyPrice : plan.monthlyPrice;
+            const price   = annual ? Number(plan.yearlyPrice ?? plan.monthlyPrice) : Number(plan.monthlyPrice);
             const period  = annual ? 'annual' : 'monthly';
             const loadKey = `${plan.id}_${period}`;
-            const current = isCurrentPlan(plan.id);
+            const current = isCurrentPlan(plan);
             const localizedPrice = displayPrice(plan.id, price, annual);
+            const planFeatures = Array.isArray(plan.features) ? plan.features : [];
+            const annualTotal = Number(plan.annualPrice || (Number(plan.yearlyPrice) || 0) * 12);
 
             return (
               <div
@@ -304,19 +431,23 @@ export default function PricingPage() {
                       <span className="pp-price-amount">Free</span>
                     ) : (
                       <>
+                        {plan.pricePrefix && <span className="pp-price-prefix">{plan.pricePrefix}</span>}
                         <span className="pp-price-amount pp-price-amount--localized">{localizedPrice.monthlyLabel}</span>
                         <span className="pp-price-period">/mo</span>
                       </>
                     )}
                   </div>
-                  {annual && price > 0 && (
+                  {annual && annualTotal > 0 && (
                     <p className="pp-billed-note">Billed {localizedPrice.annualLabel}/year</p>
+                  )}
+                  {annual && plan.annualPriceLabel && (
+                    <p className="pp-billed-note">{plan.annualPriceLabel}</p>
                   )}
                 </div>
 
                 <button
                   className={`btn pp-cta-btn pp-cta-${plan.ctaVariant}`}
-                  onClick={() => handleCta(plan.id)}
+                  onClick={() => handleCta(plan)}
                   disabled={!!loading || current === true}
                 >
                   {loading === loadKey ? (
@@ -325,20 +456,12 @@ export default function PricingPage() {
                 </button>
 
                 <ul className="pp-feature-list">
-                  {FEATURES.map(f => {
-                    const val = f[plan.id];
-                    if (val === false) return null;
-                    return (
-                      <li key={f.label} className="pp-feature-item">
-                        <span className="pp-feature-check">check</span>
-                        <span className="pp-feature-label">
-                          {typeof val === 'string' && val !== 'true'
-                            ? <><strong>{val}</strong> {f.label.toLowerCase()}</>
-                            : f.label}
-                        </span>
-                      </li>
-                    );
-                  })}
+                  {(planFeatures.length ? planFeatures : FEATURES.map(f => f[plan.id] ? `${f[plan.id]} ${f.label}` : '').filter(Boolean)).map(feature => (
+                    <li key={String(feature)} className="pp-feature-item">
+                      <span className="pp-feature-check">check</span>
+                      <span className="pp-feature-label">{String(feature)}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
             );
@@ -365,15 +488,31 @@ export default function PricingPage() {
               {FEATURES.map((f, i) => (
                 <tr key={f.label} className={i % 2 === 0 ? 'pp-tr-even' : ''}>
                   <td className="pp-td-feature">{f.label}</td>
-                  <td className="pp-td-val"><FeatureValue val={f.free} /></td>
-                  <td className="pp-td-val pp-td--highlight"><FeatureValue val={f.pro} /></td>
-                  <td className="pp-td-val"><FeatureValue val={f.business} /></td>
+                  {PLANS.map(p => (
+                    <td key={p.id} className={`pp-td-val${p.highlight ? ' pp-td--highlight' : ''}`}>
+                      <FeatureValue val={f[p.id]} />
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </section>
+
+      {showAnnual && (
+        <section className="pp-annual container">
+          <div className="pp-annual-inner">
+            <div>
+              <h2 className="pp-annual-title">{annualTitle}</h2>
+              <p className="pp-annual-sub">{annualSub}</p>
+            </div>
+            <ul className="pp-annual-list">
+              {annualItems.map(item => <li key={item}>{item}</li>)}
+            </ul>
+          </div>
+        </section>
+      )}
 
       {/* â”€â”€ FAQ â”€â”€ */}
       <section className="pp-faq container">
@@ -395,7 +534,7 @@ export default function PricingPage() {
           <h2 className="pp-banner-title">{bannerTitle}</h2>
           <p className="pp-banner-sub">{bannerSub}</p>
           <div className="pp-banner-actions">
-            <button className="btn primary" onClick={() => user ? handleCta('pro') : openAuthModal('register')}>
+            <button className="btn primary" onClick={() => user ? handleCta(PLANS.find(p => p.id === 'pro') || DEFAULT_PLANS.find(p => p.id === 'pro')!) : openAuthModal('register')}>
               {bannerCta}
             </button>
             <Link className="btn ghost" to="/create-leaflet">See demo</Link>

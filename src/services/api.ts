@@ -641,7 +641,7 @@ export async function uploadImage(file: File): Promise<string> {
 ───────────────────────────────────────────── */
 
 export interface SubscriptionInfo {
-  subscription_plan:    'free' | 'pro' | 'business' | 'admin';
+  subscription_plan:    'free' | 'starter' | 'pro' | 'business' | 'admin';
   subscription_status:  'active' | 'cancelled' | 'past_due';
   subscription_period:  'monthly' | 'annual';
   subscription_start:   string | null;
@@ -661,7 +661,7 @@ export interface LocalizedAnnualPlanPrice extends LocalizedPlanPrice {
 export interface LocalizedPricing {
   country: string;
   currency: string;
-  plans: Partial<Record<'pro' | 'business', {
+  plans: Partial<Record<'starter' | 'pro' | 'business', {
     monthly: LocalizedPlanPrice;
     annual: LocalizedAnnualPlanPrice;
   }>>;
@@ -740,7 +740,7 @@ export function searchProductImages(query: string): Promise<{ images: ProductIma
   });
 }
 
-export async function createCheckoutSession(plan: 'pro' | 'business', period: 'monthly' | 'annual'): Promise<string> {
+export async function createCheckoutSession(plan: 'starter' | 'pro' | 'business', period: 'monthly' | 'annual'): Promise<string> {
   const { locale, country } = detectBillingLocale();
   const { url } = await request<{ url: string }>('/stripe/create-checkout-session', {
     method: 'POST',
@@ -779,7 +779,7 @@ export interface UserStats {
   leaflets_count:      number;
   products_count:      number;
   recent_leaflets:     { id: number; name: string; created_at: string; thumbnail_url: string | null }[];
-  subscription_plan:   'free' | 'pro' | 'business' | 'admin';
+  subscription_plan:   'free' | 'starter' | 'pro' | 'business' | 'admin';
   subscription_status: string;
   subscription_period: 'monthly' | 'annual';
   subscription_start:  string | null;
