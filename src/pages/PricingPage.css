@@ -178,14 +178,55 @@
 .pp-cards-wrap {
   padding: 0 0 60px;
 }
+.pp-carousel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.pp-carousel-controls {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+.pp-carousel-btn {
+  width: 42px;
+  height: 42px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255,255,255,.055);
+  color: var(--text);
+  cursor: pointer;
+  transition: background .2s, border-color .2s, opacity .2s;
+}
+.pp-carousel-btn:hover:not(:disabled) {
+  background: rgba(73,242,182,.12);
+  border-color: rgba(73,242,182,.35);
+  color: var(--brand);
+}
+.pp-carousel-btn:disabled {
+  cursor: default;
+  opacity: .35;
+}
+.pp-carousel-status {
+  min-width: 72px;
+  text-align: center;
+  color: var(--muted2);
+  font-size: .8rem;
+  font-weight: 700;
+}
 .pp-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 24px;
   align-items: start;
 }
 @media (max-width: 860px) {
   .pp-cards { grid-template-columns: 1fr; max-width: 420px; }
+  .pp-carousel { align-items: center; }
+  .pp-carousel-controls { justify-content: center; width: 100%; }
 }
 
 .pp-card {

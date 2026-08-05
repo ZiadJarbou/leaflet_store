@@ -92,6 +92,7 @@ export default function HomePage() {
     const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
     const [localizedPricing, setLocalizedPricing] = useState<LocalizedPricing | null>(null);
     const [demoVideoUrl, setDemoVideoUrl] = useState('');
+    const [planStart, setPlanStart] = useState(0);
     const c = useCmsContent('home');
     const cp = useCmsContent('pricing'); // pricing page data â€” single source of truth
     useEffect(() => { closeAuthModal(); }, [closeAuthModal]);
@@ -209,6 +210,12 @@ export default function HomePage() {
     const plans = cmsJson<any>(cp, 'plans', 'items', DEFAULT_PLANS);
     const annualSavings = getMaximumAnnualSavings(plans);
     const features = cmsJson<any>(cp, 'features', 'items', DEFAULT_FEATURES_COMPARE);
+    const visiblePlanCount = 3;
+    const maxPlanStart = Math.max(0, plans.length - visiblePlanCount);
+    const visiblePlans = plans.slice(planStart, planStart + visiblePlanCount);
+    useEffect(() => {
+        setPlanStart(start => Math.min(start, Math.max(0, plans.length - visiblePlanCount)));
+    }, [plans.length]);
     const faqTitle = cms(c, 'faq', 'section_title', "Frequently asked questions");
     const faqSub = cms(c, 'faq', 'section_subtitle', "Quick answers to reduce friction and help you launch faster.");
     const showFaq = cmsVisible(c, 'faq');
@@ -295,8 +302,32 @@ export default function HomePage() {
             </div>
 
             {/* plan cards â€” exact same markup & classes as PricingPage */}
-            <div className="pp-cards">
-              {plans.map((plan: any) => {
+            <div className="pp-carousel">
+              {plans.length > visiblePlanCount && (
+                <div className="pp-carousel-controls" aria-label="Pricing plan navigation">
+                  <button
+                    className="pp-carousel-btn material-symbol"
+                    type="button"
+                    onClick={() => setPlanStart(start => Math.max(0, start - 1))}
+                    disabled={planStart === 0}
+                    aria-label="Previous pricing plans"
+                  >
+                    arrow_back
+                  </button>
+                  <span className="pp-carousel-status">{planStart + 1}-{Math.min(planStart + visiblePlanCount, plans.length)} of {plans.length}</span>
+                  <button
+                    className="pp-carousel-btn material-symbol"
+                    type="button"
+                    onClick={() => setPlanStart(start => Math.min(maxPlanStart, start + 1))}
+                    disabled={planStart >= maxPlanStart}
+                    aria-label="Next pricing plans"
+                  >
+                    arrow_forward
+                  </button>
+                </div>
+              )}
+              <div className="pp-cards">
+              {visiblePlans.map((plan: any) => {
                 const price = annual ? plan.yearlyPrice : plan.monthlyPrice;
                 const current = isCurrentPlan(plan);
                 const localizedPrice = displayPrice(plan.id, price, annual);
@@ -339,6 +370,7 @@ export default function HomePage() {
                     </ul>
                   </div>);
             })}
+              </div>
             </div>
 
             {pricingError && (

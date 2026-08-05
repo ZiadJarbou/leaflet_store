@@ -235,6 +235,14 @@ export default function PricingPage() {
   const bannerSub   = cms(c,'banner','subtitle', "Join thousands of businesses already using LeafletAI.");
   const bannerCta   = cms(c,'banner','cta_label',"Get started free");
   const showBanner  = cmsVisible(c,'banner');
+  const [planStart, setPlanStart] = useState(0);
+  const visiblePlanCount = 3;
+  const maxPlanStart = Math.max(0, PLANS.length - visiblePlanCount);
+  const visiblePlans = PLANS.slice(planStart, planStart + visiblePlanCount);
+
+  useEffect(() => {
+    setPlanStart(start => Math.min(start, Math.max(0, PLANS.length - visiblePlanCount)));
+  }, [PLANS.length]);
 
   useEffect(() => {
     if (!user) return;
@@ -405,8 +413,32 @@ export default function PricingPage() {
 
       {/* â”€â”€ Plan cards â”€â”€ */}
       <section className="pp-cards-wrap">
-        <div className="container pp-cards">
-          {PLANS.map(plan => {
+        <div className="container pp-carousel">
+          {PLANS.length > visiblePlanCount && (
+            <div className="pp-carousel-controls" aria-label="Pricing plan navigation">
+              <button
+                className="pp-carousel-btn material-symbol"
+                type="button"
+                onClick={() => setPlanStart(start => Math.max(0, start - 1))}
+                disabled={planStart === 0}
+                aria-label="Previous pricing plans"
+              >
+                arrow_back
+              </button>
+              <span className="pp-carousel-status">{planStart + 1}-{Math.min(planStart + visiblePlanCount, PLANS.length)} of {PLANS.length}</span>
+              <button
+                className="pp-carousel-btn material-symbol"
+                type="button"
+                onClick={() => setPlanStart(start => Math.min(maxPlanStart, start + 1))}
+                disabled={planStart >= maxPlanStart}
+                aria-label="Next pricing plans"
+              >
+                arrow_forward
+              </button>
+            </div>
+          )}
+          <div className="pp-cards">
+          {visiblePlans.map(plan => {
             const price   = annual ? Number(plan.yearlyPrice ?? plan.monthlyPrice) : Number(plan.monthlyPrice);
             const period  = annual ? 'annual' : 'monthly';
             const loadKey = `${plan.id}_${period}`;
@@ -466,6 +498,7 @@ export default function PricingPage() {
               </div>
             );
           })}
+          </div>
         </div>
       </section>
 
