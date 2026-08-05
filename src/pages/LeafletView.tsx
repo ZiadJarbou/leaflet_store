@@ -2205,7 +2205,6 @@ function ProductCard({ p, isTwoLang, leafletId, onUpdate, onDelete, cardLayout, 
                 </a>
               </div>);
             })()}
-          {imageLicenseNode}
           {showShapes && <CardShapes layout={cl}/>}
           {showActions && cardActions}
           {/* Overlays - rendered last so they sit above all card content */}
