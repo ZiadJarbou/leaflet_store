@@ -173,7 +173,7 @@ export default function AdminBackup() {
       <div className="cms-section-header">
         <h2 className="cms-section-title">
           Backup &amp; Restore
-          <span className="cms-count"> â€” {files.length} backup{files.length !== 1 ? 's' : ''}</span>
+          <span className="cms-count"> - {files.length} backup{files.length !== 1 ? 's' : ''}</span>
         </h2>
         <div className="bk-header-actions">
           <input ref={importInputRef} className="bk-import-input" type="file" accept=".db.gz,application/gzip" onChange={e => handleImportBackup(e.target.files?.[0] || null)}/>
@@ -202,7 +202,7 @@ export default function AdminBackup() {
           <div className="cms-stat-icon">schedule</div>
           <div className="cms-stat-body">
             <div className={cx("cms-stat-value", cssClass({ fontSize: '1rem' }))}>
-              {lastBackup ? fmtDate(lastBackup.created_at) : 'â€”'}
+              {lastBackup ? fmtDate(lastBackup.created_at) : '-'}
             </div>
             <div className="cms-stat-label">Last Backup</div>
           </div>
@@ -220,7 +220,7 @@ export default function AdminBackup() {
           <div className="cms-stat-icon">fast_forward</div>
           <div className="cms-stat-body">
             <div className={cx("cms-stat-value", cssClass({ fontSize: '1rem' }))}>
-              {isAutoOn ? nextBackupLabel(settings.auto_hours, files) : 'â€”'}
+              {isAutoOn ? nextBackupLabel(settings.auto_hours, files) : '-'}
             </div>
             <div className="cms-stat-label">Next Backup</div>
           </div>
@@ -260,7 +260,7 @@ export default function AdminBackup() {
             </label>
 
             <button type="submit" className={cx("cms-btn cms-btn-primary", cssClass({ alignSelf: 'flex-start', marginTop: 4 }))} disabled={saving}>
-              {saving ? 'Savingâ€¦' : 'Save Settings'}
+              {saving ? 'Saving...' : 'Save Settings'}
             </button>
           </form>
         </div>
@@ -268,7 +268,7 @@ export default function AdminBackup() {
         {/* â”€â”€ Backup list â”€â”€ */}
         <div className={cx("cms-card", cssClass({ flex: 1 }))}>
           <div className="cms-card-title"><span className="material-symbol" aria-hidden="true">inventory_2</span> Backup Files</div>
-          {loading ? (<div className={cx("cms-loading", cssClass({ padding: '24px 0' }))}>Loadingâ€¦</div>) : files.length === 0 ? (<div className="bk-empty">No backups yet. Click "Create Backup Now" to start.</div>) : (<div className="bk-list">
+          {loading ? (<div className={cx("cms-loading", cssClass({ padding: '24px 0' }))}>Loading...</div>) : files.length === 0 ? (<div className="bk-empty">No backups yet. Click "Create Backup Now" to start.</div>) : (<div className="bk-list">
               {files.map((f, i) => (<div key={f.name} className={`bk-row${i === 0 ? ' bk-row-latest' : ''}`}>
                   <div className="bk-row-icon">
                     {i === 0 ? 'star' : 'inventory_2'}
@@ -276,7 +276,7 @@ export default function AdminBackup() {
                   <div className="bk-row-info">
                     <div className="bk-row-name">{f.name}</div>
                     <div className="bk-row-meta">
-                      {fmtDate(f.created_at)} &nbsp;Â·&nbsp; {fmtSize(f.size)}
+                      {fmtDate(f.created_at)} &nbsp;-&nbsp; {fmtSize(f.size)}
                       {i === 0 && <span className="bk-badge-latest">latest</span>}
                     </div>
                   </div>

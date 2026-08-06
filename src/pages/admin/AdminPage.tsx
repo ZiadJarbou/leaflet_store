@@ -96,7 +96,7 @@ interface AdminPresetIcon {
     deleted: number;
 }
 /* â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-function fmtDate(s: string) { return s ? new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'â€”'; }
+function fmtDate(s: string) { return s ? new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'; }
 function fmtSize(b: number) { if (b < 1024)
     return b + 'B'; if (b < 1048576)
     return (b / 1024).toFixed(1) + 'KB'; return (b / 1048576).toFixed(1) + 'MB'; }
@@ -180,7 +180,7 @@ function AdminDashboard() {
     if (err)
         return <div className="cms-error">{err}</div>;
     if (!stats)
-        return <div className="cms-loading">Loadingâ€¦</div>;
+        return <div className="cms-loading">Loading...</div>;
     return (<div className="cms-section">
       <h2 className="cms-section-title">Dashboard</h2>
 
@@ -372,7 +372,7 @@ function AdminUsers() {
       <div className="cms-section-header">
         <h2 className="cms-section-title">Users <span className="cms-count">({total})</span></h2>
         <div className={cssClass({ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' })}>
-          <input className="cms-search" placeholder="Search name / emailâ€¦" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}/>
+          <input className="cms-search" placeholder="Search name / email..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}/>
           <button className="cms-btn cms-btn-sm cms-btn-primary" onClick={() => setCreating(true)}>
             <span className="material-symbol" aria-hidden="true">person_add</span> Add user
           </button>
@@ -398,12 +398,12 @@ function AdminUsers() {
             <th>Actions</th>
           </tr></thead>
           <tbody>
-            {loading && <tr><td colSpan={8} className="cms-loading-row">Loadingâ€¦</td></tr>}
+            {loading && <tr><td colSpan={8} className="cms-loading-row">Loading...</td></tr>}
             {!loading && users.map(u => (<tr key={u.id}>
                 <td><div className="cms-user-name">{u.name}</div><div className="cms-muted">{u.email}</div></td>
                 <td>{roleBadge(u.role)}</td>
                 <td>{planBadge(u.subscription_plan)}</td>
-                <td className="cms-muted">{u.subscription_plan === 'free' ? 'â€”' : fmtDate(u.subscription_end || '')}</td>
+                <td className="cms-muted">{u.subscription_plan === 'free' ? '-' : fmtDate(u.subscription_end || '')}</td>
                 <td>{u.email_verified ? <span className="material-symbol cms-ok" aria-label="Verified">check_circle</span> : <span className="material-symbol cms-warn" aria-label="Not verified">cancel</span>}</td>
                 <td>{u.leaflet_count}</td>
                 <td className="cms-muted">{fmtDate(u.created_at)}</td>
@@ -467,7 +467,7 @@ function AdminUsers() {
       {/* Edit modal */}
       {editing && (<div className="cms-modal-bg" onClick={e => e.target === e.currentTarget && setEditing(null)}>
           <div className="cms-modal">
-            <div className="cms-modal-title">Edit User â€” {editing.name}</div>
+            <div className="cms-modal-title">Edit User - {editing.name}</div>
             <div className="cms-form-row">
               <label>Role</label>
               <select value={editing.role} onChange={e => setEditing({ ...editing, role: e.target.value })}>
@@ -618,7 +618,7 @@ function AdminLeaflets() {
           {selected.size > 0 && (<button className="cms-btn cms-btn-danger" onClick={() => setConfirmBulkDel(true)}>
               delete Delete Selected ({selected.size})
             </button>)}
-          <input className="cms-search" placeholder="Search title / ownerâ€¦" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}/>
+          <input className="cms-search" placeholder="Search title / owner..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}/>
         </div>
       </div>
       {err && <div className="cms-error">{err}</div>}
@@ -632,7 +632,7 @@ function AdminLeaflets() {
             <th>Title</th><th>Owner</th><th>Products</th><th>Created</th><th>Actions</th>
           </tr></thead>
           <tbody>
-            {loading && <tr><td colSpan={6} className="cms-loading-row">Loadingâ€¦</td></tr>}
+            {loading && <tr><td colSpan={6} className="cms-loading-row">Loading...</td></tr>}
             {!loading && leaflets.map(l => (<tr key={l.id} className={cx(selected.has(l.id) ? 'cms-row-selected' : '', cssClass({ cursor: 'pointer' }))} onClick={e => {
                 const t = e.target as HTMLElement;
                 if (!t.closest('button, a, input'))
@@ -993,7 +993,7 @@ function AdminUploads() {
           Media Library
           <span className="cms-count"> ({files.length} file{files.length !== 1 ? 's' : ''})</span>
         </h2>
-        <input className="cms-search" placeholder="Filter filesâ€¦" value={search} onChange={e => { setSearch(e.target.value); clearSelection(); }}/>
+        <input className="cms-search" placeholder="Filter files..." value={search} onChange={e => { setSearch(e.target.value); clearSelection(); }}/>
       </div>
 
       {/* â”€â”€ Multi-select toolbar â”€â”€ */}
@@ -1015,7 +1015,7 @@ function AdminUploads() {
 
       {/* â”€â”€ Grid â”€â”€ */}
       <div className="cms-media-grid">
-        {loading && <div className="cms-loading">Loadingâ€¦</div>}
+        {loading && <div className="cms-loading">Loading...</div>}
         {!loading && filtered.length === 0 && (<div className={cx("cms-empty-state", cssClass({ gridColumn: '1/-1' }))}>
             <div className={cssClass({ fontSize: '2rem', marginBottom: 8 })}>image</div>
             <div>{search ? 'No files match your search.' : 'No uploaded files yet.'}</div>
@@ -1071,7 +1071,7 @@ function AdminUploads() {
             <div className="cms-modal-footer">
               <button className="cms-btn" onClick={() => { setConfirmDel(null); setDelTarget(null); }}>Cancel</button>
               <button className="cms-btn cms-btn-danger" disabled={deleting} onClick={() => doDeleteSingle(delTarget)}>
-                {deleting ? 'Deletingâ€¦' : 'Delete'}
+                {deleting ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
@@ -1087,7 +1087,7 @@ function AdminUploads() {
             <div className="cms-modal-footer">
               <button className="cms-btn" onClick={() => setConfirmDel(null)}>Cancel</button>
               <button className="cms-btn cms-btn-danger" disabled={deleting} onClick={doDeleteSelected}>
-                {deleting ? 'Deletingâ€¦' : `Delete ${selected.size} files`}
+                {deleting ? 'Deleting...' : `Delete ${selected.size} files`}
               </button>
             </div>
           </div>
@@ -1408,7 +1408,7 @@ function AdminSettings() {
         }
     }
     if (!s)
-        return <div className="cms-loading">Loadingâ€¦</div>;
+        return <div className="cms-loading">Loading...</div>;
     return (<div className="cms-section">
       <h2 className="cms-section-title">Site Settings</h2>
       {err && <div className="cms-error">{err}</div>}
@@ -1593,7 +1593,7 @@ export default function AdminPage() {
     }, [authLoading, user, checkAccess]);
     const active = location.pathname.split('/')[2] ?? 'dashboard';
     if (authLoading || boot === 'checking')
-        return <div className="cms-splash">Checking permissionsâ€¦</div>;
+        return <div className="cms-splash">Checking permissions...</div>;
     if (boot === 'no-session')
         return <AdminLogin />;
     if (boot === 'forbidden')

@@ -375,7 +375,7 @@ export default function AdminPages() {
       <div className="cms-section-header">
         <h2 className="cms-section-title">Pages CMS</h2>
         <p className={cssClass({ color: 'var(--cms-muted,#94a3b8)', fontSize: 13, margin: '4px 0 0' })}>
-          Edit page content â€” changes go live immediately after saving.
+          Edit page content - changes go live immediately after saving.
         </p>
       </div>
 
@@ -404,7 +404,7 @@ export default function AdminPages() {
             <div className="cms-pages-panel-actions">
               {saveMsg && <span className="cms-save-ok">{saveMsg}</span>}
               <button className="cms-btn cms-btn-primary" onClick={handleSave} disabled={saving || !isDirty}>
-                {saving ? 'Savingâ€¦' : 'Save Changes'}
+                {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>

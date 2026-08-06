@@ -4895,11 +4895,20 @@ app.put('/api/admin/backup/settings', adminMiddleware, (req, res) => {
    ══════════════════════════════════════════════════════════════ */
 
 /* helper: build nested object { section: { field: value } } */
+function repairMojibakeText(value) {
+  return String(value)
+    .replace(/\u00e2\u20ac\u201d/g, '-')
+    .replace(/\u00e2\u20ac\u00a6/g, '...')
+    .replace(/\u00e2\u2020\u2019/g, '->')
+    .replace(/\u00c2\u00b7/g, '-')
+    .replace(/\u00c3\u2014/g, 'x');
+}
+
 function buildPageContent(rows) {
   const out = {};
   for (const r of rows) {
     if (!out[r.section]) out[r.section] = {};
-    out[r.section][r.field] = r.value;
+    out[r.section][r.field] = repairMojibakeText(r.value);
   }
   return out;
 }
@@ -4936,7 +4945,7 @@ app.put('/api/admin/pages/:page', adminMiddleware, async (req, res) => {
     for (const [section, fields] of Object.entries(entries)) {
       if (typeof fields !== 'object') continue;
       for (const [field, value] of Object.entries(fields)) {
-        upsert.run(page, section, field, String(value));
+        upsert.run(page, section, field, repairMojibakeText(value));
       }
     }
   });
