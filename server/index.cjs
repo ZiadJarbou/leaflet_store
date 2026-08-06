@@ -668,6 +668,7 @@ const settingDefaults = {
   announcement_banner: '',
   stripe_secret_key: '',
   stripe_checkout_url: '',
+  google_api_key: '',
   default_card_template_id: '',
   nano_a4_enabled: '1',
   home_demo_video_url: '',
@@ -692,6 +693,11 @@ function refreshStripeClient() {
 }
 
 refreshStripeClient();
+
+function googleApiKeyValue() {
+  const row = db.prepare("SELECT value FROM site_settings WHERE key = 'google_api_key'").get();
+  return String(row?.value || '').trim() || GOOGLE_API_KEY;
+}
 
 /* ── Page Content table ── */
 db.exec(`
@@ -3802,12 +3808,13 @@ app.post('/api/generate-a4', authMiddleware, async (req, res) => {
   const safeHeight = Number(height);
   const aspectRatio = safeOrientation === 'landscape' ? '4:3' : '3:4';
   const imageSize = safeResolution === '4k' ? '4K' : safeResolution === '2k' ? '2K' : '1K';
+  const googleApiKey = googleApiKeyValue();
 
   if (!safePrompt) {
     res.status(400).json({ message: 'Prompt is required' });
     return;
   }
-  if (!GOOGLE_API_KEY) {
+  if (!googleApiKey) {
     res.status(500).json({ message: 'GOOGLE_API_KEY or GEMINI_API_KEY is not configured' });
     return;
   }
@@ -3848,7 +3855,7 @@ app.post('/api/generate-a4', authMiddleware, async (req, res) => {
       ? [{ text: `${finalPrompt} Use the attached images only as visual style or product references; do not copy any text or logo lettering from them.` }, ...referenceParts]
       : [{ text: finalPrompt }];
     const data = await httpsJsonPost(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(NANO_BANANA_MODEL)}:generateContent?key=${encodeURIComponent(GOOGLE_API_KEY)}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(NANO_BANANA_MODEL)}:generateContent?key=${encodeURIComponent(googleApiKey)}`,
       {
         contents: [{
           role: 'user',

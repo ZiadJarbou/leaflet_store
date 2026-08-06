@@ -62,6 +62,7 @@ interface SiteSettings {
     announcement_banner: string;
     stripe_secret_key: string;
     stripe_checkout_url: string;
+    google_api_key: string;
     home_demo_video_url: string;
     help_video_1_url: string;
     help_video_2_url: string;
@@ -1434,6 +1435,10 @@ function AdminSettings() {
           <div className="cms-form-row">
             <label>Stripe Secret Key</label>
             <input type="password" value={s.stripe_secret_key || ''} placeholder="sk_live_..." autoComplete="off" onChange={e => setS({ ...s, stripe_secret_key: e.target.value })}/>
+          </div>
+          <div className="cms-form-row">
+            <label>GOOGLE_API_KEY</label>
+            <input type="password" value={s.google_api_key || ''} placeholder="AIza..." autoComplete="off" onChange={e => setS({ ...s, google_api_key: e.target.value })}/>
           </div>
         </div>
 
