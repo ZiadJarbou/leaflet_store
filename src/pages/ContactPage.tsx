@@ -1,3 +1,4 @@
+import type { FormEvent } from 'react';
 import SEOHelmet from '../components/SEOHelmet';
 import Footer from '../components/Footer';
 import './ContactPage.css';
@@ -6,6 +7,25 @@ const supportEmail = 'info@leafletai.ai';
 const salesEmail = 'sales@leafletai.ai';
 
 export default function ContactPage() {
+  function handleContactSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get('name') || '').trim();
+    const email = String(form.get('email') || '').trim();
+    const topic = String(form.get('topic') || 'Support').trim();
+    const message = String(form.get('message') || '').trim();
+    const subject = encodeURIComponent(`LeafletAI ${topic} request`);
+    const body = encodeURIComponent([
+      name ? `Name: ${name}` : '',
+      email ? `Email: ${email}` : '',
+      `Topic: ${topic}`,
+      '',
+      message,
+    ].filter(line => line !== '').join('\n'));
+
+    window.location.href = `mailto:${supportEmail}?subject=${subject}&body=${body}`;
+  }
+
   return (
     <>
       <SEOHelmet
@@ -57,12 +77,7 @@ export default function ContactPage() {
                 understand the issue faster.
               </p>
             </div>
-            <form
-              className="ct-form"
-              action={`mailto:${supportEmail}`}
-              method="post"
-              encType="text/plain"
-            >
+            <form className="ct-form" onSubmit={handleContactSubmit}>
               <label>
                 Name
                 <input name="name" type="text" placeholder="Your name" />
