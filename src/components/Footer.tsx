@@ -24,6 +24,7 @@ export default function Footer({ onOpenDemo }: FooterProps) {
 
           <div>
             <h4>Support</h4>
+            <a href="mailto:info@leafletai.ai">info@leafletai.ai</a>
             <Link to="/help">Help Center</Link>
             <Link to="/contact">Contact Support</Link>
             <Link to="/guides">Guides</Link>
