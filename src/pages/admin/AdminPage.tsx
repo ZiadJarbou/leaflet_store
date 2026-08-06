@@ -13,6 +13,7 @@ import AdminCardTemplates from './AdminCardTemplates';
 import LeafletView from '../LeafletView';
 import './AdminPage.css';
 const NANO_A4_VISIBILITY_STORAGE_KEY = 'leafletai_nano_a4_enabled';
+const SUBSCRIPTION_MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 /* â”€â”€ types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 interface AdminUser {
     id: number;
@@ -34,6 +35,7 @@ interface AdminCreateUserForm {
     password: string;
     subscription_plan: 'starter' | 'pro' | 'business';
     subscription_period: 'monthly' | 'annual';
+    subscription_months: number;
     email_verified: boolean;
 }
 interface AdminLeaflet {
@@ -100,6 +102,16 @@ function fmtDate(s: string) { return s ? new Date(s).toLocaleDateString('en-GB',
 function fmtSize(b: number) { if (b < 1024)
     return b + 'B'; if (b < 1048576)
     return (b / 1024).toFixed(1) + 'KB'; return (b / 1048576).toFixed(1) + 'MB'; }
+function inferSubscriptionMonths(user: Pick<AdminUser, 'subscription_period' | 'subscription_end'> | null) {
+    if (!user || user.subscription_period !== 'monthly' || !user.subscription_end)
+        return 1;
+    const end = new Date(user.subscription_end);
+    if (Number.isNaN(end.getTime()))
+        return 1;
+    const now = new Date();
+    const approxMonths = Math.ceil((end.getTime() - now.getTime()) / (30 * 24 * 60 * 60 * 1000));
+    return Math.min(12, Math.max(1, approxMonths));
+}
 function planBadge(plan: string) {
     const map: Record<string, string> = { free: 'badge-free', starter: 'badge-pro', pro: 'badge-pro', business: 'badge-business', enterprise: 'badge-business' };
     const labels: Record<string, string> = { pro: 'professional' };
@@ -254,8 +266,10 @@ function AdminUsers() {
         password: '',
         subscription_plan: 'pro',
         subscription_period: 'monthly',
+        subscription_months: 1,
         email_verified: true,
     });
+    const [editSubscriptionMonths, setEditSubscriptionMonths] = useState(1);
     const [confirmDel, setConfirmDel] = useState<number | null>(null);
     const PER = 15;
     const load = useCallback(async () => {
@@ -326,6 +340,7 @@ function AdminUsers() {
                 subscription_plan: editing.subscription_plan,
                 subscription_status: editing.subscription_status,
                 subscription_period: editing.subscription_period,
+                subscription_months: editing.subscription_period === 'monthly' ? editSubscriptionMonths : undefined,
                 email_verified: editing.email_verified,
             });
             setEditing(null);
@@ -348,6 +363,7 @@ function AdminUsers() {
                 password: '',
                 subscription_plan: 'pro',
                 subscription_period: 'monthly',
+                subscription_months: 1,
                 email_verified: true,
             });
             setPage(1);
@@ -408,7 +424,7 @@ function AdminUsers() {
                 <td>{u.leaflet_count}</td>
                 <td className="cms-muted">{fmtDate(u.created_at)}</td>
                 <td className="cms-actions">
-                  <button className="cms-btn cms-btn-sm" onClick={() => setEditing({ ...u })}>Edit</button>
+                  <button className="cms-btn cms-btn-sm" onClick={() => { setEditing({ ...u }); setEditSubscriptionMonths(inferSubscriptionMonths(u)); }}>Edit</button>
                   <button className="cms-btn cms-btn-sm cms-btn-danger" onClick={() => setConfirmDel(u.id)}>Delete</button>
                 </td>
               </tr>))}
@@ -453,6 +469,12 @@ function AdminUsers() {
                 <option value="annual">annual</option>
               </select>
             </div>
+            {createForm.subscription_period === 'monthly' && (<div className="cms-form-row">
+              <label>Subscription Months</label>
+              <select value={createForm.subscription_months} onChange={e => setCreateForm({ ...createForm, subscription_months: Number(e.target.value) })}>
+                {SUBSCRIPTION_MONTH_OPTIONS.map(month => (<option key={month} value={month}>{month} month{month !== 1 ? 's' : ''}</option>))}
+              </select>
+            </div>)}
             <div className="cms-form-row">
               <label>Email Verified</label>
               <input type="checkbox" checked={createForm.email_verified} onChange={e => setCreateForm({ ...createForm, email_verified: e.target.checked })}/>
@@ -496,6 +518,12 @@ function AdminUsers() {
               <select value={editing.subscription_period || 'monthly'} onChange={e => setEditing({ ...editing, subscription_period: e.target.value })}>
                 <option value="monthly">monthly</option>
                 <option value="annual">annual</option>
+              </select>
+            </div>)}
+            {editing.subscription_plan !== 'free' && editing.subscription_period === 'monthly' && (<div className="cms-form-row">
+              <label>Subscription Months</label>
+              <select value={editSubscriptionMonths} onChange={e => setEditSubscriptionMonths(Number(e.target.value))}>
+                {SUBSCRIPTION_MONTH_OPTIONS.map(month => (<option key={month} value={month}>{month} month{month !== 1 ? 's' : ''}</option>))}
               </select>
             </div>)}
             {editing.subscription_plan !== 'free' && (<div className="cms-form-row">

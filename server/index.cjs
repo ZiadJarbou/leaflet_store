@@ -1018,19 +1018,23 @@ function validatePasswordRules(password) {
 const ADMIN_SUBSCRIPTION_PLANS = new Set(['free', 'starter', 'pro', 'business']);
 const ADMIN_SUBSCRIPTION_STATUSES = new Set(['active', 'cancelled', 'past_due']);
 const ADMIN_SUBSCRIPTION_PERIODS = new Set(['monthly', 'annual']);
-function validateAdminSubscription({ plan = 'free', status = 'active', period = 'monthly' } = {}) {
+function validateAdminSubscription({ plan = 'free', status = 'active', period = 'monthly', months = 1 } = {}) {
   const nextPlan = String(plan || 'free').trim().toLowerCase();
   const nextStatus = String(status || 'active').trim().toLowerCase();
   const nextPeriod = String(period || 'monthly').trim().toLowerCase();
+  const nextMonths = Number(months);
   if (!ADMIN_SUBSCRIPTION_PLANS.has(nextPlan)) return { error: 'Invalid subscription plan' };
   if (!ADMIN_SUBSCRIPTION_STATUSES.has(nextStatus)) return { error: 'Invalid subscription status' };
   if (!ADMIN_SUBSCRIPTION_PERIODS.has(nextPeriod)) return { error: 'Invalid subscription period' };
-  return { plan: nextPlan, status: nextPlan === 'free' ? 'active' : nextStatus, period: nextPeriod };
+  if (nextPeriod === 'monthly' && (!Number.isInteger(nextMonths) || nextMonths < 1 || nextMonths > 12)) {
+    return { error: 'Invalid subscription months' };
+  }
+  return { plan: nextPlan, status: nextPlan === 'free' ? 'active' : nextStatus, period: nextPeriod, months: nextPeriod === 'monthly' ? nextMonths : 12 };
 }
-function adminSubscriptionEndDate(period, from = new Date()) {
+function adminSubscriptionEndDate(period, from = new Date(), months = 1) {
   const end = new Date(from);
   if (period === 'annual') end.setFullYear(end.getFullYear() + 1);
-  else end.setMonth(end.getMonth() + 1);
+  else end.setMonth(end.getMonth() + months);
   return end.toISOString();
 }
 function escapeHtml(value) {
@@ -4093,6 +4097,7 @@ app.post('/api/admin/users', adminMiddleware, async (req, res, next) => {
       plan: req.body.subscription_plan || 'free',
       status: req.body.subscription_status || 'active',
       period: req.body.subscription_period || 'monthly',
+      months: req.body.subscription_months || 1,
     });
     if (sub.error) { res.status(400).json({ error: sub.error }); return; }
 
@@ -4114,9 +4119,9 @@ app.post('/api/admin/users', adminMiddleware, async (req, res, next) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const isPaid = sub.plan === 'pro' || sub.plan === 'business';
+    const isPaid = sub.plan !== 'free';
     const subscriptionStart = isPaid ? new Date() : null;
-    const subscriptionEnd = isPaid ? adminSubscriptionEndDate(sub.period, subscriptionStart) : null;
+    const subscriptionEnd = isPaid ? adminSubscriptionEndDate(sub.period, subscriptionStart, sub.months) : null;
     const result = db.prepare(`
       INSERT INTO users (
         name, email, password_hash, email_verified, role,
@@ -4148,7 +4153,7 @@ app.post('/api/admin/users', adminMiddleware, async (req, res, next) => {
 
 /* ── PUT /api/admin/users/:id ── */
 app.put('/api/admin/users/:id', adminMiddleware, (req, res) => {
-  const { role, subscription_plan, subscription_status, subscription_period, email_verified } = req.body;
+  const { role, subscription_plan, subscription_status, subscription_period, subscription_months, email_verified } = req.body;
   const id = Number(req.params.id);
   const target = db.prepare('SELECT id,email,subscription_plan,subscription_status,subscription_period,subscription_start,subscription_end FROM users WHERE id=?').get(id);
   if (!target) {
@@ -4168,6 +4173,7 @@ app.put('/api/admin/users/:id', adminMiddleware, (req, res) => {
     plan: subscription_plan !== undefined ? subscription_plan : target.subscription_plan,
     status: subscription_status !== undefined ? subscription_status : target.subscription_status,
     period: subscription_period !== undefined ? subscription_period : target.subscription_period,
+    months: subscription_months !== undefined ? subscription_months : 1,
   });
   if (sub.error) { res.status(400).json({ error: sub.error }); return; }
   const fields = [];
@@ -4184,12 +4190,12 @@ app.put('/api/admin/users/:id', adminMiddleware, (req, res) => {
     fields.push('subscription_start=NULL');
     fields.push('subscription_end=NULL');
   }
-  if ((subscription_plan !== undefined || subscription_period !== undefined) && sub.plan !== 'free') {
+  if ((subscription_plan !== undefined || subscription_period !== undefined || subscription_months !== undefined) && sub.plan !== 'free') {
     const subscriptionStart = target.subscription_start || new Date().toISOString();
     fields.push('subscription_start=COALESCE(subscription_start, ?)');
     vals.push(subscriptionStart);
     fields.push('subscription_end=?');
-    vals.push(adminSubscriptionEndDate(sub.period));
+    vals.push(adminSubscriptionEndDate(sub.period, new Date(), sub.months));
   }
   if (email_verified     !== undefined) { fields.push('email_verified=?');      vals.push(email_verified ? 1 : 0); }
   if (!fields.length) { res.status(400).json({ error: 'Nothing to update' }); return; }
