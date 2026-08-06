@@ -14,6 +14,7 @@ const fallbackDirs = [
   'why',
   'features',
   'faq',
+  'contact',
   'pricing',
   'payment',
   'payment/success',

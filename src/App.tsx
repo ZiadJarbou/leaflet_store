@@ -16,6 +16,7 @@ import PaymentSuccess from './pages/PaymentSuccess';
 import WhyPage from './pages/WhyPage';
 import FeaturesPage from './pages/FeaturesPage';
 import FaqPage from './pages/FaqPage';
+import ContactPage from './pages/ContactPage';
 import DashboardPage from './pages/DashboardPage';
 import SettingsPage from './pages/SettingsPage';
 import AdminPage from './pages/admin/AdminPage';
@@ -53,6 +54,7 @@ function AppShell() {
           <Route path="/why" element={<WhyPage />}/>
           <Route path="/features" element={<FeaturesPage />}/>
           <Route path="/faq" element={<FaqPage />}/>
+          <Route path="/contact" element={<ContactPage />}/>
           <Route path="/pricing" element={<PricingPage />}/>
           <Route path="/payment/success" element={<PaymentSuccess />}/>
           <Route path="/forgot-password" element={<ForgotPasswordPage />}/>

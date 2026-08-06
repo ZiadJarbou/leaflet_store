@@ -1,0 +1,176 @@
+.ct-page {
+  min-height: 100vh;
+  padding-bottom: 80px;
+}
+
+.ct-hero {
+  text-align: center;
+  padding: 88px 24px 52px;
+}
+
+.ct-eyebrow,
+.ct-section-label {
+  margin: 0 0 14px;
+  color: var(--brand);
+  font-size: .75rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.ct-hero h1 {
+  margin: 0 0 18px;
+  font-size: clamp(2.1rem, 5vw, 3.4rem);
+  font-weight: 850;
+  letter-spacing: -.04em;
+}
+
+.ct-hero p {
+  max-width: 680px;
+  margin: 0 auto;
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+.ct-content {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  padding-bottom: 24px;
+}
+
+.ct-card,
+.ct-form-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius2);
+  box-shadow: var(--shadow);
+}
+
+.ct-card {
+  padding: 34px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.ct-card--primary {
+  border-color: rgba(73, 242, 182, .24);
+  background:
+    radial-gradient(circle at 20% 0%, rgba(73, 242, 182, .12), transparent 34%),
+    var(--card);
+}
+
+.ct-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(124, 92, 255, .14);
+  color: var(--brand);
+  font-size: 28px;
+}
+
+.ct-card h2,
+.ct-form-panel h2 {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -.03em;
+}
+
+.ct-card p,
+.ct-form-panel p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.ct-card .btn {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ct-email {
+  color: var(--muted2);
+  font-size: .9rem;
+}
+
+.ct-form-section {
+  padding-top: 8px;
+}
+
+.ct-form-panel {
+  display: grid;
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+  gap: 34px;
+  padding: 36px;
+}
+
+.ct-form {
+  display: grid;
+  gap: 14px;
+}
+
+.ct-form label {
+  display: grid;
+  gap: 8px;
+  color: var(--text);
+  font-size: .82rem;
+  font-weight: 700;
+}
+
+.ct-form input,
+.ct-form select,
+.ct-form textarea {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 12px;
+  background: rgba(255,255,255,.05);
+  color: var(--text);
+  font: inherit;
+  padding: 12px 14px;
+  outline: none;
+}
+
+.ct-form textarea {
+  resize: vertical;
+  min-height: 140px;
+}
+
+.ct-form input:focus,
+.ct-form select:focus,
+.ct-form textarea:focus {
+  border-color: rgba(73, 242, 182, .55);
+  box-shadow: 0 0 0 3px rgba(73, 242, 182, .12);
+}
+
+.ct-form .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: fit-content;
+}
+
+@media (max-width: 780px) {
+  .ct-content,
+  .ct-form-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .ct-card,
+  .ct-form-panel {
+    padding: 26px;
+  }
+
+  .ct-form .btn {
+    width: 100%;
+  }
+}
