@@ -102,3 +102,6 @@ export const adminUpdateHelpArticle = (id: number, body: object) => adminFetch(`
 export const adminDeleteHelpArticle = (id: number)  => adminFetch(`/help-articles/${id}`, { method: 'DELETE' });
 export const adminGetCardTemplates  = ()             => adminFetch('/card-templates');
 export const adminCreateCardTemplate = (body: object) => adminFetch('/card-templates', { method: 'POST', body: JSON.stringify(body) });
+export const adminUpdateCardTemplate = (id: number, body: object) => adminFetch(`/card-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+export const adminDeleteCardTemplate = (id: number) => adminFetch(`/card-templates/${id}`, { method: 'DELETE' });
+export const adminSetDefaultCardTemplate = (id: number) => adminFetch('/card-templates/default', { method: 'PUT', body: JSON.stringify({ template_id: id }) });

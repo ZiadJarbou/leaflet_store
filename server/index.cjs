@@ -3020,20 +3020,116 @@ app.post('/api/admin/card-templates', adminMiddleware, (req, res) => {
   });
 });
 
-/* ── DELETE /api/layout-templates/:id ── */
+function adminCardTemplateResponse(row, layoutOverride) {
+  let layout = layoutOverride;
+  if (!layout) {
+    try { layout = JSON.parse(row.layout_json); } catch { layout = DEFAULT_LEAFLET_LAYOUT; }
+  }
+  return {
+    id: row.id,
+    name: row.name,
+    layout,
+    created_at: row.created_at,
+    owner_id: row.user_id,
+    is_platform: true,
+    is_default: PLATFORM_DEFAULT_TEMPLATE_NAMES.includes(row.name),
+    can_delete: !PLATFORM_DEFAULT_TEMPLATE_NAMES.includes(row.name),
+  };
+}
+
+function resolveVirtualDefaultTemplateId(rawId) {
+  const id = parseInt(String(rawId || ''), 10);
+  if (Number.isNaN(id) || id >= 0) return null;
+  const index = Math.abs(id) - 1;
+  const name = PLATFORM_DEFAULT_TEMPLATE_NAMES[index];
+  return name ? { id, name } : null;
+}
+
 app.put('/api/admin/card-templates/default', adminMiddleware, (req, res) => {
   const id = parseInt(String(req.body.template_id || ''), 10);
-  if (Number.isNaN(id) || id <= 0) {
+  if (Number.isNaN(id) || id === 0) {
     res.status(400).json({ error: 'Valid template_id is required.' });
     return;
   }
-  const row = db.prepare('SELECT id, name FROM card_layout_templates WHERE id = ?').get(id);
+  const virtualDefault = resolveVirtualDefaultTemplateId(id);
+  let row = id > 0
+    ? db.prepare('SELECT id, name FROM card_layout_templates WHERE id = ?').get(id)
+    : null;
+  if (!row && virtualDefault) {
+    row = db.prepare('SELECT id, name FROM card_layout_templates WHERE lower(name) = lower(?) ORDER BY created_at DESC LIMIT 1').get(virtualDefault.name);
+    if (!row) {
+      const fallbackRow = defaultCardTemplateRows().find(template => template.name === virtualDefault.name);
+      const layoutJson = fallbackRow?.layout_json || JSON.stringify(DEFAULT_LEAFLET_LAYOUT);
+      const result = db.prepare(
+        'INSERT INTO card_layout_templates (user_id, name, layout_json, is_platform) VALUES (?, ?, ?, 1)'
+      ).run(req.user.id, virtualDefault.name, layoutJson);
+      row = { id: result.lastInsertRowid, name: virtualDefault.name };
+    }
+  }
   if (!row) {
     res.status(404).json({ error: 'Template not found.' });
     return;
   }
-  db.prepare('INSERT OR REPLACE INTO site_settings (key, value) VALUES (?, ?)').run('default_card_template_id', String(id));
-  res.json({ ok: true, template_id: id, template_name: row.name });
+  db.prepare('INSERT OR REPLACE INTO site_settings (key, value) VALUES (?, ?)').run('default_card_template_id', String(row.id));
+  res.json({ ok: true, template_id: row.id, template_name: row.name });
+});
+
+app.put('/api/admin/card-templates/:id', adminMiddleware, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id) || id === 0) { res.status(400).json({ error: 'Invalid template id.' }); return; }
+  const virtualDefault = resolveVirtualDefaultTemplateId(id);
+  let row = id > 0
+    ? db.prepare('SELECT id, user_id, name, layout_json, is_platform, created_at FROM card_layout_templates WHERE id = ?').get(id)
+    : null;
+  if (!row && virtualDefault) {
+    row = db.prepare('SELECT id, user_id, name, layout_json, is_platform, created_at FROM card_layout_templates WHERE lower(name) = lower(?) ORDER BY created_at DESC LIMIT 1').get(virtualDefault.name);
+  }
+
+  const fallbackRow = virtualDefault ? defaultCardTemplateRows().find(template => template.name === virtualDefault.name) : null;
+  const existingLayout = row?.layout_json || fallbackRow?.layout_json || JSON.stringify(DEFAULT_LEAFLET_LAYOUT);
+  const name = virtualDefault ? virtualDefault.name : (req.body.name !== undefined ? String(req.body.name || '').trim() : row?.name);
+  if (!name) { res.status(400).json({ error: 'Template name is required.' }); return; }
+  if (name.length > 80) { res.status(400).json({ error: 'Template name must be 80 characters or fewer.' }); return; }
+  const layout = req.body.layout !== undefined ? req.body.layout : JSON.parse(existingLayout);
+  if (!layout || typeof layout !== 'object') {
+    res.status(400).json({ error: 'Layout data is required.' });
+    return;
+  }
+
+  if (row) {
+    db.prepare('UPDATE card_layout_templates SET name = ?, layout_json = ?, is_platform = 1 WHERE id = ?')
+      .run(name, JSON.stringify(layout), row.id);
+    const updated = { ...row, name, layout_json: JSON.stringify(layout), is_platform: 1 };
+    res.json({ template: adminCardTemplateResponse(updated, layout) });
+    return;
+  }
+
+  const result = db.prepare(
+    'INSERT INTO card_layout_templates (user_id, name, layout_json, is_platform) VALUES (?, ?, ?, 1)'
+  ).run(req.user.id, name, JSON.stringify(layout));
+  res.status(201).json({
+    template: adminCardTemplateResponse({
+      id: result.lastInsertRowid,
+      user_id: req.user.id,
+      name,
+      layout_json: JSON.stringify(layout),
+      is_platform: 1,
+      created_at: new Date().toISOString(),
+    }, layout),
+  });
+});
+
+app.delete('/api/admin/card-templates/:id', adminMiddleware, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id) || id <= 0) { res.status(400).json({ error: 'Invalid template id.' }); return; }
+  const row = db.prepare('SELECT id, name FROM card_layout_templates WHERE id = ?').get(id);
+  if (!row) { res.status(404).json({ error: 'Template not found.' }); return; }
+  if (PLATFORM_DEFAULT_TEMPLATE_NAMES.includes(row.name)) {
+    res.status(403).json({ error: 'Default platform templates cannot be deleted.' });
+    return;
+  }
+  db.prepare('DELETE FROM card_layout_templates WHERE id = ?').run(id);
+  res.json({ success: true });
 });
 
 app.put('/api/layout-templates/:id', authMiddleware, (req, res) => {

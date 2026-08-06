@@ -2,8 +2,8 @@ import { cssClass } from '../../utils/styleClass';
 import { useEffect, useState } from 'react';
 import LayoutCustomizer from '../../components/LayoutCustomizer';
 import { LayoutThumbnail } from '../../components/CardTemplateModal';
-import { deleteLayoutTemplate, getLayoutTemplates, savePlatformLayoutTemplate, updateLayoutTemplate, type CardLayout, type LayoutTemplate } from '../../services/api';
-import { adminGetSettings, adminSaveSettings } from './adminApi';
+import { type CardLayout, type LayoutTemplate } from '../../services/api';
+import { adminCreateCardTemplate, adminDeleteCardTemplate, adminGetCardTemplates, adminGetSettings, adminSaveSettings, adminSetDefaultCardTemplate, adminUpdateCardTemplate } from './adminApi';
 import './AdminPage.css';
 const EMPTY_LAYOUT = {} as CardLayout;
 export default function AdminCardTemplates() {
@@ -27,7 +27,7 @@ export default function AdminCardTemplates() {
         setError(null);
         try {
             const [res, settings] = await Promise.all([
-                getLayoutTemplates(),
+                adminGetCardTemplates() as Promise<{ templates: LayoutTemplate[] }>,
                 adminGetSettings() as Promise<Record<string, string>>,
             ]);
             setTemplates(res.templates);
@@ -47,12 +47,12 @@ export default function AdminCardTemplates() {
         if (!name)
             throw new Error('Enter a template name before saving.');
         if (editingTemplate) {
-            const res = await updateLayoutTemplate(editingTemplate.id, { name, layout, is_platform: true });
+            const res = await adminUpdateCardTemplate(editingTemplate.id, { name, layout }) as { template: LayoutTemplate };
             setTemplates(prev => prev.map(t => t.id === editingTemplate.id ? res.template : t));
             setSuccess(`"${name}" template updated.`);
         }
         else {
-            const res = await savePlatformLayoutTemplate(name, layout);
+            const res = await adminCreateCardTemplate({ name, layout }) as { template: LayoutTemplate };
             setTemplates(prev => [res.template, ...prev]);
             setTemplateName('');
             setSuccess(`"${name}" saved as a platform card template.`);
@@ -66,11 +66,11 @@ export default function AdminCardTemplates() {
         setError(null);
         try {
             if (template.is_platform !== true && template.is_default !== true) {
-                const promoted = await updateLayoutTemplate(template.id, { name: template.name, layout: template.layout, is_platform: true });
+                const promoted = await adminUpdateCardTemplate(template.id, { name: template.name, layout: template.layout }) as { template: LayoutTemplate };
                 setTemplates(prev => prev.map(t => t.id === template.id ? promoted.template : t));
             }
-            await adminSaveSettings({ default_card_template_id: String(template.id) });
-            setDefaultTemplateId(template.id);
+            const result = await adminSetDefaultCardTemplate(template.id) as { template_id?: number };
+            setDefaultTemplateId(result.template_id ?? template.id);
             setSuccess(`"${template.name}" is now the default card template for new leaflets.`);
             setTimeout(() => setSuccess(null), 2500);
         }
@@ -101,7 +101,7 @@ export default function AdminCardTemplates() {
         setBusyTemplateId(renamingTemplate.id);
         setError(null);
         try {
-            const res = await updateLayoutTemplate(renamingTemplate.id, { name, layout: renamingTemplate.layout, is_platform: true });
+            const res = await adminUpdateCardTemplate(renamingTemplate.id, { name, layout: renamingTemplate.layout }) as { template: LayoutTemplate };
             setTemplates(prev => prev.map(t => t.id === renamingTemplate.id ? res.template : t));
             setSuccess(`Template renamed to "${name}".`);
             setRenamingTemplate(null);
@@ -118,7 +118,7 @@ export default function AdminCardTemplates() {
         setBusyTemplateId(template.id);
         setError(null);
         try {
-            await deleteLayoutTemplate(template.id);
+            await adminDeleteCardTemplate(template.id);
             setTemplates(prev => prev.filter(t => t.id !== template.id));
             if (defaultTemplateId === template.id) {
                 await adminSaveSettings({ default_card_template_id: '' });
