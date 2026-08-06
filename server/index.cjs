@@ -3842,9 +3842,11 @@ app.post('/api/generate-a4', authMiddleware, async (req, res) => {
 
   const startTime = Date.now();
   try {
+    const noTextInstruction = 'Important: generate background artwork only. Do not include any written words, letters, numbers, prices, logos with text, labels, captions, brand names, watermarks, or readable typography in the image.';
+    const finalPrompt = `${safePrompt}\n\n${noTextInstruction}`;
     const requestParts = referenceParts.length
-      ? [{ text: `${safePrompt} Use the attached images as brand/logo/reference assets if appropriate.` }, ...referenceParts]
-      : [{ text: safePrompt }];
+      ? [{ text: `${finalPrompt} Use the attached images only as visual style or product references; do not copy any text or logo lettering from them.` }, ...referenceParts]
+      : [{ text: finalPrompt }];
     const data = await httpsJsonPost(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(NANO_BANANA_MODEL)}:generateContent?key=${encodeURIComponent(GOOGLE_API_KEY)}`,
       {

@@ -255,10 +255,10 @@ const A4_RESOLUTIONS: Record<A4Resolution, {
     '4k': { maxPixels: 4096 * 4096, label: '4K', dpi: 350, description: 'Pro' },
 };
 const A4_NANO_TEMPLATE_PROMPTS = [
-    'Premium product leaflet cover with bold headline area, product collage, clean price highlights, modern retail design.',
-    'Elegant supermarket catalogue cover with fresh food photography, clear brand space, refined typography, bright commercial style.',
-    'Luxury promotional flyer cover with dark background, gold accents, hero product area, high-end retail composition.',
-    'Modern electronics leaflet cover with dynamic product grid, blue accent lighting, clean offer badges, professional layout.',
+    'Premium product leaflet background with abstract product-inspired shapes, clean empty headline area, modern retail design, no text.',
+    'Elegant supermarket catalogue background with fresh food photography mood, clear brand space, refined commercial style, no text.',
+    'Luxury promotional flyer background with dark atmosphere, gold accents, hero product area, high-end retail composition, no text.',
+    'Modern electronics leaflet background with dynamic light streaks, blue accent lighting, clean empty offer areas, no text.',
 ];
 const LEGACY_COVER_DEAL_TAGS = [
     { key: 'deal-tag_20.png', name: '50% Off', url: '/deal-tags/deal-tag_20.png' },
@@ -382,7 +382,7 @@ function enhanceA4CoverPrompt(prompt: string, orientation: 'portrait' | 'landsca
         : 'A4 landscape format 297x210mm, horizontal composition';
     return [
         `${format}. ${prompt.trim()}`,
-        'Fast clean leaflet cover, sharp commercial style, clear margins.',
+        'Create background artwork only. No written words, no letters, no numbers, no prices, no labels, no badges with text, no logo text, no watermark, no readable typography anywhere. Leave clean empty areas for editable text overlays. Fast clean leaflet cover background, sharp commercial style, clear margins.',
     ].join(' ');
 }
 function blobToDataUrl(blob: Blob) {
@@ -2911,6 +2911,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const [nanoResolution, setNanoResolution] = useState<A4Resolution>('1k');
     const [nanoImageUrl, setNanoImageUrl] = useState('');
     const [nanoReferenceImages, setNanoReferenceImages] = useState<{
+        id: string;
         dataUrl: string;
         mimeType: string;
         data: string;
@@ -4034,24 +4035,17 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         }
     }
     async function applyGeneratedCoverImage(imageUrl: string) {
-        const hasSelectedProducts = coverBuilder.selectedProductIds.length > 0;
-        if (!hasSelectedProducts) {
-            setCoverPage({ image: imageUrl, show: true, builder: false });
-            setCurrentPage(-1);
-            return;
-        }
         const dynamicCoverBuilder = cloneCoverBuilderState({
             ...coverBuilder,
             bgType: 'image',
             bgImage: imageUrl,
-            visibleItems: { ...coverBuilder.visibleItems, products: true },
+            visibleItems: { ...coverBuilder.visibleItems },
         });
         updateCoverBuilderForSelectedTemplate(dynamicCoverBuilder);
         setFrontCoverBuilder(dynamicCoverBuilder);
-        setCoverBuilderSelected('products');
+        setCoverBuilderSelected('background');
         setCoverPage({ image: '', show: true, builder: true });
         setCurrentPage(-1);
-        setCoverBuilderOpen(false);
     }
     async function handleNanoReferenceUpload(files: FileList | File[] | File | null) {
         const selectedFiles = files instanceof File
@@ -4073,6 +4067,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 const dataUrl = await blobToDataUrl(file);
                 const [, data = ''] = dataUrl.split(',');
                 nextImages.push({
+                    id: `${file.name || 'reference'}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2)}`,
                     dataUrl,
                     mimeType: file.type || 'image/png',
                     data,
@@ -4093,6 +4088,9 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             return;
         e.preventDefault();
         void handleNanoReferenceUpload(file);
+    }
+    function removeNanoReferenceImage(id: string) {
+        setNanoReferenceImages(prev => prev.filter(image => image.id !== id));
     }
     function setCoverBuilderValue<K extends keyof CoverBuilderState>(key: K, value: CoverBuilderState[K]) {
         const clearsAiGradient = key === 'bgType'
@@ -5435,6 +5433,62 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             <button type="button" className="lv-cb-ai-gradient-btn" onClick={() => void generateCoverAiGradient()}>
               AI gradient color
             </button>
+            {nanoA4Enabled && (<div className="lv-nano-a4 lv-nano-a4--background">
+              <div className="lv-nano-head">
+                <span className="material-symbol" aria-hidden="true">auto_awesome</span>
+                <div>
+                  <strong>AI background image</strong>
+                  <em>Generates artwork only. Text stays editable on the canvas.</em>
+                </div>
+              </div>
+              <div className="lv-nano-resolution" role="group" aria-label="AI background resolution">
+                {(Object.entries(A4_RESOLUTIONS) as [A4Resolution, typeof A4_RESOLUTIONS[A4Resolution]][]).map(([key, option]) => (<button key={key} type="button" className={nanoResolution === key ? 'active' : ''} onClick={() => setNanoResolution(key)}>
+                  <span>{option.label}</span>
+                  <small>{option.description}</small>
+                </button>))}
+              </div>
+              <div className="lv-nano-templates">
+                {A4_NANO_TEMPLATE_PROMPTS.map(template => (<button key={template} type="button" onClick={() => setNanoPrompt(template)}>
+                  {template.replace(/, no text\.?$/i, '')}
+                </button>))}
+              </div>
+              <div className="lv-nano-prompt-wrap">
+                <textarea className="lv-nano-prompt" value={nanoPrompt} onChange={e => setNanoPrompt(e.target.value.slice(0, 4000))} onPaste={handleNanoPromptPaste} rows={4} placeholder="Describe the background style, colors, product mood, and empty areas. Do not ask for text."/>
+                <input ref={nanoReferenceInputRef} className="lv-nano-reference-input" type="file" accept="image/*" multiple onChange={e => void handleNanoReferenceUpload(e.target.files)}/>
+                <button type="button" className="lv-nano-reference-add" onClick={() => nanoReferenceInputRef.current?.click()}>
+                  <span className="material-symbol" aria-hidden="true">add_photo_alternate</span>
+                  Add reference
+                </button>
+              </div>
+              {nanoReferenceImages.length > 0 && (<div className="lv-nano-reference-list">
+                {nanoReferenceImages.map(image => (<div key={image.id} className="lv-nano-reference-chip">
+                  <img src={image.dataUrl} alt="Reference"/>
+                  <span>{image.name}</span>
+                  <button type="button" onClick={() => removeNanoReferenceImage(image.id)} aria-label={`Remove ${image.name}`}>
+                    close
+                  </button>
+                </div>))}
+              </div>)}
+              <div className="lv-nano-prompt-actions">
+                <div className="lv-nano-prompt-tools">
+                  <button type="button" className="lv-nano-voice-btn" onClick={toggleNanoVoicePrompt} aria-pressed={nanoListening}>
+                    <span className="material-symbol" aria-hidden="true">{nanoListening ? 'mic' : 'keyboard_voice'}</span>
+                    {nanoListening ? 'Listening' : 'Voice'}
+                  </button>
+                  <span>{nanoDimensions.width} x {nanoDimensions.height}</span>
+                </div>
+                <button type="button" className="lv-nano-generate" onClick={() => void generateNanoCover()} disabled={nanoGenerating}>
+                  <span className="material-symbol" aria-hidden="true">{nanoGenerating ? 'progress_activity' : 'auto_awesome'}</span>
+                  {nanoGenerating ? 'Generating...' : 'Generate background'}
+                </button>
+              </div>
+              {nanoImageUrl && (<div className="lv-nano-preview">
+                <img src={nanoImageUrl} alt="Generated cover background"/>
+                <button type="button" onClick={() => void applyGeneratedCoverImage(nanoImageUrl)}>
+                  Apply background
+                </button>
+              </div>)}
+            </div>)}
             <div className="lv-cb-deal-tag-actions lv-cb-background-library-actions">
               <button type="button" className="lv-cb-deal-tag-library-button" onClick={() => {
                     setCoverBuilderLibrarySearch('');
