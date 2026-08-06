@@ -139,6 +139,28 @@
   outline: none;
 }
 
+.ct-topic-select {
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  padding-right: 44px !important;
+  background:
+    linear-gradient(45deg, transparent 50%, rgba(234,240,255,.8) 50%) calc(100% - 22px) 50% / 7px 7px no-repeat,
+    linear-gradient(135deg, rgba(234,240,255,.8) 50%, transparent 50%) calc(100% - 16px) 50% / 7px 7px no-repeat,
+    radial-gradient(circle at 12% 0%, rgba(73,242,182,.12), transparent 36%),
+    rgba(255,255,255,.055) !important;
+}
+
+.ct-topic-select:hover {
+  border-color: rgba(255,255,255,.18);
+  background-color: rgba(255,255,255,.075) !important;
+}
+
+.ct-topic-select option {
+  background: #101525;
+  color: #eaf0ff;
+}
+
 .ct-form textarea {
   resize: vertical;
   min-height: 140px;

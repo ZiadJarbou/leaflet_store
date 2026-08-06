@@ -88,7 +88,7 @@ export default function ContactPage() {
               </label>
               <label>
                 Topic
-                <select name="topic" defaultValue="Support">
+                <select className="ct-topic-select" name="topic" defaultValue="Support">
                   <option>Support</option>
                   <option>Billing</option>
                   <option>Sales</option>
