@@ -75,6 +75,7 @@ const SMTP_SECURE                  = envValue('SMTP_SECURE').toLowerCase() === '
 const SMTP_USER                    = envValue('SMTP_USER');
 const SMTP_PASS                    = smtpPasswordValue();
 const MAIL_FROM                    = envValue('MAIL_FROM') || SMTP_USER || 'LeafletAI <no-reply@leafletai.ai>';
+const CONTACT_TO_EMAIL             = envValue('CONTACT_TO_EMAIL') || 'info@leafletai.ai';
 
 let stripe = null;
 
@@ -1237,6 +1238,66 @@ async function sendSubscriptionDetailsEmail(userId, details) {
   });
   return true;
 }
+async function sendContactMessage({ name, email, topic, message }) {
+  const mailer = createMailer();
+  if (!mailer) {
+    console.warn('[contact-email] SMTP not configured', { email, topic });
+    return false;
+  }
+
+  const submittedAt = new Date().toISOString();
+  const info = await mailer.sendMail({
+    from: MAIL_FROM,
+    to: CONTACT_TO_EMAIL,
+    replyTo: email,
+    subject: `LeafletAI ${topic} request`,
+    text: [
+      'New LeafletAI contact form message',
+      '',
+      `Name: ${name}`,
+      `Email: ${email}`,
+      `Topic: ${topic}`,
+      `Submitted: ${submittedAt}`,
+      '',
+      message,
+    ].join('\n'),
+    html: `
+      <div style="font-family:Inter,Arial,sans-serif;line-height:1.55;color:#111827;max-width:620px;margin:0 auto;padding:24px;">
+        <a href="${escapeHtml(APP_URL)}" style="display:inline-block;margin:0 0 18px;text-decoration:none;">
+          <img src="${escapeHtml(`${APP_URL}/leafletai_email_logo_black.png?v=20260729`)}" alt="LeafletAI" style="display:block;width:180px;max-width:100%;height:auto;border:0;"/>
+        </a>
+        <h1 style="font-size:22px;margin:0 0 12px;">New contact form message</h1>
+        <table role="presentation" style="width:100%;border-collapse:collapse;margin:20px 0;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+          <tbody>
+            ${[
+              ['Name', name],
+              ['Email', email],
+              ['Topic', topic],
+              ['Submitted', submittedAt],
+            ].map(([label, value]) => `
+              <tr>
+                <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;background:#f9fafb;color:#4b5563;font-size:14px;width:34%;">${escapeHtml(label)}</td>
+                <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#111827;font-weight:700;font-size:14px;">${escapeHtml(value)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div style="white-space:pre-wrap;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;color:#111827;">${escapeHtml(message)}</div>
+      </div>
+    `,
+  });
+
+  console.log('[contact-email] sent', {
+    to: CONTACT_TO_EMAIL,
+    from: email,
+    topic,
+    messageId: info.messageId,
+    accepted: info.accepted,
+    rejected: info.rejected,
+    response: info.response,
+  });
+  return true;
+}
 function verificationEmailFailureMessage(err) {
   if (!isSmtpConfigured()) {
     return 'Verification email is not configured. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in Hostinger.';
@@ -1545,6 +1606,38 @@ app.post('/api/upload', authMiddleware, (req, res, next) => {
     if (!req.file) { res.status(400).json({ error: 'No image file provided.' }); return; }
     res.json({ url: `/uploads/${req.file.filename}` });
   });
+});
+
+/* ── POST /api/contact ── */
+app.post('/api/contact', async (req, res, next) => {
+  try {
+    const name = normalizeName(req.body.name || '');
+    const email = normalizeEmail(req.body.email || '');
+    const topic = String(req.body.topic || 'Support').trim().replace(/\s+/g, ' ');
+    const message = String(req.body.message || '').trim();
+    const topics = new Set(['Support', 'Billing', 'Sales', 'Feature request']);
+
+    const errors = {};
+    if (!name) errors.name = 'Name is required.';
+    else if (name.length > 120) errors.name = 'Name is too long.';
+    if (!email) errors.email = 'Email is required.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Please enter a valid email.';
+    else if (email.length > 190) errors.email = 'Email is too long.';
+    if (!topics.has(topic)) errors.topic = 'Please select a valid topic.';
+    if (!message) errors.message = 'Message is required.';
+    else if (message.length > 5000) errors.message = 'Message is too long.';
+    if (Object.keys(errors).length) {
+      res.status(422).json({ errors });
+      return;
+    }
+
+    const sent = await sendContactMessage({ name, email, topic, message });
+    if (!sent) {
+      res.status(503).json({ error: 'Contact email is not configured yet. Please email info@leafletai.ai directly.' });
+      return;
+    }
+    res.json({ message: 'Your message was sent to info@leafletai.ai.' });
+  } catch (err) { next(err); }
 });
 
 /* ── POST /api/signup ── */

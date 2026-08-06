@@ -181,6 +181,33 @@
   width: fit-content;
 }
 
+.ct-form .btn:disabled {
+  cursor: wait;
+  opacity: .72;
+}
+
+.ct-form-notice {
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: var(--muted);
+  background: rgba(255,255,255,.055);
+  line-height: 1.55;
+  font-size: .9rem;
+}
+
+.ct-form-notice--success {
+  border-color: rgba(73, 242, 182, .28);
+  color: #b9f8df;
+  background: rgba(73, 242, 182, .09);
+}
+
+.ct-form-notice--error {
+  border-color: rgba(255, 107, 107, .32);
+  color: #ffc8c8;
+  background: rgba(255, 107, 107, .1);
+}
+
 @media (max-width: 780px) {
   .ct-content,
   .ct-form-panel {

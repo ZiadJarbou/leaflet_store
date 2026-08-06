@@ -1,4 +1,5 @@
 import type { FormEvent } from 'react';
+import { useState } from 'react';
 import SEOHelmet from '../components/SEOHelmet';
 import Footer from '../components/Footer';
 import './ContactPage.css';
@@ -7,23 +8,41 @@ const supportEmail = 'info@leafletai.ai';
 const salesEmail = 'sales@leafletai.ai';
 
 export default function ContactPage() {
-  function handleContactSubmit(event: FormEvent<HTMLFormElement>) {
+  const [submitState, setSubmitState] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+  const [submitMessage, setSubmitMessage] = useState('');
+
+  async function handleContactSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
     const name = String(form.get('name') || '').trim();
     const email = String(form.get('email') || '').trim();
     const topic = String(form.get('topic') || 'Support').trim();
     const message = String(form.get('message') || '').trim();
-    const subject = encodeURIComponent(`LeafletAI ${topic} request`);
-    const body = encodeURIComponent([
-      name ? `Name: ${name}` : '',
-      email ? `Email: ${email}` : '',
-      `Topic: ${topic}`,
-      '',
-      message,
-    ].filter(line => line !== '').join('\n'));
 
-    window.location.href = `mailto:${supportEmail}?subject=${subject}&body=${body}`;
+    setSubmitState('sending');
+    setSubmitMessage('');
+
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, topic, message }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const detail = data?.errors
+          ? Object.values(data.errors).filter(Boolean).join(' ')
+          : data?.error;
+        throw new Error(detail || 'Message could not be sent. Please try again.');
+      }
+      setSubmitState('success');
+      setSubmitMessage(data?.message || 'Your message was sent successfully.');
+      formEl.reset();
+    } catch (err) {
+      setSubmitState('error');
+      setSubmitMessage(err instanceof Error ? err.message : 'Message could not be sent. Please try again.');
+    }
   }
 
   return (
@@ -99,10 +118,15 @@ export default function ContactPage() {
                 Message
                 <textarea name="message" rows={6} placeholder="Write your message..." />
               </label>
-              <button className="btn primary big" type="submit">
-                Send message
+              <button className="btn primary big" type="submit" disabled={submitState === 'sending'}>
+                {submitState === 'sending' ? 'Sending...' : 'Send message'}
                 <span className="material-symbol" aria-hidden="true">send</span>
               </button>
+              {submitMessage && (
+                <div className={`ct-form-notice ct-form-notice--${submitState === 'success' ? 'success' : 'error'}`} role="status">
+                  {submitMessage}
+                </div>
+              )}
             </form>
           </div>
         </section>
