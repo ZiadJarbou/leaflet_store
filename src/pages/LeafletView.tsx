@@ -5441,14 +5441,19 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                   {template.replace(/, no text\.?$/i, '')}
                 </button>))}
               </div>
-              <div className="lv-nano-prompt-wrap">
+              <div className={`lv-nano-prompt-wrap${nanoGenerating ? ' is-generating' : ''}`}>
                 <textarea className="lv-nano-prompt" value={nanoPrompt} onChange={e => setNanoPrompt(e.target.value.slice(0, 4000))} onPaste={handleNanoPromptPaste} rows={4} placeholder="Describe the background style, colors, product mood, and empty areas. Do not ask for text."/>
                 <input ref={nanoReferenceInputRef} className="lv-nano-reference-input" type="file" accept="image/*" multiple onChange={e => void handleNanoReferenceUpload(e.target.files)}/>
+                {nanoGenerating && (<div className="lv-nano-generating-status" role="status" aria-live="polite">
+                  <span className="lv-nano-generating-spark material-symbol" aria-hidden="true">auto_awesome</span>
+                  <span>Creating background</span>
+                  <span className="lv-nano-generating-dots" aria-hidden="true"><i/><i/><i/></span>
+                </div>)}
                 <div className="lv-nano-chatbot-actions">
-                  <button type="button" className="lv-nano-reference-add" onClick={() => nanoReferenceInputRef.current?.click()} aria-label="Reference image" title="Reference image">
+                  <button type="button" className="lv-nano-reference-add" onClick={() => nanoReferenceInputRef.current?.click()} disabled={nanoGenerating} aria-label="Reference image" title="Reference image">
                     <span className="material-symbol" aria-hidden="true">add_photo_alternate</span>
                   </button>
-                  <button type="button" className="lv-nano-voice-btn" onClick={toggleNanoVoicePrompt} aria-pressed={nanoListening} aria-label={nanoListening ? 'Stop voice input' : 'Voice input'} title={nanoListening ? 'Listening' : 'Voice input'}>
+                  <button type="button" className="lv-nano-voice-btn" onClick={toggleNanoVoicePrompt} disabled={nanoGenerating} aria-pressed={nanoListening} aria-label={nanoListening ? 'Stop voice input' : 'Voice input'} title={nanoListening ? 'Listening' : 'Voice input'}>
                     <span className="material-symbol" aria-hidden="true">{nanoListening ? 'mic' : 'keyboard_voice'}</span>
                   </button>
                   <button type="button" className="lv-nano-generate" onClick={() => void generateNanoCover()} disabled={nanoGenerating} aria-label={nanoGenerating ? 'Generating background' : 'Generate background'} title={nanoGenerating ? 'Generating background' : 'Generate background'}>
