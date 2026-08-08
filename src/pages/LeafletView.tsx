@@ -2906,6 +2906,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         name: string;
     }[]>([]);
     const [nanoGenerating, setNanoGenerating] = useState(false);
+    const [nanoGeneratedBackgroundUrl, setNanoGeneratedBackgroundUrl] = useState('');
     const [nanoListening, setNanoListening] = useState(false);
     const [nanoError, setNanoError] = useState<string | null>(null);
     const availableCoverDealTags = COVER_DEAL_TAGS.filter(tag => !deletedCoverDealTagKeys.includes(tag.key));
@@ -4009,6 +4010,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 height: nanoDimensions.height,
                 referenceImages: nanoReferenceImages.map(image => ({ mimeType: image.mimeType, data: image.data })),
             });
+            setNanoGeneratedBackgroundUrl(result.imageUrl);
             await applyGeneratedCoverImage(result.imageUrl);
         }
         catch (err) {
@@ -7362,7 +7364,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             const y = s.valign === 'bottom' ? '100%' : s.valign === 'middle' ? '50%' : '0%';
             return `${x} ${y}`;
         };
-        const surfaceClass = cx("lv-cover-builder-preview", options.applied ? 'lv-cover-builder-preview--applied' : '', cssClass({
+        const surfaceClass = cx("lv-cover-builder-preview", options.applied ? 'lv-cover-builder-preview--applied' : '', builder.bgType === 'image' && builder.bgImage && builder.bgImage === nanoGeneratedBackgroundUrl ? 'lv-cover-builder-preview--generated-bg' : '', cssClass({
             background: builderBg,
             width: A4_W,
             height: A4_H,
