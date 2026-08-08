@@ -5441,14 +5441,9 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                   {template.replace(/, no text\.?$/i, '')}
                 </button>))}
               </div>
-              <div className={`lv-nano-prompt-wrap${nanoGenerating ? ' is-generating' : ''}`}>
+              <div className="lv-nano-prompt-wrap">
                 <textarea className="lv-nano-prompt" value={nanoPrompt} onChange={e => setNanoPrompt(e.target.value.slice(0, 4000))} onPaste={handleNanoPromptPaste} rows={4} placeholder="Describe the background style, colors, product mood, and empty areas. Do not ask for text."/>
                 <input ref={nanoReferenceInputRef} className="lv-nano-reference-input" type="file" accept="image/*" multiple onChange={e => void handleNanoReferenceUpload(e.target.files)}/>
-                {nanoGenerating && (<div className="lv-nano-generating-status" role="status" aria-live="polite">
-                  <span className="lv-nano-generating-spark material-symbol" aria-hidden="true">auto_awesome</span>
-                  <span>Creating background</span>
-                  <span className="lv-nano-generating-dots" aria-hidden="true"><i/><i/><i/></span>
-                </div>)}
                 <div className="lv-nano-chatbot-actions">
                   <button type="button" className="lv-nano-reference-add" onClick={() => nanoReferenceInputRef.current?.click()} disabled={nanoGenerating} aria-label="Reference image" title="Reference image">
                     <span className="material-symbol" aria-hidden="true">add_photo_alternate</span>
@@ -7624,6 +7619,13 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                         clearCoverBuilderSelection('background');
                 }}>
                 {renderCoverBuilderSurface({ interactive: true, scale: coverBuilderZoom / 100 })}
+                {nanoGenerating && (<div className="lv-cb-image-generating-overlay" role="status" aria-live="polite">
+                  <div className="lv-cb-image-generating-card">
+                    <span className="lv-cb-image-generating-spark material-symbol" aria-hidden="true">auto_awesome</span>
+                    <span>Creating background</span>
+                    <span className="lv-cb-image-generating-dots" aria-hidden="true"><i/><i/><i/></span>
+                  </div>
+                </div>)}
                 {selectedToolbarKey && !coverBuilderFloatingToolbarHidden && renderCoverBuilderFloatingToolbar(selectedToolbarKey, selectedToolbarPlacement?.style, selectedToolbarPlacement?.className)}
               </div>);
         })()}

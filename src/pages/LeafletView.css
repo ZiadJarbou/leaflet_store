@@ -4733,6 +4733,75 @@ body.dragging-icon .lv-card-drop-layer {
   border-radius: 6px;
   transition: box-shadow .18s ease, outline-color .18s ease;
 }
+.lv-cb-image-generating-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(96, 165, 250, .24), transparent 30%),
+    linear-gradient(135deg, rgba(15, 23, 42, .52), rgba(15, 23, 42, .18));
+  backdrop-filter: blur(1px) saturate(1.1);
+  pointer-events: all;
+}
+.lv-cb-image-generating-overlay::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background: linear-gradient(110deg, transparent 22%, rgba(255, 255, 255, .22) 42%, transparent 62%);
+  transform: translateX(-70%);
+  animation: lvNanoGeneratingSweep 1.7s ease-in-out infinite;
+}
+.lv-cb-image-generating-overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(191, 219, 254, .4);
+  border-radius: inherit;
+  box-shadow: inset 0 0 40px rgba(96, 165, 250, .18), 0 0 34px rgba(96, 165, 250, .16);
+  animation: lvNanoGeneratingGlow 1.8s ease-in-out infinite;
+}
+.lv-cb-image-generating-card {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 13px;
+  border: 1px solid rgba(191, 219, 254, .38);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, .72);
+  color: #eff6ff;
+  font-size: .72rem;
+  font-weight: 900;
+  box-shadow: 0 16px 38px rgba(2, 6, 23, .34);
+}
+.lv-cb-image-generating-spark {
+  color: #bfdbfe;
+  font-size: 1.08rem;
+  animation: lvNanoSparkSpin 1.1s linear infinite;
+}
+.lv-cb-image-generating-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.lv-cb-image-generating-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #bfdbfe;
+  animation: lvNanoDotPulse 1.1s ease-in-out infinite;
+}
+.lv-cb-image-generating-dots i:nth-child(2) {
+  animation-delay: .16s;
+}
+.lv-cb-image-generating-dots i:nth-child(3) {
+  animation-delay: .32s;
+}
 .lv-cb-canvas-stage.selected,
 .lv-cb-canvas-stage:focus-visible {
   outline: 3px solid #49f2b6;
@@ -7281,32 +7350,9 @@ body.dragging-icon .lv-card-drop-layer {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 12px 30px rgba(2, 6, 23, .22);
   transition: border-color .16s, box-shadow .16s, background .16s;
 }
-.lv-nano-prompt-wrap::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  opacity: 0;
-  background: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, .12) 34%, transparent 62%);
-  transform: translateX(-120%);
-}
 .lv-nano-prompt-wrap:focus-within {
   border-color: rgba(96, 165, 250, .66);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 0 0 2px rgba(96, 165, 250, .14), 0 14px 34px rgba(2, 6, 23, .28);
-}
-.lv-nano-prompt-wrap.is-generating {
-  border-color: rgba(96, 165, 250, .7);
-  background:
-    radial-gradient(circle at top left, rgba(66, 133, 244, .22), transparent 34%),
-    radial-gradient(circle at top right, rgba(251, 188, 4, .18), transparent 32%),
-    rgba(15, 23, 42, .78);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 0 0 2px rgba(96, 165, 250, .12), 0 16px 38px rgba(37, 99, 235, .18);
-  animation: lvNanoGeneratingGlow 1.8s ease-in-out infinite;
-}
-.lv-nano-prompt-wrap.is-generating::after {
-  opacity: 1;
-  animation: lvNanoGeneratingSweep 1.65s ease-in-out infinite;
 }
 .lv-nano-prompt {
   width: 100%;
@@ -7353,42 +7399,6 @@ body.dragging-icon .lv-card-drop-layer {
   background: rgba(37, 99, 235, .28);
   color: #eff6ff;
   transform: translateY(-1px);
-}
-.lv-nano-generating-status {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  display: inline-flex;
-  align-items: center;
-  max-width: calc(100% - 130px);
-  gap: 7px;
-  color: #dbeafe;
-  font-size: .68rem;
-  font-weight: 900;
-  pointer-events: none;
-}
-.lv-nano-generating-spark {
-  color: #bfdbfe;
-  font-size: 1rem;
-  animation: lvNanoSparkSpin 1.15s linear infinite;
-}
-.lv-nano-generating-dots {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-.lv-nano-generating-dots i {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #bfdbfe;
-  animation: lvNanoDotPulse 1.1s ease-in-out infinite;
-}
-.lv-nano-generating-dots i:nth-child(2) {
-  animation-delay: .16s;
-}
-.lv-nano-generating-dots i:nth-child(3) {
-  animation-delay: .32s;
 }
 .lv-nano-chatbot-actions {
   position: absolute;
