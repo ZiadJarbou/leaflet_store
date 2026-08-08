@@ -2914,6 +2914,9 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const [nanoA4Enabled, setNanoA4Enabled] = useState(() => typeof nanoA4VisibleOverride === 'boolean' ? nanoA4VisibleOverride : localStorage.getItem(NANO_A4_VISIBILITY_STORAGE_KEY) !== '0');
     const nanoReferenceInputRef = useRef<HTMLInputElement>(null);
     const nanoSpeechRef = useRef<any>(null);
+    const nanoSpeechBasePromptRef = useRef('');
+    const nanoSpeechFinalRef = useRef('');
+    const nanoSpeechManualStopRef = useRef(false);
     const coverBuilderPreviewRef = useRef<HTMLDivElement>(null);
     const coverBuilderStageRef = useRef<HTMLDivElement>(null);
     const coverBuilderLogoTextDraftRef = useRef(DEFAULT_COVER_BUILDER.logoText);
@@ -2990,6 +2993,9 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             coverBuilderLogoTextCommitTimerRef.current = null;
         }
         coverBuilderNativeDragCleanupRef.current?.();
+        nanoSpeechManualStopRef.current = true;
+        nanoSpeechRef.current?.abort?.();
+        nanoSpeechRef.current = null;
         const liveEditFrame = coverBuilderToolbarLiveEditRef.current?.frame;
         if (typeof liveEditFrame === 'number')
             window.cancelAnimationFrame(liveEditFrame);
@@ -7716,45 +7722,75 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             return;
         }
         if (nanoListening) {
+            nanoSpeechManualStopRef.current = true;
             nanoSpeechRef.current?.stop?.();
             setNanoListening(false);
             return;
         }
         const recognition = new SpeechRecognition();
         nanoSpeechRef.current = recognition;
+        nanoSpeechBasePromptRef.current = nanoPrompt.trim();
+        nanoSpeechFinalRef.current = '';
+        nanoSpeechManualStopRef.current = false;
         recognition.lang = navigator.language || 'en-US';
-        recognition.continuous = false;
-        recognition.interimResults = false;
+        recognition.continuous = true;
+        recognition.interimResults = true;
         recognition.onstart = () => {
             setNanoListening(true);
             setNanoError(null);
         };
         recognition.onresult = (event: any) => {
-            const spokenParts: string[] = [];
+            const finalParts: string[] = [];
+            const interimParts: string[] = [];
             for (let i = event.resultIndex; i < event.results.length; i += 1) {
                 const transcript = String(event.results[i]?.[0]?.transcript || '').trim();
                 if (!transcript)
                     continue;
-                spokenParts.push(transcript);
+                if (event.results[i]?.isFinal)
+                    finalParts.push(transcript);
+                else
+                    interimParts.push(transcript);
             }
-            const spoken = spokenParts.join(' ').trim();
-            if (spoken) {
-                setNanoPrompt(prev => {
-                    const base = prev.trim();
-                    const next = base ? `${base} ${spoken}` : spoken;
-                    return next.slice(0, 4000);
-                });
-            }
+            if (finalParts.length > 0)
+                nanoSpeechFinalRef.current = [nanoSpeechFinalRef.current, ...finalParts].filter(Boolean).join(' ').trim();
+            const spoken = [nanoSpeechFinalRef.current, ...interimParts].filter(Boolean).join(' ').trim();
+            if (!spoken)
+                return;
+            const base = nanoSpeechBasePromptRef.current;
+            const next = base ? `${base} ${spoken}` : spoken;
+            setNanoPrompt(next.slice(0, 4000));
         };
-        recognition.onerror = () => {
+        recognition.onerror = (event: any) => {
             setNanoListening(false);
-            setNanoError('Voice input could not start. Check microphone permission and try again.');
+            const error = String(event?.error || '');
+            if (nanoSpeechManualStopRef.current || error === 'aborted')
+                return;
+            if (error === 'not-allowed' || error === 'service-not-allowed') {
+                setNanoError('Microphone permission is blocked. Allow microphone access in your browser and try again.');
+                return;
+            }
+            if (error === 'no-speech') {
+                setNanoError('No speech was detected. Try again and speak after the microphone turns on.');
+                return;
+            }
+            if (error === 'audio-capture') {
+                setNanoError('No microphone was found. Check your microphone connection and browser input settings.');
+                return;
+            }
+            setNanoError('Voice input stopped unexpectedly. Try again in Chrome or Edge.');
         };
         recognition.onend = () => {
             setNanoListening(false);
             nanoSpeechRef.current = null;
         };
-        recognition.start();
+        try {
+            recognition.start();
+        }
+        catch {
+            nanoSpeechRef.current = null;
+            setNanoListening(false);
+            setNanoError('Voice input could not start. Close other microphone sessions and try again.');
+        }
     }
     const isPaidPlan = exportQuota ? exportQuota.plan !== 'free' : false;
     const freePdfLimit = exportQuota?.free_pdf_limit ?? 1;
