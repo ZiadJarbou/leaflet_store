@@ -126,6 +126,7 @@ interface CoverBuilderState {
     gradToStop: number;
     aiGradientCss: string;
     bgImage: string;
+    aiGeneratedBg: boolean;
     logo: string;
     logoText: string;
     logoAiStyle: string;
@@ -172,6 +173,7 @@ const DEFAULT_COVER_BUILDER: CoverBuilderState = {
     gradToStop: 100,
     aiGradientCss: '',
     bgImage: '',
+    aiGeneratedBg: false,
     logo: '',
     logoText: 'Logo',
     logoAiStyle: '',
@@ -215,6 +217,7 @@ function normalizeCoverBuilder(value: unknown): CoverBuilderState {
         gradFromStop: typeof raw.gradFromStop === 'number' && Number.isFinite(raw.gradFromStop) ? Math.max(0, Math.min(100, raw.gradFromStop)) : DEFAULT_COVER_BUILDER.gradFromStop,
         gradToStop: typeof raw.gradToStop === 'number' && Number.isFinite(raw.gradToStop) ? Math.max(0, Math.min(100, raw.gradToStop)) : DEFAULT_COVER_BUILDER.gradToStop,
         aiGradientCss: typeof raw.aiGradientCss === 'string' ? raw.aiGradientCss : '',
+        aiGeneratedBg: raw.aiGeneratedBg === true,
         logoText: typeof raw.logoText === 'string' ? raw.logoText : DEFAULT_COVER_BUILDER.logoText,
         logoAiStyle: typeof raw.logoAiStyle === 'string' ? raw.logoAiStyle : '',
         headlineAiStyle: typeof raw.headlineAiStyle === 'string' ? raw.headlineAiStyle : '',
@@ -2906,7 +2909,6 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         name: string;
     }[]>([]);
     const [nanoGenerating, setNanoGenerating] = useState(false);
-    const [nanoGeneratedBackgroundUrl, setNanoGeneratedBackgroundUrl] = useState('');
     const [nanoListening, setNanoListening] = useState(false);
     const [nanoError, setNanoError] = useState<string | null>(null);
     const availableCoverDealTags = COVER_DEAL_TAGS.filter(tag => !deletedCoverDealTagKeys.includes(tag.key));
@@ -4016,7 +4018,6 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 height: nanoDimensions.height,
                 referenceImages: nanoReferenceImages.map(image => ({ mimeType: image.mimeType, data: image.data })),
             });
-            setNanoGeneratedBackgroundUrl(result.imageUrl);
             await applyGeneratedCoverImage(result.imageUrl);
         }
         catch (err) {
@@ -4034,6 +4035,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             ...coverBuilder,
             bgType: 'image',
             bgImage: imageUrl,
+            aiGeneratedBg: true,
             visibleItems: { ...coverBuilder.visibleItems },
         });
         updateCoverBuilderForSelectedTemplate(dynamicCoverBuilder);
@@ -4096,10 +4098,19 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             || key === 'gradFromStop'
             || key === 'gradToStop'
             || key === 'bgImage';
+        const clearsGeneratedBackground = key === 'bgType'
+            || key === 'bgColor'
+            || key === 'gradFrom'
+            || key === 'gradTo'
+            || key === 'gradAngle'
+            || key === 'gradFromStop'
+            || key === 'gradToStop'
+            || key === 'bgImage';
         updateCoverBuilderForSelectedTemplate(prev => ({
             ...prev,
             [key]: value,
             ...(clearsAiGradient ? { aiGradientCss: '' } : {}),
+            ...(clearsGeneratedBackground ? { aiGeneratedBg: false } : {}),
         }));
     }
     function commitCoverBuilderLogoText(nextText = coverBuilderLogoTextDraftRef.current) {
@@ -5227,6 +5238,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             ...prev,
             bgType: 'image',
             bgImage: url,
+            aiGeneratedBg: false,
             aiGradientCss: '',
         }));
         setCoverBuilderBackgroundUsage(previous => {
@@ -6905,6 +6917,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 ...(templatePalette ? {
                 bgType: 'gradient' as CoverBuilderBgType,
                 bgImage: '',
+                aiGeneratedBg: false,
                 bgColor: templatePalette.from,
                 gradFrom: templatePalette.from,
                 gradTo: templatePalette.to,
@@ -7370,7 +7383,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             const y = s.valign === 'bottom' ? '100%' : s.valign === 'middle' ? '50%' : '0%';
             return `${x} ${y}`;
         };
-        const surfaceClass = cx("lv-cover-builder-preview", options.applied ? 'lv-cover-builder-preview--applied' : '', builder.bgType === 'image' && builder.bgImage && builder.bgImage === nanoGeneratedBackgroundUrl ? 'lv-cover-builder-preview--generated-bg' : '', cssClass({
+        const surfaceClass = cx("lv-cover-builder-preview", options.applied ? 'lv-cover-builder-preview--applied' : '', builder.bgType === 'image' && builder.bgImage && builder.aiGeneratedBg ? 'lv-cover-builder-preview--generated-bg' : '', cssClass({
             background: builderBg,
             width: A4_W,
             height: A4_H,
