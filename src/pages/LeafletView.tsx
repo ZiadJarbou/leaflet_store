@@ -371,11 +371,11 @@ function calculateA4GeneratorDimensions(orientation: 'portrait' | 'landscape') {
 }
 function enhanceA4CoverPrompt(prompt: string, orientation: 'portrait' | 'landscape') {
     const format = orientation === 'portrait'
-        ? 'A4 portrait format 210x297mm, vertical composition'
-        : 'A4 landscape format 297x210mm, horizontal composition';
+        ? 'A4 portrait aspect ratio, vertical full-bleed composition'
+        : 'A4 landscape aspect ratio, horizontal full-bleed composition';
     return [
         `${format}. ${prompt.trim()}`,
-        'Create background artwork only. No written words, no letters, no numbers, no prices, no labels, no badges with text, no logo text, no watermark, no readable typography anywhere. Leave clean empty areas for editable text overlays. Fast clean leaflet cover background, sharp commercial style, clear margins.',
+        'Create background artwork only, filling the entire image edge to edge. No white margins, no page border, no decorative frame, no inner frame, no crop marks, no trim marks, no registration marks, no print guide lines, no page outline, and no blank paper area around the artwork. Do not design it as a poster mockup or printable sheet. No written words, no letters, no numbers, no prices, no labels, no badges with text, no logo text, no watermark, no readable typography anywhere. Leave clean empty areas inside the artwork for editable text overlays. Fast clean leaflet cover background, sharp commercial style.',
     ].join(' ');
 }
 function blobToDataUrl(blob: Blob) {

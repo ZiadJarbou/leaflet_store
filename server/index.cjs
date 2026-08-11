@@ -3849,7 +3849,12 @@ app.post('/api/generate-a4', authMiddleware, async (req, res) => {
 
   const startTime = Date.now();
   try {
-    const noTextInstruction = 'Important: generate background artwork only. Do not include any written words, letters, numbers, prices, logos with text, labels, captions, brand names, watermarks, or readable typography in the image.';
+    const noTextInstruction = [
+      'Important: generate background artwork only, filling the entire image edge to edge.',
+      'Do not include white margins, page borders, decorative frames, inner frames, crop marks, trim marks, registration marks, print guide lines, page outlines, or blank paper around the artwork.',
+      'Do not make it look like a poster mockup, printable sheet, framed flyer, or page placed on a white background.',
+      'Do not include any written words, letters, numbers, prices, logos with text, labels, captions, brand names, watermarks, or readable typography in the image.',
+    ].join(' ');
     const finalPrompt = `${safePrompt}\n\n${noTextInstruction}`;
     const requestParts = referenceParts.length
       ? [{ text: `${finalPrompt} Use the attached images only as visual style or product references; do not copy any text or logo lettering from them.` }, ...referenceParts]
