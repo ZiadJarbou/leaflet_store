@@ -4147,6 +4147,8 @@ body.dragging-icon .lv-card-drop-layer {
   display: grid;
   gap: 16px;
   width: 100%;
+  height: 100%;
+  align-content: start;
   padding: 16px;
   border: 1px solid var(--lv-cb-section-border);
   border-radius: 12px;
@@ -4302,6 +4304,7 @@ body.dragging-icon .lv-card-drop-layer {
 }
 .lv-cb-bg-tab-panel {
   display: grid;
+  align-content: start;
   gap: 12px;
 }
 .lv-cb-bg-editor-card {
@@ -7154,6 +7157,14 @@ body.dragging-icon .lv-card-drop-layer {
 .lv-cb-background-grid--library .lv-cb-background-library-card > button:first-child {
   min-height: 120px;
 }
+.lv-cb-library-search--panel {
+  margin: 0;
+}
+.lv-cb-background-grid--panel {
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
 .lv-cb-deal-tag-grid--library .lv-cb-deal-tag-library-card > button:first-child > span {
   overflow: hidden;
   color: #dbeafe;
@@ -7369,7 +7380,11 @@ body.dragging-icon .lv-card-drop-layer {
   justify-content: center;
   gap: 6px;
   min-width: 0;
-  padding: 7px 4px;
+  min-height: 40px;
+  padding: 8px 6px;
+  border-color: var(--lv-cb-section-border);
+  background: var(--lv-cb-inner-bg);
+  color: #c2c6d6;
 }
 .lv-nano-resolution button span {
   display: block;
@@ -7378,7 +7393,7 @@ body.dragging-icon .lv-card-drop-layer {
   font-weight: 900;
 }
 .lv-nano-resolution button .material-symbol {
-  color: #fbbf24;
+  color: #adc6ff;
   font-size: 18px;
   line-height: 1;
 }
@@ -7389,8 +7404,12 @@ body.dragging-icon .lv-card-drop-layer {
   font-size: .62rem;
 }
 .lv-nano-resolution button.active {
-  border-color: rgba(245, 158, 11, .72);
-  background: rgba(120, 53, 15, .36);
+  border-color: rgba(59, 130, 246, .5);
+  background: #17202d;
+  box-shadow: 0 0 8px rgba(59, 130, 246, .22);
+}
+.lv-nano-resolution button.active .material-symbol {
+  color: #60a5fa;
 }
 .lv-nano-templates {
   display: flex;
@@ -7412,7 +7431,7 @@ body.dragging-icon .lv-card-drop-layer {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px;
+  padding: 10px 10px 50px;
   border: 1px solid rgba(148, 163, 184, .22);
   border-radius: 18px;
   background:
@@ -7429,7 +7448,7 @@ body.dragging-icon .lv-card-drop-layer {
 .lv-nano-prompt {
   width: 100%;
   min-height: 94px;
-  padding: 3px 2px 42px;
+  padding: 3px 2px 4px;
   resize: none;
   border: 0;
   border-radius: 12px;
@@ -7446,10 +7465,58 @@ body.dragging-icon .lv-card-drop-layer {
 .lv-nano-prompt:focus {
   box-shadow: none;
 }
+.lv-nano-chat-suggestion {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 6px 8px;
+  padding: 9px;
+  border: 1px solid rgba(96, 165, 250, .22);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, .48);
+}
+.lv-nano-chat-suggestion > span {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, .18);
+  color: #93c5fd;
+  font-size: 15px;
+}
+.lv-nano-chat-suggestion p {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: .68rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+.lv-nano-chat-suggestion div {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.lv-nano-chat-suggestion button {
+  padding: 4px 7px;
+  border: 1px solid rgba(148, 163, 184, .24);
+  border-radius: 999px;
+  background: rgba(30, 41, 59, .74);
+  color: #dbeafe;
+  cursor: pointer;
+  font: inherit;
+  font-size: .62rem;
+  font-weight: 800;
+}
+.lv-nano-chat-suggestion button:hover {
+  border-color: rgba(96, 165, 250, .58);
+  background: rgba(37, 99, 235, .22);
+}
 .lv-nano-reference-input {
   display: none;
 }
-.lv-nano-reference-add {
+.lv-nano-reference-add,
+.lv-nano-enhance-btn {
   width: 30px;
   height: 30px;
   border: 1px solid rgba(148, 163, 184, .26);
@@ -7466,11 +7533,19 @@ body.dragging-icon .lv-card-drop-layer {
   justify-content: center;
   transition: background .15s, border-color .15s, color .15s, transform .12s;
 }
-.lv-nano-reference-add:hover {
+.lv-nano-reference-add:hover,
+.lv-nano-enhance-btn:hover {
   border-color: rgba(96, 165, 250, .72);
   background: rgba(37, 99, 235, .28);
   color: #eff6ff;
   transform: translateY(-1px);
+}
+.lv-nano-enhance-btn {
+  color: #fde68a;
+}
+.lv-nano-enhance-btn:hover {
+  border-color: rgba(245, 158, 11, .62);
+  background: rgba(120, 53, 15, .28);
 }
 .lv-nano-chatbot-actions {
   position: absolute;

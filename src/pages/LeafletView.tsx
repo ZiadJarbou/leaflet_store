@@ -28,6 +28,7 @@ const NANO_A4_VISIBILITY_STORAGE_KEY = 'leafletai_nano_a4_enabled';
 const DEAL_TAG_USAGE_STORAGE_KEY = 'leafletai_deal_tag_usage';
 const BASKET_USAGE_STORAGE_KEY = 'leafletai_basket_usage';
 const BACKGROUND_USAGE_STORAGE_KEY = 'leafletai_background_usage';
+const GENERATED_BACKGROUNDS_STORAGE_KEY = 'leafletai_generated_backgrounds';
 function readAuthToken() {
     return getStoredToken() || localStorage.getItem('authToken') || localStorage.getItem('token') || '';
 }
@@ -249,10 +250,10 @@ function normalizeCoverBuilder(value: unknown): CoverBuilderState {
 const A4_GENERATOR_MAX_PIXELS = 2048 * 2048;
 const A4_GENERATOR_DPI = 220;
 const A4_NANO_TEMPLATE_PROMPTS = [
-    'Bright supermarket aisle background with clean empty space for offers, no text.',
-    'Fresh fruits and vegetables supermarket background, no text.',
-    'Grocery shelves background for a weekly deals leaflet, no text.',
-    'Modern supermarket entrance background with shopping carts, no text.',
+    { label: '🛒 Supermarket', prompt: 'Bright supermarket background with clean empty space for offers, no text.' },
+    { label: '🥬 Fresh Produce', prompt: 'Fresh produce supermarket background with fruits and vegetables, clean empty offer space, no text.' },
+    { label: '🏪 Store Entrance', prompt: 'Modern supermarket entrance background with shopping carts and welcoming lighting, no text.' },
+    { label: '✨ Clean Offers Space', prompt: 'Clean supermarket offers background with a large empty center area for editable prices and products, no text.' },
 ];
 const LEGACY_COVER_DEAL_TAGS = [
     { key: 'deal-tag_20.png', name: '50% Off', url: '/deal-tags/deal-tag_20.png' },
@@ -2888,6 +2889,33 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             return {};
         }
     });
+    const [generatedCoverBackgrounds, setGeneratedCoverBackgrounds] = useState<{
+        key: string;
+        name: string;
+        url: string;
+        prompt: string;
+        generated: true;
+        createdAt: number;
+    }[]>(() => {
+        try {
+            const stored = JSON.parse(localStorage.getItem(GENERATED_BACKGROUNDS_STORAGE_KEY) || '[]');
+            return Array.isArray(stored)
+                ? stored
+                    .filter(item => item && typeof item.key === 'string' && typeof item.url === 'string')
+                    .map(item => ({
+                        key: item.key,
+                        name: typeof item.name === 'string' ? item.name : 'Generated background',
+                        url: item.url,
+                        prompt: typeof item.prompt === 'string' ? item.prompt : '',
+                        generated: true,
+                        createdAt: typeof item.createdAt === 'number' ? item.createdAt : Date.now(),
+                    }))
+                : [];
+        }
+        catch {
+            return [];
+        }
+    });
     const [coverBuilderToolbarOpenGroup, setCoverBuilderToolbarOpenGroup] = useState<string | null>(null);
     const [coverBuilderFloatingToolbarHidden, setCoverBuilderFloatingToolbarHidden] = useState(false);
     const [coverBuilderEditingProduct, setCoverBuilderEditingProduct] = useState<LeafletProduct | null>(null);
@@ -4019,6 +4047,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 height: nanoDimensions.height,
                 referenceImages: nanoReferenceImages.map(image => ({ mimeType: image.mimeType, data: image.data })),
             });
+            saveGeneratedCoverBackground(result.imageUrl, prompt);
             await applyGeneratedCoverImage(result.imageUrl);
         }
         catch (err) {
@@ -4030,6 +4059,46 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         finally {
             setNanoGenerating(false);
         }
+    }
+    function saveGeneratedCoverBackground(imageUrl: string, prompt: string) {
+        const entry = {
+            key: `generated-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            name: `Generated ${new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`,
+            url: imageUrl,
+            prompt,
+            generated: true as const,
+            createdAt: Date.now(),
+        };
+        setGeneratedCoverBackgrounds(previous => {
+            const next = [entry, ...previous.filter(background => background.url !== imageUrl)].slice(0, 24);
+            localStorage.setItem(GENERATED_BACKGROUNDS_STORAGE_KEY, JSON.stringify(next));
+            return next;
+        });
+    }
+    function deleteGeneratedCoverBackground(key: string) {
+        setGeneratedCoverBackgrounds(previous => {
+            const target = previous.find(background => background.key === key);
+            const next = previous.filter(background => background.key !== key);
+            localStorage.setItem(GENERATED_BACKGROUNDS_STORAGE_KEY, JSON.stringify(next));
+            if (target) {
+                setCoverBuilderBackgroundUsage(usage => {
+                    const updated = { ...usage };
+                    delete updated[target.url];
+                    localStorage.setItem(BACKGROUND_USAGE_STORAGE_KEY, JSON.stringify(updated));
+                    return updated;
+                });
+                if (coverBuilder.bgType === 'image' && coverBuilder.bgImage === target.url) {
+                    setCoverBuilderValue('bgType', 'solid');
+                }
+            }
+            return next;
+        });
+    }
+    function enhanceNanoPromptDraft() {
+        const basePrompt = nanoPrompt.trim() || 'Supermarket background with clean space for offers';
+        const enhancedPrompt = `${basePrompt.replace(/\s+$/g, '')}, full-bleed A4 ${pageSettings.orientation} supermarket leaflet background, bright professional retail lighting, clean product shelves, large empty center area for editable offers, modern commercial design, no text, no logos, no borders, no frames, no crop marks, no print guide lines.`;
+        setNanoPrompt(enhancedPrompt.slice(0, 4000));
+        setNanoError(null);
     }
     async function applyGeneratedCoverImage(imageUrl: string) {
         const dynamicCoverBuilder = cloneCoverBuilderState({
@@ -5234,12 +5303,12 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             return next;
         });
     }
-    function selectCoverBuilderBackground(url: string) {
+    function selectCoverBuilderBackground(url: string, aiGenerated = false) {
         updateCoverBuilderForSelectedTemplate(prev => ({
             ...prev,
             bgType: 'image',
             bgImage: url,
-            aiGeneratedBg: false,
+            aiGeneratedBg: aiGenerated,
             aiGradientCss: '',
         }));
         setCoverBuilderBackgroundUsage(previous => {
@@ -5341,7 +5410,8 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         const trendingBaskets = [...COVER_BASKETS]
             .sort((first, second) => (coverBuilderBasketUsage[second.url] || 0) - (coverBuilderBasketUsage[first.url] || 0))
             .slice(0, 4);
-        const trendingBackgrounds = [...COVER_BACKGROUNDS]
+        const allCoverBackgrounds = [...generatedCoverBackgrounds, ...COVER_BACKGROUNDS.map(background => ({ ...background, generated: false as const, prompt: '' }))];
+        const trendingBackgrounds = [...allCoverBackgrounds]
             .sort((first, second) => (coverBuilderBackgroundUsage[second.url] || 0) - (coverBuilderBackgroundUsage[first.url] || 0))
             .slice(0, 4);
         const librarySearch = coverBuilderLibrarySearch.trim().toLowerCase();
@@ -5350,7 +5420,11 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             || item.key.toLowerCase().includes(librarySearch);
         const filteredDealTags = availableCoverDealTags.filter(matchesLibrarySearch);
         const filteredBaskets = COVER_BASKETS.filter(matchesLibrarySearch);
-        const filteredBackgrounds = COVER_BACKGROUNDS.filter(matchesLibrarySearch);
+        const filteredBackgrounds = allCoverBackgrounds.filter(matchesLibrarySearch);
+        const nanoPromptSuggestion = nanoPrompt.trim()
+            ? 'Suggestion: add the season, main colors, and where the empty offer space should be.'
+            : 'Tell me the supermarket mood you want, or start with one of these ideas.';
+        const nanoPromptSuggestionChips = ['Add bright lighting', 'Keep center empty', 'Use fresh colors'];
         if (coverBuilderSelected === 'dealTag' && coverBuilderDealTagLibraryOpen) {
             return (<div className="lv-cb-deal-tag-library-view" id="lv-cb-deal-tag-library">
               <div className="lv-cb-deal-tag-library-copy">
@@ -5410,13 +5484,16 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
               </label>
               <div className="lv-cb-deal-tag-grid lv-cb-deal-tag-grid--library lv-cb-background-grid--library">
                 {filteredBackgrounds.map(background => (<div key={background.key} className="lv-cb-deal-tag-library-card lv-cb-background-library-card">
-                  <button type="button" className={coverBuilder.bgType === 'image' && coverBuilder.bgImage === background.url ? 'active' : ''} onClick={() => selectCoverBuilderBackground(background.url)} title={background.name} aria-label={`Use ${background.name}`}>
+                  <button type="button" className={coverBuilder.bgType === 'image' && coverBuilder.bgImage === background.url ? 'active' : ''} onClick={() => selectCoverBuilderBackground(background.url, background.generated)} title={background.name} aria-label={`Use ${background.name}`}>
                     <img src={background.url} alt={background.name}/>
                     <span>{background.name}</span>
                   </button>
+                  {background.generated && (<button type="button" className="lv-cb-deal-tag-delete material-symbol" onClick={() => deleteGeneratedCoverBackground(background.key)} title={`Delete ${background.name}`} aria-label={`Delete ${background.name}`}>
+                    delete
+                  </button>)}
                 </div>))}
-                {COVER_BACKGROUNDS.length === 0 && (<div className="lv-cb-deal-tag-library-empty">No backgrounds are available.</div>)}
-                {COVER_BACKGROUNDS.length > 0 && filteredBackgrounds.length === 0 && (<div className="lv-cb-deal-tag-library-empty">No backgrounds match your search.</div>)}
+                {allCoverBackgrounds.length === 0 && (<div className="lv-cb-deal-tag-library-empty">No backgrounds are available.</div>)}
+                {allCoverBackgrounds.length > 0 && filteredBackgrounds.length === 0 && (<div className="lv-cb-deal-tag-library-empty">No backgrounds match your search.</div>)}
               </div>
             </div>);
         }
@@ -5454,9 +5531,6 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             </div>
             {coverBuilderBackgroundTab === 'aiImage' && (<div className="lv-cb-bg-tab-panel" role="tabpanel">
               {nanoA4Enabled && (<div className="lv-nano-a4 lv-nano-a4--background">
-                <div className="lv-nano-head">
-                  <span className="material-symbol" aria-hidden="true">auto_awesome</span>
-                </div>
                 <div className="lv-nano-resolution" role="group" aria-label="AI background A4 size">
                   <button type="button" className={pageSettings.orientation === 'portrait' ? 'active' : ''} onClick={() => setPageOrientation('portrait')}>
                     <span className="material-symbol" aria-hidden="true">crop_portrait</span>
@@ -5468,16 +5542,28 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                   </button>
                 </div>
                 <div className="lv-nano-templates">
-                  {A4_NANO_TEMPLATE_PROMPTS.map(template => (<button key={template} type="button" onClick={() => setNanoPrompt(template)}>
-                    {template.replace(/, no text\.?$/i, '')}
+                  {A4_NANO_TEMPLATE_PROMPTS.map(template => (<button key={template.label} type="button" onClick={() => setNanoPrompt(template.prompt)}>
+                    {template.label}
                   </button>))}
                 </div>
                 <div className="lv-nano-prompt-wrap">
                   <textarea className="lv-nano-prompt" value={nanoPrompt} onChange={e => setNanoPrompt(e.target.value.slice(0, 4000))} onPaste={handleNanoPromptPaste} rows={4} placeholder="Describe the background style, colors, product mood, and empty areas. Do not ask for text."/>
+                  <div className="lv-nano-chat-suggestion">
+                    <span className="material-symbol" aria-hidden="true">tips_and_updates</span>
+                    <p>{nanoPromptSuggestion}</p>
+                    <div>
+                      {nanoPromptSuggestionChips.map(suggestion => (<button key={suggestion} type="button" onClick={() => setNanoPrompt(previous => `${previous.trim()}${previous.trim() ? ', ' : ''}${suggestion.toLowerCase()}`.slice(0, 4000))}>
+                        {suggestion}
+                      </button>))}
+                    </div>
+                  </div>
                   <input ref={nanoReferenceInputRef} className="lv-nano-reference-input" type="file" accept="image/*" multiple onChange={e => void handleNanoReferenceUpload(e.target.files)}/>
                   <div className="lv-nano-chatbot-actions">
                     <button type="button" className="lv-nano-reference-add" onClick={() => nanoReferenceInputRef.current?.click()} disabled={nanoGenerating} aria-label="Reference image" title="Reference image">
                       <span className="material-symbol" aria-hidden="true">add_photo_alternate</span>
+                    </button>
+                    <button type="button" className="lv-nano-enhance-btn" onClick={enhanceNanoPromptDraft} disabled={nanoGenerating} aria-label="Enhance prompt" title="Enhance prompt">
+                      <span className="material-symbol" aria-hidden="true">wand_stars</span>
                     </button>
                     <button type="button" className="lv-nano-voice-btn" onClick={toggleNanoVoicePrompt} disabled={nanoGenerating} aria-pressed={nanoListening} aria-label={nanoListening ? 'Stop voice input' : 'Voice input'} title={nanoListening ? 'Listening' : 'Voice input'}>
                       <span className="material-symbol" aria-hidden="true">{nanoListening ? 'mic' : 'keyboard_voice'}</span>
@@ -5499,18 +5585,22 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
               </div>)}
             </div>)}
             {coverBuilderBackgroundTab === 'library' && (<div className="lv-cb-bg-tab-panel" role="tabpanel">
-              <div className="lv-cb-deal-tag-actions lv-cb-background-library-actions">
-                <button type="button" className="lv-cb-deal-tag-library-button" onClick={() => {
-                      setCoverBuilderLibrarySearch('');
-                      setCoverBuilderBackgroundLibraryOpen(true);
-                  }} aria-haspopup="dialog" aria-controls="lv-cb-background-library">
-                  <span className="lv-cb-deal-tag-library-button-icon material-symbol" aria-hidden="true">wallpaper</span>
-                  <span className="lv-cb-deal-tag-library-button-copy">
-                    <strong>Library</strong>
-                    <small>Browse all backgrounds</small>
-                  </span>
-                  <span className="lv-cb-deal-tag-library-button-arrow material-symbol" aria-hidden="true">arrow_forward</span>
-                </button>
+              <label className="lv-cb-library-search lv-cb-library-search--panel">
+                <span className="material-symbol" aria-hidden="true">search</span>
+                <input value={coverBuilderLibrarySearch} onChange={e => setCoverBuilderLibrarySearch(e.target.value)} placeholder="Search backgrounds" aria-label="Search backgrounds"/>
+              </label>
+              <div className="lv-cb-deal-tag-grid lv-cb-deal-tag-grid--library lv-cb-background-grid--library lv-cb-background-grid--panel">
+                {filteredBackgrounds.map(background => (<div key={background.key} className="lv-cb-deal-tag-library-card lv-cb-background-library-card">
+                  <button type="button" className={coverBuilder.bgType === 'image' && coverBuilder.bgImage === background.url ? 'active' : ''} onClick={() => selectCoverBuilderBackground(background.url, background.generated)} title={background.name} aria-label={`Use ${background.name}`}>
+                    <img src={background.url} alt={background.name}/>
+                    <span>{background.name}</span>
+                  </button>
+                  {background.generated && (<button type="button" className="lv-cb-deal-tag-delete material-symbol" onClick={() => deleteGeneratedCoverBackground(background.key)} title={`Delete ${background.name}`} aria-label={`Delete ${background.name}`}>
+                    delete
+                  </button>)}
+                </div>))}
+                {allCoverBackgrounds.length === 0 && (<div className="lv-cb-deal-tag-library-empty">No backgrounds are available.</div>)}
+                {allCoverBackgrounds.length > 0 && filteredBackgrounds.length === 0 && (<div className="lv-cb-deal-tag-library-empty">No backgrounds match your search.</div>)}
               </div>
               <label className="lv-cb-file-drop lv-cb-bg-editor-drop">
                 <span className="lv-cb-bg-editor-drop-icon" aria-hidden="true">
@@ -5523,7 +5613,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
               <div className="lv-cb-trending-deal-tags lv-cb-trending-backgrounds">
                 <strong>Trending Backgrounds</strong>
                 <div className="lv-cb-trending-deal-tags-grid">
-                  {trendingBackgrounds.map(background => (<button key={background.url} type="button" className={coverBuilder.bgType === 'image' && coverBuilder.bgImage === background.url ? 'active' : ''} onClick={() => selectCoverBuilderBackground(background.url)} title={background.name} aria-label={`Use trending background ${background.name}`}>
+                  {trendingBackgrounds.map(background => (<button key={background.url} type="button" className={coverBuilder.bgType === 'image' && coverBuilder.bgImage === background.url ? 'active' : ''} onClick={() => selectCoverBuilderBackground(background.url, background.generated)} title={background.name} aria-label={`Use trending background ${background.name}`}>
                     <img src={background.url} alt={background.name}/>
                   </button>))}
                 </div>
