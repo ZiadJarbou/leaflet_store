@@ -2852,7 +2852,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const [coverBuilderDealTagLibraryOpen, setCoverBuilderDealTagLibraryOpen] = useState(false);
     const [coverBuilderBasketLibraryOpen, setCoverBuilderBasketLibraryOpen] = useState(false);
     const [coverBuilderBackgroundLibraryOpen, setCoverBuilderBackgroundLibraryOpen] = useState(false);
-    const [coverBuilderBackgroundTab, setCoverBuilderBackgroundTab] = useState<'aiImage' | 'aiColor'>('aiImage');
+    const [coverBuilderBackgroundTab, setCoverBuilderBackgroundTab] = useState<'aiImage' | 'aiColor' | 'library'>('aiImage');
     const [coverBuilderLibrarySearch, setCoverBuilderLibrarySearch] = useState('');
     const [deletedCoverDealTagKeys, setDeletedCoverDealTagKeys] = useState<string[]>([]);
     const [deletingCoverDealTagKey, setDeletingCoverDealTagKey] = useState<string | null>(null);
@@ -5438,28 +5438,32 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 <small>Canvas fill style</small>
               </div>
             </div>
-            <div className="lv-cb-properties-tabs" role="tablist" aria-label="Background properties">
+            <div className="lv-cb-properties-tabs lv-cb-properties-tabs--background" role="tablist" aria-label="Background properties">
               <button type="button" role="tab" aria-selected={coverBuilderBackgroundTab === 'aiImage'} className={coverBuilderBackgroundTab === 'aiImage' ? 'active' : ''} onClick={() => setCoverBuilderBackgroundTab('aiImage')}>
-                AI image
+                <span className="material-symbol" aria-hidden="true">auto_awesome</span>
+                <strong>AI image</strong>
               </button>
               <button type="button" role="tab" aria-selected={coverBuilderBackgroundTab === 'aiColor'} className={coverBuilderBackgroundTab === 'aiColor' ? 'active' : ''} onClick={() => setCoverBuilderBackgroundTab('aiColor')}>
-                AI color
+                <span className="material-symbol" aria-hidden="true">palette</span>
+                <strong>AI color</strong>
+              </button>
+              <button type="button" role="tab" aria-selected={coverBuilderBackgroundTab === 'library'} className={coverBuilderBackgroundTab === 'library' ? 'active' : ''} onClick={() => setCoverBuilderBackgroundTab('library')}>
+                <span className="material-symbol" aria-hidden="true">wallpaper</span>
+                <strong>Library</strong>
               </button>
             </div>
             {coverBuilderBackgroundTab === 'aiImage' && (<div className="lv-cb-bg-tab-panel" role="tabpanel">
               {nanoA4Enabled && (<div className="lv-nano-a4 lv-nano-a4--background">
                 <div className="lv-nano-head">
                   <span className="material-symbol" aria-hidden="true">auto_awesome</span>
-                  <div>
-                    <strong>AI background image</strong>
-                    <em>Generates artwork only. Text stays editable on the canvas.</em>
-                  </div>
                 </div>
                 <div className="lv-nano-resolution" role="group" aria-label="AI background A4 size">
                   <button type="button" className={pageSettings.orientation === 'portrait' ? 'active' : ''} onClick={() => setPageOrientation('portrait')}>
+                    <span className="material-symbol" aria-hidden="true">crop_portrait</span>
                     <span>A4 Portrait</span>
                   </button>
                   <button type="button" className={pageSettings.orientation === 'landscape' ? 'active' : ''} onClick={() => setPageOrientation('landscape')}>
+                    <span className="material-symbol" aria-hidden="true">crop_landscape</span>
                     <span>A4 Landscape</span>
                   </button>
                 </div>
@@ -5479,7 +5483,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                       <span className="material-symbol" aria-hidden="true">{nanoListening ? 'mic' : 'keyboard_voice'}</span>
                     </button>
                     <button type="button" className="lv-nano-generate" onClick={() => void generateNanoCover()} disabled={nanoGenerating} aria-label={nanoGenerating ? 'Generating background' : 'Generate background'} title={nanoGenerating ? 'Generating background' : 'Generate background'}>
-                      <span className="material-symbol" aria-hidden="true">{nanoGenerating ? 'progress_activity' : 'auto_awesome'}</span>
+                      <span className="material-symbol" aria-hidden="true">{nanoGenerating ? 'progress_activity' : 'arrow_forward'}</span>
                     </button>
                   </div>
                 </div>
@@ -5493,6 +5497,8 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                   </div>))}
                 </div>)}
               </div>)}
+            </div>)}
+            {coverBuilderBackgroundTab === 'library' && (<div className="lv-cb-bg-tab-panel" role="tabpanel">
               <div className="lv-cb-deal-tag-actions lv-cb-background-library-actions">
                 <button type="button" className="lv-cb-deal-tag-library-button" onClick={() => {
                       setCoverBuilderLibrarySearch('');

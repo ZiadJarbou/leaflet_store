@@ -4255,7 +4255,14 @@ body.dragging-icon .lv-card-drop-layer {
   border-radius: 10px;
   background: var(--lv-cb-inner-bg);
 }
+.lv-cb-properties-tabs--background {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 .lv-cb-properties-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   min-width: 0;
   min-height: 36px;
   border: 1px solid transparent;
@@ -4268,6 +4275,20 @@ body.dragging-icon .lv-card-drop-layer {
   font-weight: 900;
   letter-spacing: 0;
   transition: background .16s ease, border-color .16s ease, color .16s ease;
+}
+.lv-cb-properties-tabs button span {
+  flex: 0 0 auto;
+  font-size: 17px;
+  line-height: 1;
+}
+.lv-cb-properties-tabs button strong {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .lv-cb-properties-tabs button:hover {
   border-color: rgba(173, 198, 255, .28);
@@ -7290,11 +7311,11 @@ body.dragging-icon .lv-card-drop-layer {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 12px;
-  padding: 12px;
-  border: 1px solid rgba(245, 158, 11, .28);
-  border-radius: 8px;
-  background: linear-gradient(180deg, rgba(245, 158, 11, .10), rgba(15, 23, 42, .72));
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 .lv-nano-head {
   display: flex;
@@ -7343,6 +7364,10 @@ body.dragging-icon .lv-card-drop-layer {
   font: inherit;
 }
 .lv-nano-resolution button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-width: 0;
   padding: 7px 4px;
 }
@@ -7351,6 +7376,11 @@ body.dragging-icon .lv-card-drop-layer {
   color: #f8fafc;
   font-size: .72rem;
   font-weight: 900;
+}
+.lv-nano-resolution button .material-symbol {
+  color: #fbbf24;
+  font-size: 18px;
+  line-height: 1;
 }
 .lv-nano-resolution button small {
   display: block;
@@ -7400,7 +7430,7 @@ body.dragging-icon .lv-card-drop-layer {
   width: 100%;
   min-height: 94px;
   padding: 3px 2px 42px;
-  resize: vertical;
+  resize: none;
   border: 0;
   border-radius: 12px;
   background: transparent;
