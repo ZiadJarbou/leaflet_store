@@ -4333,6 +4333,7 @@ body.dragging-icon .lv-card-drop-layer {
 }
 .lv-cb-bg-tab-panel--ai-image {
   height: 100%;
+  align-content: stretch;
 }
 .lv-cb-bg-editor-card {
   display: grid;
@@ -7358,6 +7359,7 @@ body.dragging-icon .lv-card-drop-layer {
 }
 .lv-cb-bg-tab-panel--ai-image .lv-nano-a4 {
   height: 100%;
+  flex: 1 1 auto;
 }
 .lv-nano-head {
   display: flex;
@@ -7445,6 +7447,8 @@ body.dragging-icon .lv-card-drop-layer {
 .lv-nano-templates {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-self: center;
+  width: min(100%, 330px);
   gap: 6px;
 }
 .lv-nano-templates button {
