@@ -4130,6 +4130,11 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         setNanoPrompt(enhancedPrompt.slice(0, 4000));
         setNanoError(null);
     }
+    function startNewNanoChat() {
+        setNanoConversation([]);
+        setNanoPrompt('');
+        setNanoError(null);
+    }
     async function applyGeneratedCoverImage(imageUrl: string) {
         const dynamicCoverBuilder = cloneCoverBuilderState({
             ...coverBuilder,
@@ -5555,7 +5560,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 <strong>Library</strong>
               </button>
             </div>
-            {coverBuilderBackgroundTab === 'aiImage' && (<div className="lv-cb-bg-tab-panel" role="tabpanel">
+            {coverBuilderBackgroundTab === 'aiImage' && (<div className="lv-cb-bg-tab-panel lv-cb-bg-tab-panel--ai-image" role="tabpanel">
               {nanoA4Enabled && (<div className="lv-nano-a4 lv-nano-a4--background">
                 <div className="lv-nano-resolution" role="group" aria-label="AI background A4 size">
                   <button type="button" className={pageSettings.orientation === 'portrait' ? 'active' : ''} onClick={() => setPageOrientation('portrait')}>
@@ -5567,11 +5572,16 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                     <span>A4 Landscape</span>
                   </button>
                 </div>
-                <div className="lv-nano-templates">
+                {nanoConversation.length > 0 && (<div className="lv-nano-chat-tools">
+                  <button type="button" className="lv-nano-new-chat-btn material-symbol" onClick={startNewNanoChat} aria-label="New chat" title="New chat">
+                    add_comment
+                  </button>
+                </div>)}
+                {nanoConversation.length === 0 && (<div className="lv-nano-templates">
                   {A4_NANO_TEMPLATE_PROMPTS.map(template => (<button key={template.label} type="button" onClick={() => setNanoPrompt(template.prompt)}>
                     {template.label}
                   </button>))}
-                </div>
+                </div>)}
                 {nanoConversation.length > 0 && (<div className="lv-nano-conversation" aria-live="polite">
                   {nanoConversation.map(message => (<div key={message.id} className={cx("lv-nano-message-row", message.role === 'user' ? 'lv-nano-message-row--user' : 'lv-nano-message-row--ai')}>
                     {message.role === 'ai' && (<span className="lv-nano-message-avatar material-symbol" aria-hidden="true">auto_awesome</span>)}
@@ -5587,9 +5597,6 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                   <div className="lv-nano-chatbot-actions">
                     <button type="button" className="lv-nano-reference-add" onClick={() => nanoReferenceInputRef.current?.click()} disabled={nanoGenerating} aria-label="Reference image" title="Reference image">
                       <span className="material-symbol" aria-hidden="true">add_photo_alternate</span>
-                    </button>
-                    <button type="button" className="lv-nano-enhance-btn" onClick={enhanceNanoPromptDraft} disabled={nanoGenerating} aria-label="Enhance prompt" title="Enhance prompt">
-                      <span className="material-symbol" aria-hidden="true">wand_stars</span>
                     </button>
                     <button type="button" className="lv-nano-voice-btn" onClick={toggleNanoVoicePrompt} disabled={nanoGenerating} aria-pressed={nanoListening} aria-label={nanoListening ? 'Stop voice input' : 'Voice input'} title={nanoListening ? 'Listening' : 'Voice input'}>
                       <span className="material-symbol" aria-hidden="true">{nanoListening ? 'mic' : 'keyboard_voice'}</span>
@@ -7788,7 +7795,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         </main>
 
         <aside className="lv-cb-properties-panel">
-          <div className="lv-cb-panel-title">
+          {(coverBuilderSelected === 'dealTag' && coverBuilderDealTagLibraryOpen) || (coverBuilderSelected === 'basket' && coverBuilderBasketLibraryOpen) || (coverBuilderSelected === 'background' && coverBuilderBackgroundLibraryOpen) ? (<div className="lv-cb-panel-title">
             {coverBuilderSelected === 'dealTag' && coverBuilderDealTagLibraryOpen ? (<>
               <button type="button" className="lv-cb-properties-back material-symbol" onClick={() => setCoverBuilderDealTagLibraryOpen(false)} aria-label="Back to Deal tag properties" title="Back to Deal tag properties">arrow_back</button>
               <strong>Deal tag library</strong>
@@ -7798,11 +7805,8 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             </>) : coverBuilderSelected === 'background' && coverBuilderBackgroundLibraryOpen ? (<>
               <button type="button" className="lv-cb-properties-back material-symbol" onClick={() => setCoverBuilderBackgroundLibraryOpen(false)} aria-label="Back to Background properties" title="Back to Background properties">arrow_back</button>
               <strong>Background library</strong>
-            </>) : (<>
-              <span className="material-symbol" aria-hidden="true">tune</span>
-              <strong>Properties</strong>
-            </>)}
-          </div>
+            </>) : null}
+          </div>) : null}
           {renderCoverBuilderProperties()}
         </aside>
       </div>);
