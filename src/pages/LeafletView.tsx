@@ -2854,6 +2854,8 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const [coverBuilderBasketLibraryOpen, setCoverBuilderBasketLibraryOpen] = useState(false);
     const [coverBuilderBackgroundLibraryOpen, setCoverBuilderBackgroundLibraryOpen] = useState(false);
     const [coverBuilderBackgroundTab, setCoverBuilderBackgroundTab] = useState<'aiImage' | 'aiColor' | 'library'>('aiImage');
+    const [nanoRecentChatsOpen, setNanoRecentChatsOpen] = useState(false);
+    const [nanoSettingsOpen, setNanoSettingsOpen] = useState(false);
     const [coverBuilderLibrarySearch, setCoverBuilderLibrarySearch] = useState('');
     const [deletedCoverDealTagKeys, setDeletedCoverDealTagKeys] = useState<string[]>([]);
     const [deletingCoverDealTagKey, setDeletingCoverDealTagKey] = useState<string | null>(null);
@@ -4134,6 +4136,18 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         setNanoConversation([]);
         setNanoPrompt('');
         setNanoError(null);
+        setNanoRecentChatsOpen(false);
+        setNanoSettingsOpen(false);
+    }
+    function openRecentNanoChat(background: (typeof generatedCoverBackgrounds)[number]) {
+        const prompt = background.prompt || background.name;
+        setNanoConversation([
+            { id: `${background.key}-user`, role: 'user', text: prompt },
+            { id: `${background.key}-ai`, role: 'ai', text: 'This generated background is saved in your Library and ready to reuse.' },
+        ]);
+        setNanoPrompt('');
+        setNanoRecentChatsOpen(false);
+        setNanoSettingsOpen(false);
     }
     async function applyGeneratedCoverImage(imageUrl: string) {
         const dynamicCoverBuilder = cloneCoverBuilderState({
@@ -5553,20 +5567,40 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             </div>
             {coverBuilderBackgroundTab === 'aiImage' && (<div className="lv-cb-bg-tab-panel lv-cb-bg-tab-panel--ai-image" role="tabpanel">
               {nanoA4Enabled && (<div className="lv-nano-a4 lv-nano-a4--background">
-                <div className="lv-nano-resolution" role="group" aria-label="AI background A4 size">
-                  <button type="button" className={pageSettings.orientation === 'portrait' ? 'active' : ''} onClick={() => setPageOrientation('portrait')}>
-                    <span className="material-symbol" aria-hidden="true">crop_portrait</span>
-                    <span>A4 Portrait</span>
+                <div className="lv-nano-chat-tools">
+                  <button type="button" className="lv-nano-tool-btn" onClick={startNewNanoChat} aria-label="New chat" title="New chat">
+                    <span className="material-symbol" aria-hidden="true">edit_square</span>
                   </button>
-                  <button type="button" className={pageSettings.orientation === 'landscape' ? 'active' : ''} onClick={() => setPageOrientation('landscape')}>
-                    <span className="material-symbol" aria-hidden="true">crop_landscape</span>
-                    <span>A4 Landscape</span>
+                  <button type="button" className={nanoRecentChatsOpen ? 'lv-nano-tool-btn active' : 'lv-nano-tool-btn'} onClick={() => {
+                        setNanoRecentChatsOpen(open => !open);
+                        setNanoSettingsOpen(false);
+                    }} aria-label="Recent chats" title="Recent chats">
+                    <span className="material-symbol" aria-hidden="true">history</span>
+                  </button>
+                  <button type="button" className={nanoSettingsOpen ? 'lv-nano-tool-btn active' : 'lv-nano-tool-btn'} onClick={() => {
+                        setNanoSettingsOpen(open => !open);
+                        setNanoRecentChatsOpen(false);
+                    }} aria-label="Settings" title="Settings">
+                    <span className="material-symbol" aria-hidden="true">settings</span>
                   </button>
                 </div>
-                {nanoConversation.length > 0 && (<div className="lv-nano-chat-tools">
-                  <button type="button" className="lv-nano-new-chat-btn material-symbol" onClick={startNewNanoChat} aria-label="New chat" title="New chat">
-                    add_comment
-                  </button>
+                {nanoRecentChatsOpen && (<div className="lv-nano-popover lv-nano-recent-chats">
+                  {generatedCoverBackgrounds.length > 0 ? generatedCoverBackgrounds.slice(0, 8).map(background => (<button key={background.key} type="button" onClick={() => openRecentNanoChat(background)}>
+                    <span className="material-symbol" aria-hidden="true">chat_bubble</span>
+                    <strong>{background.prompt || background.name}</strong>
+                  </button>)) : (<span>No recent chats yet</span>)}
+                </div>)}
+                {nanoSettingsOpen && (<div className="lv-nano-popover">
+                  <div className="lv-nano-resolution" role="group" aria-label="AI background A4 size">
+                    <button type="button" className={pageSettings.orientation === 'portrait' ? 'active' : ''} onClick={() => setPageOrientation('portrait')}>
+                      <span className="material-symbol" aria-hidden="true">crop_portrait</span>
+                      <span>A4 Portrait</span>
+                    </button>
+                    <button type="button" className={pageSettings.orientation === 'landscape' ? 'active' : ''} onClick={() => setPageOrientation('landscape')}>
+                      <span className="material-symbol" aria-hidden="true">crop_landscape</span>
+                      <span>A4 Landscape</span>
+                    </button>
+                  </div>
                 </div>)}
                 {nanoConversation.length === 0 && (<div className="lv-nano-templates">
                   {A4_NANO_TEMPLATE_PROMPTS.map(template => (<button key={template.label} type="button" onClick={() => setNanoPrompt(template.prompt)}>
