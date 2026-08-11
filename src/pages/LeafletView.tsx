@@ -2848,7 +2848,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         isPlatformTemplate: boolean;
         hideOnly?: boolean;
     } | null>(null);
-    const [coverBuilderSelected, setCoverBuilderSelected] = useState<CoverBuilderItemKey | 'background' | null>(null);
+    const [coverBuilderSelected, setCoverBuilderSelected] = useState<CoverBuilderItemKey | 'background' | null>('background');
     const [coverBuilderSelectedItems, setCoverBuilderSelectedItems] = useState<CoverBuilderItemKey[]>([]);
     const [coverBuilderDealTagLibraryOpen, setCoverBuilderDealTagLibraryOpen] = useState(false);
     const [coverBuilderBasketLibraryOpen, setCoverBuilderBasketLibraryOpen] = useState(false);
@@ -5414,7 +5414,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     function openCoverBuilderForTarget(target: 'front' | 'back') {
         setCoverBuilderTarget(target);
         setCoverBuilder(cloneCoverBuilderState(target === 'back' ? backCoverBuilder : frontCoverBuilder));
-        clearCoverBuilderSelection(null);
+        clearCoverBuilderSelection('background');
         setCoverBuilderOpen(true);
     }
     function resetCoverBuilderToDefault() {
@@ -5537,15 +5537,6 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         if (coverBuilderSelected === 'background') {
             return (<div className="lv-cb-section-body lv-cb-section-body--background">
             <div className="lv-cb-bg-editor">
-              <div className="lv-cb-bg-editor-head">
-                <span className="lv-cb-bg-editor-icon" aria-hidden="true">
-                  wallpaper
-              </span>
-              <div>
-                <strong>Background</strong>
-                <small>Canvas fill style</small>
-              </div>
-            </div>
             <div className="lv-cb-properties-tabs lv-cb-properties-tabs--background" role="tablist" aria-label="Background properties">
               <button type="button" role="tab" aria-selected={coverBuilderBackgroundTab === 'aiImage'} className={coverBuilderBackgroundTab === 'aiImage' ? 'active' : ''} onClick={() => setCoverBuilderBackgroundTab('aiImage')}>
                 <span className="material-symbol" aria-hidden="true">auto_awesome</span>
@@ -7794,8 +7785,8 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         })()}
         </main>
 
-        <aside className="lv-cb-properties-panel">
-          {(coverBuilderSelected === 'dealTag' && coverBuilderDealTagLibraryOpen) || (coverBuilderSelected === 'basket' && coverBuilderBasketLibraryOpen) || (coverBuilderSelected === 'background' && coverBuilderBackgroundLibraryOpen) ? (<div className="lv-cb-panel-title">
+        <aside className={cx("lv-cb-properties-panel", coverBuilderSelected === 'background' ? 'lv-cb-properties-panel--background' : '')}>
+          {(coverBuilderSelected === 'dealTag' && coverBuilderDealTagLibraryOpen) || (coverBuilderSelected === 'basket' && coverBuilderBasketLibraryOpen) || coverBuilderSelected === 'background' ? (<div className={cx("lv-cb-panel-title", coverBuilderSelected === 'background' && !coverBuilderBackgroundLibraryOpen ? 'lv-cb-bg-editor-head' : '')}>
             {coverBuilderSelected === 'dealTag' && coverBuilderDealTagLibraryOpen ? (<>
               <button type="button" className="lv-cb-properties-back material-symbol" onClick={() => setCoverBuilderDealTagLibraryOpen(false)} aria-label="Back to Deal tag properties" title="Back to Deal tag properties">arrow_back</button>
               <strong>Deal tag library</strong>
@@ -7805,6 +7796,14 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             </>) : coverBuilderSelected === 'background' && coverBuilderBackgroundLibraryOpen ? (<>
               <button type="button" className="lv-cb-properties-back material-symbol" onClick={() => setCoverBuilderBackgroundLibraryOpen(false)} aria-label="Back to Background properties" title="Back to Background properties">arrow_back</button>
               <strong>Background library</strong>
+            </>) : coverBuilderSelected === 'background' ? (<>
+              <span className="lv-cb-bg-editor-icon" aria-hidden="true">
+                wallpaper
+              </span>
+              <div>
+                <strong>Background</strong>
+                <small>Canvas fill style</small>
+              </div>
             </>) : null}
           </div>) : null}
           {renderCoverBuilderProperties()}

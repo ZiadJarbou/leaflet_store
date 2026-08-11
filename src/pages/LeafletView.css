@@ -3717,13 +3717,15 @@ body.dragging-icon .lv-card-drop-layer {
   border-right: 1px solid var(--lv-cb-section-border);
 }
 .lv-cb-properties-panel {
+  width: 400px;
+  border-left: 1px solid var(--lv-cb-section-border);
+}
+.lv-cb-properties-panel--background {
   display: flex;
   flex-direction: column;
-  width: 400px;
   height: 100%;
   max-height: 100%;
   overflow: hidden;
-  border-left: 1px solid var(--lv-cb-section-border);
 }
 .lv-cb-panel-title {
   display: flex;
@@ -3861,10 +3863,12 @@ body.dragging-icon .lv-card-drop-layer {
   padding: 0;
 }
 .lv-cb-properties-panel > .lv-cb-section-body {
-  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
   padding: 0;
+}
+.lv-cb-properties-panel--background > .lv-cb-section-body {
+  flex: 1 1 auto;
 }
 .lv-cb-properties-panel > .lv-cb-section-body--background {
   overflow: hidden;
@@ -4165,9 +4169,9 @@ body.dragging-icon .lv-card-drop-layer {
   min-height: 0;
   align-content: center;
   padding: 3px;
-  border: 1px solid var(--lv-cb-section-border);
-  border-radius: 12px;
-  background: var(--lv-cb-section-bg);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: #dae3f6;
 }
 .lv-cb-bg-editor-head {
