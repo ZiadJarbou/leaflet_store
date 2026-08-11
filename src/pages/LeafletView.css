@@ -4206,6 +4206,9 @@ body.dragging-icon .lv-card-drop-layer {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
+.lv-cb-bg-type-grid--color {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 .lv-cb-bg-type-grid button {
   display: grid;
   gap: 6px;
@@ -4242,6 +4245,43 @@ body.dragging-icon .lv-card-drop-layer {
   background: #17202d;
   box-shadow: 0 0 8px rgba(59, 130, 246, .22);
   color: #fff;
+}
+.lv-cb-properties-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--lv-cb-section-border);
+  border-radius: 10px;
+  background: var(--lv-cb-inner-bg);
+}
+.lv-cb-properties-tabs button {
+  min-width: 0;
+  min-height: 36px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  font: inherit;
+  font-size: .74rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  transition: background .16s ease, border-color .16s ease, color .16s ease;
+}
+.lv-cb-properties-tabs button:hover {
+  border-color: rgba(173, 198, 255, .28);
+  color: #e2e8f0;
+}
+.lv-cb-properties-tabs button.active {
+  border-color: rgba(59, 130, 246, .44);
+  background: #17202d;
+  color: #fff;
+  box-shadow: 0 0 8px rgba(59, 130, 246, .18);
+}
+.lv-cb-bg-tab-panel {
+  display: grid;
+  gap: 12px;
 }
 .lv-cb-bg-editor-card {
   display: grid;

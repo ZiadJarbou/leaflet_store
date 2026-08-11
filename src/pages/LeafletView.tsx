@@ -2852,6 +2852,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const [coverBuilderDealTagLibraryOpen, setCoverBuilderDealTagLibraryOpen] = useState(false);
     const [coverBuilderBasketLibraryOpen, setCoverBuilderBasketLibraryOpen] = useState(false);
     const [coverBuilderBackgroundLibraryOpen, setCoverBuilderBackgroundLibraryOpen] = useState(false);
+    const [coverBuilderBackgroundTab, setCoverBuilderBackgroundTab] = useState<'aiImage' | 'aiColor'>('aiImage');
     const [coverBuilderLibrarySearch, setCoverBuilderLibrarySearch] = useState('');
     const [deletedCoverDealTagKeys, setDeletedCoverDealTagKeys] = useState<string[]>([]);
     const [deletingCoverDealTagKey, setDeletingCoverDealTagKey] = useState<string | null>(null);
@@ -5437,128 +5438,140 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 <small>Canvas fill style</small>
               </div>
             </div>
-            <button type="button" className="lv-cb-ai-gradient-btn" onClick={() => void generateCoverAiGradient()}>
-              AI gradient color
-            </button>
-            {nanoA4Enabled && (<div className="lv-nano-a4 lv-nano-a4--background">
-              <div className="lv-nano-head">
-                <span className="material-symbol" aria-hidden="true">auto_awesome</span>
-                <div>
-                  <strong>AI background image</strong>
-                  <em>Generates artwork only. Text stays editable on the canvas.</em>
-                </div>
-              </div>
-              <div className="lv-nano-resolution" role="group" aria-label="AI background A4 size">
-                <button type="button" className={pageSettings.orientation === 'portrait' ? 'active' : ''} onClick={() => setPageOrientation('portrait')}>
-                  <span>A4 Portrait</span>
-                </button>
-                <button type="button" className={pageSettings.orientation === 'landscape' ? 'active' : ''} onClick={() => setPageOrientation('landscape')}>
-                  <span>A4 Landscape</span>
-                </button>
-              </div>
-              <div className="lv-nano-templates">
-                {A4_NANO_TEMPLATE_PROMPTS.map(template => (<button key={template} type="button" onClick={() => setNanoPrompt(template)}>
-                  {template.replace(/, no text\.?$/i, '')}
-                </button>))}
-              </div>
-              <div className="lv-nano-prompt-wrap">
-                <textarea className="lv-nano-prompt" value={nanoPrompt} onChange={e => setNanoPrompt(e.target.value.slice(0, 4000))} onPaste={handleNanoPromptPaste} rows={4} placeholder="Describe the background style, colors, product mood, and empty areas. Do not ask for text."/>
-                <input ref={nanoReferenceInputRef} className="lv-nano-reference-input" type="file" accept="image/*" multiple onChange={e => void handleNanoReferenceUpload(e.target.files)}/>
-                <div className="lv-nano-chatbot-actions">
-                  <button type="button" className="lv-nano-reference-add" onClick={() => nanoReferenceInputRef.current?.click()} disabled={nanoGenerating} aria-label="Reference image" title="Reference image">
-                    <span className="material-symbol" aria-hidden="true">add_photo_alternate</span>
-                  </button>
-                  <button type="button" className="lv-nano-voice-btn" onClick={toggleNanoVoicePrompt} disabled={nanoGenerating} aria-pressed={nanoListening} aria-label={nanoListening ? 'Stop voice input' : 'Voice input'} title={nanoListening ? 'Listening' : 'Voice input'}>
-                    <span className="material-symbol" aria-hidden="true">{nanoListening ? 'mic' : 'keyboard_voice'}</span>
-                  </button>
-                  <button type="button" className="lv-nano-generate" onClick={() => void generateNanoCover()} disabled={nanoGenerating} aria-label={nanoGenerating ? 'Generating background' : 'Generate background'} title={nanoGenerating ? 'Generating background' : 'Generate background'}>
-                    <span className="material-symbol" aria-hidden="true">{nanoGenerating ? 'progress_activity' : 'auto_awesome'}</span>
-                  </button>
-                </div>
-              </div>
-              {nanoReferenceImages.length > 0 && (<div className="lv-nano-reference-list">
-                {nanoReferenceImages.map(image => (<div key={image.id} className="lv-nano-reference-chip">
-                  <img src={image.dataUrl} alt="Reference"/>
-                  <span>{image.name}</span>
-                  <button type="button" onClick={() => removeNanoReferenceImage(image.id)} aria-label={`Remove ${image.name}`}>
-                    close
-                  </button>
-                </div>))}
-              </div>)}
-            </div>)}
-            <div className="lv-cb-deal-tag-actions lv-cb-background-library-actions">
-              <button type="button" className="lv-cb-deal-tag-library-button" onClick={() => {
-                    setCoverBuilderLibrarySearch('');
-                    setCoverBuilderBackgroundLibraryOpen(true);
-                }} aria-haspopup="dialog" aria-controls="lv-cb-background-library">
-                <span className="lv-cb-deal-tag-library-button-icon material-symbol" aria-hidden="true">wallpaper</span>
-                <span className="lv-cb-deal-tag-library-button-copy">
-                  <strong>Library</strong>
-                  <small>Browse all backgrounds</small>
-                </span>
-                <span className="lv-cb-deal-tag-library-button-arrow material-symbol" aria-hidden="true">arrow_forward</span>
+            <div className="lv-cb-properties-tabs" role="tablist" aria-label="Background properties">
+              <button type="button" role="tab" aria-selected={coverBuilderBackgroundTab === 'aiImage'} className={coverBuilderBackgroundTab === 'aiImage' ? 'active' : ''} onClick={() => setCoverBuilderBackgroundTab('aiImage')}>
+                AI image
+              </button>
+              <button type="button" role="tab" aria-selected={coverBuilderBackgroundTab === 'aiColor'} className={coverBuilderBackgroundTab === 'aiColor' ? 'active' : ''} onClick={() => setCoverBuilderBackgroundTab('aiColor')}>
+                AI color
               </button>
             </div>
-            <div className="lv-cb-bg-type-grid">
-              {(['solid', 'gradient', 'image'] as CoverBuilderBgType[]).map(bg => (<button key={bg} type="button" className={coverBuilder.bgType === bg ? 'active' : ''} onClick={() => setCoverBuilderValue('bgType', bg)}>
-                  <span aria-hidden="true">
-                    {bg === 'solid' ? 'format_color_fill' : bg === 'gradient' ? 'gradient' : 'image'}
+            {coverBuilderBackgroundTab === 'aiImage' && (<div className="lv-cb-bg-tab-panel" role="tabpanel">
+              {nanoA4Enabled && (<div className="lv-nano-a4 lv-nano-a4--background">
+                <div className="lv-nano-head">
+                  <span className="material-symbol" aria-hidden="true">auto_awesome</span>
+                  <div>
+                    <strong>AI background image</strong>
+                    <em>Generates artwork only. Text stays editable on the canvas.</em>
+                  </div>
+                </div>
+                <div className="lv-nano-resolution" role="group" aria-label="AI background A4 size">
+                  <button type="button" className={pageSettings.orientation === 'portrait' ? 'active' : ''} onClick={() => setPageOrientation('portrait')}>
+                    <span>A4 Portrait</span>
+                  </button>
+                  <button type="button" className={pageSettings.orientation === 'landscape' ? 'active' : ''} onClick={() => setPageOrientation('landscape')}>
+                    <span>A4 Landscape</span>
+                  </button>
+                </div>
+                <div className="lv-nano-templates">
+                  {A4_NANO_TEMPLATE_PROMPTS.map(template => (<button key={template} type="button" onClick={() => setNanoPrompt(template)}>
+                    {template.replace(/, no text\.?$/i, '')}
+                  </button>))}
+                </div>
+                <div className="lv-nano-prompt-wrap">
+                  <textarea className="lv-nano-prompt" value={nanoPrompt} onChange={e => setNanoPrompt(e.target.value.slice(0, 4000))} onPaste={handleNanoPromptPaste} rows={4} placeholder="Describe the background style, colors, product mood, and empty areas. Do not ask for text."/>
+                  <input ref={nanoReferenceInputRef} className="lv-nano-reference-input" type="file" accept="image/*" multiple onChange={e => void handleNanoReferenceUpload(e.target.files)}/>
+                  <div className="lv-nano-chatbot-actions">
+                    <button type="button" className="lv-nano-reference-add" onClick={() => nanoReferenceInputRef.current?.click()} disabled={nanoGenerating} aria-label="Reference image" title="Reference image">
+                      <span className="material-symbol" aria-hidden="true">add_photo_alternate</span>
+                    </button>
+                    <button type="button" className="lv-nano-voice-btn" onClick={toggleNanoVoicePrompt} disabled={nanoGenerating} aria-pressed={nanoListening} aria-label={nanoListening ? 'Stop voice input' : 'Voice input'} title={nanoListening ? 'Listening' : 'Voice input'}>
+                      <span className="material-symbol" aria-hidden="true">{nanoListening ? 'mic' : 'keyboard_voice'}</span>
+                    </button>
+                    <button type="button" className="lv-nano-generate" onClick={() => void generateNanoCover()} disabled={nanoGenerating} aria-label={nanoGenerating ? 'Generating background' : 'Generate background'} title={nanoGenerating ? 'Generating background' : 'Generate background'}>
+                      <span className="material-symbol" aria-hidden="true">{nanoGenerating ? 'progress_activity' : 'auto_awesome'}</span>
+                    </button>
+                  </div>
+                </div>
+                {nanoReferenceImages.length > 0 && (<div className="lv-nano-reference-list">
+                  {nanoReferenceImages.map(image => (<div key={image.id} className="lv-nano-reference-chip">
+                    <img src={image.dataUrl} alt="Reference"/>
+                    <span>{image.name}</span>
+                    <button type="button" onClick={() => removeNanoReferenceImage(image.id)} aria-label={`Remove ${image.name}`}>
+                      close
+                    </button>
+                  </div>))}
+                </div>)}
+              </div>)}
+              <div className="lv-cb-deal-tag-actions lv-cb-background-library-actions">
+                <button type="button" className="lv-cb-deal-tag-library-button" onClick={() => {
+                      setCoverBuilderLibrarySearch('');
+                      setCoverBuilderBackgroundLibraryOpen(true);
+                  }} aria-haspopup="dialog" aria-controls="lv-cb-background-library">
+                  <span className="lv-cb-deal-tag-library-button-icon material-symbol" aria-hidden="true">wallpaper</span>
+                  <span className="lv-cb-deal-tag-library-button-copy">
+                    <strong>Library</strong>
+                    <small>Browse all backgrounds</small>
                   </span>
-                  <strong>{bg}</strong>
-                </button>))}
-            </div>
-            {coverBuilder.bgType === 'solid' && (<div className="lv-cb-bg-editor-card">
-              <div className="lv-cb-bg-picker-row lv-cb-bg-editor-color-row">
-                <label>Solid color</label>
-                <ColorSwatch value={coverBuilder.bgColor} onChange={v => setCoverBuilderValue('bgColor', v)}/>
-                <span>{coverBuilder.bgColor}</span>
+                  <span className="lv-cb-deal-tag-library-button-arrow material-symbol" aria-hidden="true">arrow_forward</span>
+                </button>
               </div>
-            </div>)}
-            {coverBuilder.bgType === 'gradient' && (<div className="lv-cb-bg-editor-card">
-              <div className="lv-cb-bg-picker-grid lv-cb-bg-editor-grid">
-                <div className="lv-cb-bg-picker-row lv-cb-bg-editor-color-row">
-                  <label>From</label>
-                  <ColorSwatch value={coverBuilder.gradFrom} onChange={v => setCoverBuilderValue('gradFrom', v)}/>
-                  <span>{coverBuilder.gradFrom}</span>
-                </div>
-                <div className="lv-cb-bg-picker-row lv-cb-bg-editor-color-row">
-                  <label>To</label>
-                  <ColorSwatch value={coverBuilder.gradTo} onChange={v => setCoverBuilderValue('gradTo', v)}/>
-                  <span>{coverBuilder.gradTo}</span>
-                </div>
-                <div className="lv-cb-bg-angle-row lv-cb-bg-editor-slider">
-                  <label>Angle</label>
-                  <input className={cssClass({ '--range-pct': `${coverBuilder.gradAngle / 360 * 100}%` } as React.CSSProperties)} type="range" min={0} max={360} value={coverBuilder.gradAngle} onChange={e => setCoverBuilderValue('gradAngle', +e.target.value)}/>
-                  <span>{coverBuilder.gradAngle}deg</span>
-                </div>
-                <div className="lv-cb-bg-angle-row lv-cb-bg-editor-slider">
-                  <label>From stop</label>
-                  <input className={cssClass({ '--range-pct': `${coverBuilder.gradFromStop}%` } as React.CSSProperties)} type="range" min={0} max={100} value={coverBuilder.gradFromStop} onChange={e => setCoverBuilderValue('gradFromStop', Math.min(+e.target.value, coverBuilder.gradToStop))}/>
-                  <span>{coverBuilder.gradFromStop}%</span>
-                </div>
-                <div className="lv-cb-bg-angle-row lv-cb-bg-editor-slider">
-                  <label>To stop</label>
-                  <input className={cssClass({ '--range-pct': `${coverBuilder.gradToStop}%` } as React.CSSProperties)} type="range" min={0} max={100} value={coverBuilder.gradToStop} onChange={e => setCoverBuilderValue('gradToStop', Math.max(+e.target.value, coverBuilder.gradFromStop))}/>
-                  <span>{coverBuilder.gradToStop}%</span>
+              <label className="lv-cb-file-drop lv-cb-bg-editor-drop">
+                <span className="lv-cb-bg-editor-drop-icon" aria-hidden="true">
+                  add_photo_alternate
+                </span>
+                <strong>Click or drop background image</strong>
+                <small>PNG, JPG, or WebP</small>
+                <input type="file" accept="image/*" onChange={e => void readCoverBuilderImage(e.target.files?.[0] || null, 'bgImage')}/>
+              </label>
+              <div className="lv-cb-trending-deal-tags lv-cb-trending-backgrounds">
+                <strong>Trending Backgrounds</strong>
+                <div className="lv-cb-trending-deal-tags-grid">
+                  {trendingBackgrounds.map(background => (<button key={background.url} type="button" className={coverBuilder.bgType === 'image' && coverBuilder.bgImage === background.url ? 'active' : ''} onClick={() => selectCoverBuilderBackground(background.url)} title={background.name} aria-label={`Use trending background ${background.name}`}>
+                    <img src={background.url} alt={background.name}/>
+                  </button>))}
                 </div>
               </div>
             </div>)}
-            <label className="lv-cb-file-drop lv-cb-bg-editor-drop">
-              <span className="lv-cb-bg-editor-drop-icon" aria-hidden="true">
-                add_photo_alternate
-              </span>
-              <strong>Click or drop background image</strong>
-              <small>PNG, JPG, or WebP</small>
-              <input type="file" accept="image/*" onChange={e => void readCoverBuilderImage(e.target.files?.[0] || null, 'bgImage')}/>
-            </label>
-            <div className="lv-cb-trending-deal-tags lv-cb-trending-backgrounds">
-              <strong>Trending Backgrounds</strong>
-              <div className="lv-cb-trending-deal-tags-grid">
-                {trendingBackgrounds.map(background => (<button key={background.url} type="button" className={coverBuilder.bgType === 'image' && coverBuilder.bgImage === background.url ? 'active' : ''} onClick={() => selectCoverBuilderBackground(background.url)} title={background.name} aria-label={`Use trending background ${background.name}`}>
-                  <img src={background.url} alt={background.name}/>
-                </button>))}
+            {coverBuilderBackgroundTab === 'aiColor' && (<div className="lv-cb-bg-tab-panel" role="tabpanel">
+              <button type="button" className="lv-cb-ai-gradient-btn" onClick={() => void generateCoverAiGradient()}>
+                AI color
+              </button>
+              <div className="lv-cb-bg-type-grid lv-cb-bg-type-grid--color">
+                {(['solid', 'gradient'] as CoverBuilderBgType[]).map(bg => (<button key={bg} type="button" className={coverBuilder.bgType === bg ? 'active' : ''} onClick={() => setCoverBuilderValue('bgType', bg)}>
+                    <span aria-hidden="true">
+                      {bg === 'solid' ? 'format_color_fill' : 'gradient'}
+                    </span>
+                    <strong>{bg}</strong>
+                  </button>))}
               </div>
-            </div>
+              {coverBuilder.bgType === 'solid' && (<div className="lv-cb-bg-editor-card">
+                <div className="lv-cb-bg-picker-row lv-cb-bg-editor-color-row">
+                  <label>Solid color</label>
+                  <ColorSwatch value={coverBuilder.bgColor} onChange={v => setCoverBuilderValue('bgColor', v)}/>
+                  <span>{coverBuilder.bgColor}</span>
+                </div>
+              </div>)}
+              {coverBuilder.bgType === 'gradient' && (<div className="lv-cb-bg-editor-card">
+                <div className="lv-cb-bg-picker-grid lv-cb-bg-editor-grid">
+                  <div className="lv-cb-bg-picker-row lv-cb-bg-editor-color-row">
+                    <label>From</label>
+                    <ColorSwatch value={coverBuilder.gradFrom} onChange={v => setCoverBuilderValue('gradFrom', v)}/>
+                    <span>{coverBuilder.gradFrom}</span>
+                  </div>
+                  <div className="lv-cb-bg-picker-row lv-cb-bg-editor-color-row">
+                    <label>To</label>
+                    <ColorSwatch value={coverBuilder.gradTo} onChange={v => setCoverBuilderValue('gradTo', v)}/>
+                    <span>{coverBuilder.gradTo}</span>
+                  </div>
+                  <div className="lv-cb-bg-angle-row lv-cb-bg-editor-slider">
+                    <label>Angle</label>
+                    <input className={cssClass({ '--range-pct': `${coverBuilder.gradAngle / 360 * 100}%` } as React.CSSProperties)} type="range" min={0} max={360} value={coverBuilder.gradAngle} onChange={e => setCoverBuilderValue('gradAngle', +e.target.value)}/>
+                    <span>{coverBuilder.gradAngle}deg</span>
+                  </div>
+                  <div className="lv-cb-bg-angle-row lv-cb-bg-editor-slider">
+                    <label>From stop</label>
+                    <input className={cssClass({ '--range-pct': `${coverBuilder.gradFromStop}%` } as React.CSSProperties)} type="range" min={0} max={100} value={coverBuilder.gradFromStop} onChange={e => setCoverBuilderValue('gradFromStop', Math.min(+e.target.value, coverBuilder.gradToStop))}/>
+                    <span>{coverBuilder.gradFromStop}%</span>
+                  </div>
+                  <div className="lv-cb-bg-angle-row lv-cb-bg-editor-slider">
+                    <label>To stop</label>
+                    <input className={cssClass({ '--range-pct': `${coverBuilder.gradToStop}%` } as React.CSSProperties)} type="range" min={0} max={100} value={coverBuilder.gradToStop} onChange={e => setCoverBuilderValue('gradToStop', Math.max(+e.target.value, coverBuilder.gradFromStop))}/>
+                    <span>{coverBuilder.gradToStop}%</span>
+                  </div>
+                </div>
+              </div>)}
+            </div>)}
           </div>
         </div>);
         }
