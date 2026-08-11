@@ -2930,6 +2930,12 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         ready: boolean;
     } | null>(null);
     const [nanoPrompt, setNanoPrompt] = useState('');
+    const [nanoConversation, setNanoConversation] = useState<{
+        id: string;
+        role: 'user' | 'ai';
+        text: string;
+        status?: 'loading' | 'error';
+    }[]>([]);
     const [nanoReferenceImages, setNanoReferenceImages] = useState<{
         id: string;
         dataUrl: string;
@@ -2944,6 +2950,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const defaultCoverDealTag = availableCoverDealTags[0] ?? COVER_DEAL_TAGS[0];
     const [nanoA4Enabled, setNanoA4Enabled] = useState(() => typeof nanoA4VisibleOverride === 'boolean' ? nanoA4VisibleOverride : localStorage.getItem(NANO_A4_VISIBILITY_STORAGE_KEY) !== '0');
     const nanoReferenceInputRef = useRef<HTMLInputElement>(null);
+    const nanoConversationBottomRef = useRef<HTMLDivElement>(null);
     const nanoSpeechRef = useRef<any>(null);
     const nanoSpeechBasePromptRef = useRef('');
     const nanoSpeechFinalRef = useRef('');
@@ -3014,6 +3021,14 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         if (id)
             localStorage.setItem(`leaflet_rows_${id}`, String(rowsPerPage));
     }, [rowsPerPage, id]);
+    useEffect(() => {
+        nanoConversationBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, [nanoConversation, nanoGenerating]);
+    useEffect(() => {
+        const shouldHideChatTrigger = coverBuilderOpen || customizerOpen;
+        document.body.classList.toggle('cb-trigger-hidden', shouldHideChatTrigger);
+        return () => document.body.classList.remove('cb-trigger-hidden');
+    }, [coverBuilderOpen, customizerOpen]);
     useEffect(() => () => {
         if (coverBuilderTemplateLayoutSyncTimerRef.current !== null) {
             window.clearTimeout(coverBuilderTemplateLayoutSyncTimerRef.current);
@@ -4036,6 +4051,14 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             setNanoError('Enter a prompt first.');
             return;
         }
+        const userMessageId = `user-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const aiMessageId = `ai-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        setNanoConversation(previous => [
+            ...previous,
+            { id: userMessageId, role: 'user', text: prompt },
+            { id: aiMessageId, role: 'ai', text: 'Generating your supermarket background...', status: 'loading' },
+        ]);
+        setNanoPrompt('');
         setNanoGenerating(true);
         setNanoError(null);
         try {
@@ -4049,12 +4072,19 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             });
             saveGeneratedCoverBackground(result.imageUrl, prompt);
             await applyGeneratedCoverImage(result.imageUrl);
+            setNanoConversation(previous => previous.map(message => message.id === aiMessageId
+                ? { ...message, text: 'Done. I created the background, applied it to the cover, and saved it in your Library.', status: undefined }
+                : message));
         }
         catch (err) {
             const message = err instanceof Error ? err.message : 'Failed to generate A4 cover.';
-            setNanoError(/quota|rate limit|429/i.test(message)
+            const errorMessage = /quota|rate limit|429/i.test(message)
                 ? 'Google image generation quota is exceeded for this API key. Check AI Studio billing/quota or try again later.'
-                : message);
+                : message;
+            setNanoError(errorMessage);
+            setNanoConversation(previous => previous.map(chatMessage => chatMessage.id === aiMessageId
+                ? { ...chatMessage, text: errorMessage, status: 'error' }
+                : chatMessage));
         }
         finally {
             setNanoGenerating(false);
@@ -5542,6 +5572,15 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                     {template.label}
                   </button>))}
                 </div>
+                {nanoConversation.length > 0 && (<div className="lv-nano-conversation" aria-live="polite">
+                  {nanoConversation.map(message => (<div key={message.id} className={cx("lv-nano-message-row", message.role === 'user' ? 'lv-nano-message-row--user' : 'lv-nano-message-row--ai')}>
+                    {message.role === 'ai' && (<span className="lv-nano-message-avatar material-symbol" aria-hidden="true">auto_awesome</span>)}
+                    <div className={cx("lv-nano-message", `lv-nano-message--${message.role}`, message.status === 'loading' ? 'lv-nano-message--loading' : '', message.status === 'error' ? 'lv-nano-message--error' : '')}>
+                      <span>{message.text}</span>
+                    </div>
+                  </div>))}
+                  <div ref={nanoConversationBottomRef}/>
+                </div>)}
                 <div className="lv-nano-prompt-wrap">
                   <textarea className="lv-nano-prompt" value={nanoPrompt} onChange={e => setNanoPrompt(e.target.value.slice(0, 4000))} onPaste={handleNanoPromptPaste} rows={4} placeholder="Describe the background style, colors, product mood, and empty areas. Do not ask for text."/>
                   <input ref={nanoReferenceInputRef} className="lv-nano-reference-input" type="file" accept="image/*" multiple onChange={e => void handleNanoReferenceUpload(e.target.files)}/>
