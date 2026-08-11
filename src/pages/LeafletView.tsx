@@ -5421,10 +5421,6 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         const filteredDealTags = availableCoverDealTags.filter(matchesLibrarySearch);
         const filteredBaskets = COVER_BASKETS.filter(matchesLibrarySearch);
         const filteredBackgrounds = allCoverBackgrounds.filter(matchesLibrarySearch);
-        const nanoPromptSuggestion = nanoPrompt.trim()
-            ? 'Suggestion: add the season, main colors, and where the empty offer space should be.'
-            : 'Tell me the supermarket mood you want, or start with one of these ideas.';
-        const nanoPromptSuggestionChips = ['Add bright lighting', 'Keep center empty', 'Use fresh colors'];
         if (coverBuilderSelected === 'dealTag' && coverBuilderDealTagLibraryOpen) {
             return (<div className="lv-cb-deal-tag-library-view" id="lv-cb-deal-tag-library">
               <div className="lv-cb-deal-tag-library-copy">
@@ -5548,15 +5544,6 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 </div>
                 <div className="lv-nano-prompt-wrap">
                   <textarea className="lv-nano-prompt" value={nanoPrompt} onChange={e => setNanoPrompt(e.target.value.slice(0, 4000))} onPaste={handleNanoPromptPaste} rows={4} placeholder="Describe the background style, colors, product mood, and empty areas. Do not ask for text."/>
-                  <div className="lv-nano-chat-suggestion">
-                    <span className="material-symbol" aria-hidden="true">tips_and_updates</span>
-                    <p>{nanoPromptSuggestion}</p>
-                    <div>
-                      {nanoPromptSuggestionChips.map(suggestion => (<button key={suggestion} type="button" onClick={() => setNanoPrompt(previous => `${previous.trim()}${previous.trim() ? ', ' : ''}${suggestion.toLowerCase()}`.slice(0, 4000))}>
-                        {suggestion}
-                      </button>))}
-                    </div>
-                  </div>
                   <input ref={nanoReferenceInputRef} className="lv-nano-reference-input" type="file" accept="image/*" multiple onChange={e => void handleNanoReferenceUpload(e.target.files)}/>
                   <div className="lv-nano-chatbot-actions">
                     <button type="button" className="lv-nano-reference-add" onClick={() => nanoReferenceInputRef.current?.click()} disabled={nanoGenerating} aria-label="Reference image" title="Reference image">

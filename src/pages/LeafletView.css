@@ -7412,19 +7412,25 @@ body.dragging-icon .lv-card-drop-layer {
   color: #60a5fa;
 }
 .lv-nano-templates {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
 .lv-nano-templates button {
-  padding: 5px 8px;
-  color: #fde68a;
+  min-height: 38px;
+  padding: 7px 8px;
+  border-color: var(--lv-cb-section-border);
+  background: var(--lv-cb-inner-bg);
+  color: #c2c6d6;
   font-size: .68rem;
-  font-weight: 800;
+  font-weight: 900;
+  line-height: 1.15;
+  text-align: center;
 }
 .lv-nano-templates button:hover {
-  border-color: rgba(245, 158, 11, .62);
-  background: rgba(120, 53, 15, .28);
+  border-color: rgba(173, 198, 255, .32);
+  background: #17202d;
+  color: #fff;
 }
 .lv-nano-prompt-wrap {
   position: relative;
@@ -7464,53 +7470,6 @@ body.dragging-icon .lv-card-drop-layer {
 }
 .lv-nano-prompt:focus {
   box-shadow: none;
-}
-.lv-nano-chat-suggestion {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
-  gap: 6px 8px;
-  padding: 9px;
-  border: 1px solid rgba(96, 165, 250, .22);
-  border-radius: 12px;
-  background: rgba(15, 23, 42, .48);
-}
-.lv-nano-chat-suggestion > span {
-  display: inline-grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: rgba(37, 99, 235, .18);
-  color: #93c5fd;
-  font-size: 15px;
-}
-.lv-nano-chat-suggestion p {
-  margin: 0;
-  color: #cbd5e1;
-  font-size: .68rem;
-  font-weight: 800;
-  line-height: 1.35;
-}
-.lv-nano-chat-suggestion div {
-  grid-column: 2;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-.lv-nano-chat-suggestion button {
-  padding: 4px 7px;
-  border: 1px solid rgba(148, 163, 184, .24);
-  border-radius: 999px;
-  background: rgba(30, 41, 59, .74);
-  color: #dbeafe;
-  cursor: pointer;
-  font: inherit;
-  font-size: .62rem;
-  font-weight: 800;
-}
-.lv-nano-chat-suggestion button:hover {
-  border-color: rgba(96, 165, 250, .58);
-  background: rgba(37, 99, 235, .22);
 }
 .lv-nano-reference-input {
   display: none;
