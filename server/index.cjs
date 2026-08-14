@@ -3799,6 +3799,148 @@ app.post('/api/stripe/create-portal-session', authMiddleware, async (req, res) =
 });
 
 /* ── Global JSON error handler ── */
+const a4GenerationJobs = new Map();
+const A4_GENERATION_JOB_TTL_MS = 30 * 60 * 1000;
+function setA4GenerationJob(jobId, patch) {
+  const previous = a4GenerationJobs.get(jobId) || {};
+  a4GenerationJobs.set(jobId, { ...previous, ...patch, updatedAt: Date.now() });
+}
+function cleanupA4GenerationJobs() {
+  const cutoff = Date.now() - A4_GENERATION_JOB_TTL_MS;
+  for (const [jobId, job] of a4GenerationJobs.entries()) {
+    if ((job.updatedAt || job.createdAt || 0) < cutoff) {
+      a4GenerationJobs.delete(jobId);
+    }
+  }
+}
+function httpError(status, message) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+async function generateA4ImageFromPayload(payload) {
+  const { prompt, orientation, resolution, width, height, referenceImage, referenceImages } = payload || {};
+  const safePrompt = String(prompt || '').trim();
+  const safeOrientation = orientation === 'landscape' ? 'landscape' : 'portrait';
+  const safeResolution = ['1k', '2k', '4k'].includes(resolution) ? resolution : '2k';
+  const safeWidth = Number(width);
+  const safeHeight = Number(height);
+  const aspectRatio = safeOrientation === 'landscape' ? '4:3' : '3:4';
+  const imageSize = safeResolution === '4k' ? '4K' : safeResolution === '2k' ? '2K' : '1K';
+  const googleApiKey = googleApiKeyValue();
+  if (!safePrompt) throw httpError(400, 'Prompt is required');
+  if (!googleApiKey) throw httpError(500, 'GOOGLE_API_KEY or GEMINI_API_KEY is not configured');
+  if (!Number.isInteger(safeWidth) || !Number.isInteger(safeHeight) || safeWidth % 8 !== 0 || safeHeight % 8 !== 0) {
+    throw httpError(400, 'Dimensions must be multiples of 8');
+  }
+  const rawReferenceImages = Array.isArray(referenceImages)
+    ? referenceImages
+    : (referenceImage?.data ? [referenceImage] : []);
+  const referenceParts = [];
+  for (const refImage of rawReferenceImages.slice(0, 6)) {
+    if (!refImage?.data) continue;
+    const referenceMimeType = String(refImage.mimeType || 'image/png');
+    const referenceData = String(refImage.data || '').replace(/^data:[^,]+,/, '');
+    const referenceBytes = Buffer.byteLength(referenceData, 'base64');
+    if (!/^image\/(jpeg|jpg|png|webp|gif|avif)$/i.test(referenceMimeType)) throw httpError(400, 'Reference image must be jpg, png, webp, gif, or avif.');
+    if (referenceBytes > 6 * 1024 * 1024) throw httpError(413, 'Reference image is too large.');
+    referenceParts.push({ inlineData: { mimeType: referenceMimeType, data: referenceData } });
+  }
+  const startTime = Date.now();
+  const noTextInstruction = [
+    'Important: generate background artwork only, filling the entire image edge to edge.',
+    'Do not include white margins, page borders, decorative frames, inner frames, crop marks, trim marks, registration marks, print guide lines, page outlines, or blank paper around the artwork.',
+    'Do not make it look like a poster mockup, printable sheet, framed flyer, or page placed on a white background.',
+    'Do not include any written words, letters, numbers, prices, logos with text, labels, captions, brand names, watermarks, or readable typography in the image.',
+  ].join(' ');
+  const finalPrompt = `${safePrompt}\n\n${noTextInstruction}`;
+  const requestParts = referenceParts.length
+    ? [{ text: `${finalPrompt} Use the attached images only as visual style or product references; do not copy any text or logo lettering from them.` }, ...referenceParts]
+    : [{ text: finalPrompt }];
+  const data = await httpsJsonPost(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(NANO_BANANA_MODEL)}:generateContent?key=${encodeURIComponent(googleApiKey)}`,
+    {
+      contents: [{ role: 'user', parts: requestParts }],
+      generationConfig: {
+        responseModalities: ['TEXT', 'IMAGE'],
+        temperature: 0.45,
+        topP: 0.9,
+        topK: 16,
+        imageConfig: {
+          aspectRatio,
+          ...(/gemini-3|pro-image/i.test(NANO_BANANA_MODEL) ? { imageSize } : {}),
+        },
+      },
+    },
+  );
+  const candidate = data?.candidates?.[0];
+  const parts = candidate?.content?.parts || [];
+  const imagePart = parts.find(part => part?.inlineData?.data || part?.inline_data?.data);
+  const imageData = imagePart?.inlineData || imagePart?.inline_data;
+  const textPart = parts.find(part => typeof part?.text === 'string');
+  if (!imageData?.data) {
+    if (candidate?.finishReason === 'SAFETY') throw httpError(400, 'Generation blocked by safety filters. Please modify your prompt.');
+    throw httpError(502, 'No image data in response');
+  }
+  const mimeType = imageData.mimeType || imageData.mime_type || 'image/png';
+  const imageBuffer = Buffer.from(imageData.data, 'base64');
+  if (imageBuffer.byteLength > 20 * 1024 * 1024) throw httpError(413, 'Generated image is too large.');
+  const extension = {
+    'image/jpeg': '.jpg',
+    'image/jpg': '.jpg',
+    'image/png': '.png',
+    'image/webp': '.webp',
+    'image/gif': '.gif',
+    'image/avif': '.avif',
+  }[String(mimeType).toLowerCase()] || '.png';
+  const filename = `${crypto.randomBytes(16).toString('hex')}${extension}`;
+  fs.writeFileSync(path.join(UPLOADS_DIR, filename), imageBuffer);
+  return {
+    imageUrl: `/uploads/${filename}`,
+    mimeType,
+    width: safeWidth,
+    height: safeHeight,
+    orientation: safeOrientation,
+    resolution: safeResolution,
+    duration: Number(((Date.now() - startTime) / 1000).toFixed(1)),
+    textResponse: textPart?.text || null,
+  };
+}
+
+app.post('/api/generate-a4-jobs', authMiddleware, (req, res) => {
+  cleanupA4GenerationJobs();
+  const jobId = crypto.randomBytes(16).toString('hex');
+  const createdAt = Date.now();
+  a4GenerationJobs.set(jobId, { jobId, status: 'queued', createdAt, updatedAt: createdAt });
+  res.status(202).json({ jobId, status: 'queued' });
+  setImmediate(async () => {
+    setA4GenerationJob(jobId, { status: 'running' });
+    try {
+      const result = await generateA4ImageFromPayload(req.body || {});
+      setA4GenerationJob(jobId, { status: 'complete', result });
+    } catch (err) {
+      const message = err.message || 'Failed to generate image';
+      const isQuotaError = /quota|rate limit|429|free_tier/i.test(message);
+      setA4GenerationJob(jobId, {
+        status: 'error',
+        message: isQuotaError
+          ? 'Google image generation quota is currently exceeded for this API key. Check billing/quota or try again later.'
+          : message,
+      });
+    }
+  });
+});
+
+app.get('/api/generate-a4-jobs/:jobId', authMiddleware, (req, res) => {
+  cleanupA4GenerationJobs();
+  const job = a4GenerationJobs.get(String(req.params.jobId || ''));
+  if (!job) {
+    res.status(404).json({ message: 'Generation job was not found. Please start a new generation.' });
+    return;
+  }
+  res.json(job);
+});
+
 app.post('/api/generate-a4', authMiddleware, async (req, res) => {
   const { prompt, orientation, resolution, width, height, referenceImage, referenceImages } = req.body || {};
   const safePrompt = String(prompt || '').trim();

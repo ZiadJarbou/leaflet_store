@@ -92,6 +92,38 @@ export function generateA4CoverImage(payload: {
   });
 }
 
+export type A4CoverImageJobResult = {
+  imageUrl: string;
+  mimeType: string;
+  width: number;
+  height: number;
+  orientation: string;
+  resolution: string;
+  duration?: number;
+  textResponse?: string | null;
+};
+
+export type A4CoverImageJob = {
+  jobId: string;
+  status: 'queued' | 'running' | 'complete' | 'error';
+  result?: A4CoverImageJobResult;
+  message?: string;
+};
+
+export function startA4CoverImageJob(payload: Parameters<typeof generateA4CoverImage>[0]): Promise<A4CoverImageJob> {
+  return request('/generate-a4-jobs', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getA4CoverImageJob(jobId: string): Promise<A4CoverImageJob> {
+  return request(`/generate-a4-jobs/${encodeURIComponent(jobId)}`, {
+    method: 'GET',
+    cache: 'no-store',
+  });
+}
+
 
 export function deleteLeaflet(id: number): Promise<{ success: boolean }> {
   return request(`/leaflets/${id}`, { method: 'DELETE' });

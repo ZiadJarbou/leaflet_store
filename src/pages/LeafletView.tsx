@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { Link, useParams } from 'react-router-dom';
-import { getLeaflet, getAdminLeaflet, updateProduct, uploadImage, deleteProduct, getLeafletLayout, getAdminLeafletLayout, saveLeafletLayout, resetLeafletLayout, saveLeafletThumbnail, createCheckoutSession, searchProductImages, getIconLibrary, getLayoutTemplates, deleteLayoutTemplate, generateA4CoverImage, getCoverLayoutTemplates, createCoverLayoutTemplate, createAdminCoverLayoutTemplate, updateAdminCoverLayoutTemplate, deleteCoverLayoutTemplate, deleteAdminCoverLayoutTemplate, getPublicSettings, deleteAdminDealTag } from '../services/api';
+import { getLeaflet, getAdminLeaflet, updateProduct, uploadImage, deleteProduct, getLeafletLayout, getAdminLeafletLayout, saveLeafletLayout, resetLeafletLayout, saveLeafletThumbnail, createCheckoutSession, searchProductImages, getIconLibrary, getLayoutTemplates, deleteLayoutTemplate, startA4CoverImageJob, getA4CoverImageJob, getCoverLayoutTemplates, createCoverLayoutTemplate, createAdminCoverLayoutTemplate, updateAdminCoverLayoutTemplate, deleteCoverLayoutTemplate, deleteAdminCoverLayoutTemplate, getPublicSettings, deleteAdminDealTag } from '../services/api';
 import { getStoredToken } from '../services/authService';
 import { countryToFlag, countryToIso } from '../utils/countryToFlag';
 import type { CardLayout, CardElementPos, TextElementStyle, ProductImageSuggestion, LayoutTemplate, CoverLayoutTemplate } from '../services/api';
@@ -4047,6 +4047,18 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const A4_W = isLandscape ? 1123 : 794;
     const A4_H = isLandscape ? 794 : 1123;
     const nanoDimensions = calculateA4GeneratorDimensions(pageSettings.orientation);
+    async function waitForA4CoverImageJob(jobId: string) {
+        const startedAt = Date.now();
+        while (Date.now() - startedAt < 4 * 60 * 1000) {
+            await new Promise(resolve => window.setTimeout(resolve, 2500));
+            const job = await getA4CoverImageJob(jobId);
+            if (job.status === 'complete' && job.result)
+                return job.result;
+            if (job.status === 'error')
+                throw new Error(job.message || 'Failed to generate A4 cover.');
+        }
+        throw new Error('Image generation is taking longer than expected. Please check Recent Chats or try again.');
+    }
     async function generateNanoCover() {
         const prompt = nanoPrompt.trim();
         if (!prompt) {
@@ -4064,7 +4076,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         setNanoGenerating(true);
         setNanoError(null);
         try {
-            const result = await generateA4CoverImage({
+            const job = await startA4CoverImageJob({
                 prompt: enhanceA4CoverPrompt(prompt, pageSettings.orientation),
                 orientation: pageSettings.orientation,
                 resolution: '2k',
@@ -4072,6 +4084,12 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 height: nanoDimensions.height,
                 referenceImages: nanoReferenceImages.map(image => ({ mimeType: image.mimeType, data: image.data })),
             });
+            setNanoConversation(previous => previous.map(message => message.id === aiMessageId
+                ? { ...message, text: 'Working on it. This can take a minute, and I will apply it when it is ready.', status: 'loading' }
+                : message));
+            const result = job.status === 'complete' && job.result
+                ? job.result
+                : await waitForA4CoverImageJob(job.jobId);
             saveGeneratedCoverBackground(result.imageUrl, prompt);
             await applyGeneratedCoverImage(result.imageUrl);
             setNanoConversation(previous => previous.map(message => message.id === aiMessageId
