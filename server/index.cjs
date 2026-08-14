@@ -3818,7 +3818,34 @@ function httpError(status, message) {
   err.status = status;
   return err;
 }
-async function generateA4ImageFromPayload(payload) {
+function isTemporaryAiDemandError(err) {
+  const message = String(err?.message || '');
+  return /high demand|overloaded|temporar|try again later|unavailable|503|502|504/i.test(message) ||
+    [502, 503, 504].includes(Number(err?.status || err?.statusCode));
+}
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+async function httpsJsonPostWithAiRetry(url, payload, options = {}) {
+  const delays = options.delays || [2500, 6000, 12000];
+  for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+    try {
+      return await httpsJsonPost(url, payload);
+    } catch (err) {
+      if (!isTemporaryAiDemandError(err) || attempt === delays.length) {
+        if (isTemporaryAiDemandError(err)) {
+          throw httpError(503, 'The AI image model is busy right now. I tried again automatically, but demand is still high. Please try again in a minute.');
+        }
+        throw err;
+      }
+      if (typeof options.onRetry === 'function') {
+        options.onRetry(attempt + 1, delays.length);
+      }
+      await wait(delays[attempt]);
+    }
+  }
+}
+async function generateA4ImageFromPayload(payload, options = {}) {
   const { prompt, orientation, resolution, width, height, referenceImage, referenceImages } = payload || {};
   const safePrompt = String(prompt || '').trim();
   const safeOrientation = orientation === 'landscape' ? 'landscape' : 'portrait';
@@ -3857,7 +3884,7 @@ async function generateA4ImageFromPayload(payload) {
   const requestParts = referenceParts.length
     ? [{ text: `${finalPrompt} Use the attached images only as visual style or product references; do not copy any text or logo lettering from them.` }, ...referenceParts]
     : [{ text: finalPrompt }];
-  const data = await httpsJsonPost(
+  const data = await httpsJsonPostWithAiRetry(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(NANO_BANANA_MODEL)}:generateContent?key=${encodeURIComponent(googleApiKey)}`,
     {
       contents: [{ role: 'user', parts: requestParts }],
@@ -3872,6 +3899,7 @@ async function generateA4ImageFromPayload(payload) {
         },
       },
     },
+    options,
   );
   const candidate = data?.candidates?.[0];
   const parts = candidate?.content?.parts || [];
@@ -3916,7 +3944,14 @@ app.post('/api/generate-a4-jobs', authMiddleware, (req, res) => {
   setImmediate(async () => {
     setA4GenerationJob(jobId, { status: 'running' });
     try {
-      const result = await generateA4ImageFromPayload(req.body || {});
+      const result = await generateA4ImageFromPayload(req.body || {}, {
+        onRetry: (attempt, total) => {
+          setA4GenerationJob(jobId, {
+            status: 'running',
+            message: `The AI image model is busy. Retrying automatically (${attempt}/${total})...`,
+          });
+        },
+      });
       setA4GenerationJob(jobId, { status: 'complete', result });
     } catch (err) {
       const message = err.message || 'Failed to generate image';
@@ -4113,7 +4148,10 @@ function httpsJsonPost(url, payload) {
         try { parsed = data ? JSON.parse(data) : null; }
         catch (err) { reject(err); return; }
         if (res.statusCode < 200 || res.statusCode >= 300) {
-          reject(new Error(parsed?.error?.message || `Google API returned ${res.statusCode}`));
+          const err = new Error(parsed?.error?.message || `Google API returned ${res.statusCode}`);
+          err.status = res.statusCode;
+          err.details = parsed;
+          reject(err);
           return;
         }
         resolve(parsed);

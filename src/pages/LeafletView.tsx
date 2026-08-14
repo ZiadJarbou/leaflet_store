@@ -4047,11 +4047,16 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const A4_W = isLandscape ? 1123 : 794;
     const A4_H = isLandscape ? 794 : 1123;
     const nanoDimensions = calculateA4GeneratorDimensions(pageSettings.orientation);
-    async function waitForA4CoverImageJob(jobId: string) {
+    async function waitForA4CoverImageJob(jobId: string, aiMessageId: string) {
         const startedAt = Date.now();
         while (Date.now() - startedAt < 4 * 60 * 1000) {
             await new Promise(resolve => window.setTimeout(resolve, 2500));
             const job = await getA4CoverImageJob(jobId);
+            if ((job.status === 'queued' || job.status === 'running') && job.message) {
+                setNanoConversation(previous => previous.map(message => message.id === aiMessageId
+                    ? { ...message, text: job.message || message.text, status: 'loading' }
+                    : message));
+            }
             if (job.status === 'complete' && job.result)
                 return job.result;
             if (job.status === 'error')
@@ -4089,7 +4094,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 : message));
             const result = job.status === 'complete' && job.result
                 ? job.result
-                : await waitForA4CoverImageJob(job.jobId);
+                : await waitForA4CoverImageJob(job.jobId, aiMessageId);
             saveGeneratedCoverBackground(result.imageUrl, prompt);
             await applyGeneratedCoverImage(result.imageUrl);
             setNanoConversation(previous => previous.map(message => message.id === aiMessageId
@@ -4100,6 +4105,8 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             const message = err instanceof Error ? err.message : 'Failed to generate A4 cover.';
             const errorMessage = /quota|rate limit|429/i.test(message)
                 ? 'Google image generation quota is exceeded for this API key. Check AI Studio billing/quota or try again later.'
+                : /high demand|model is busy|temporar|try again/i.test(message)
+                    ? 'The AI image model is busy right now. Please try again in a minute.'
                 : message;
             setNanoError(errorMessage);
             setNanoConversation(previous => previous.map(chatMessage => chatMessage.id === aiMessageId
