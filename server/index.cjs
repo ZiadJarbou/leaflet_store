@@ -38,8 +38,8 @@ const STRIPE_PRO_ANNUAL_PRICE_ID   = process.env.STRIPE_PRO_ANNUAL_PRICE_ID   ||
 const STRIPE_BIZ_MONTHLY_PRICE_ID  = process.env.STRIPE_BUSINESS_MONTHLY_PRICE_ID || '';
 const STRIPE_BIZ_ANNUAL_PRICE_ID   = process.env.STRIPE_BUSINESS_ANNUAL_PRICE_ID  || '';
 const APP_URL                      = String(process.env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
-const GOOGLE_API_KEY               = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '';
-const NANO_BANANA_MODEL            = process.env.NANO_BANANA_MODEL || 'gemini-3.1-flash-image-preview';
+const OPENAI_API_KEY               = envValue('OPENAI_API_KEY') || '';
+const OPENAI_IMAGE_MODEL           = envValue('OPENAI_IMAGE_MODEL') || 'gpt-image-1';
 function envValue(...names) {
   for (const name of names) {
     let value = String(process.env[name] || '').trim();
@@ -668,7 +668,7 @@ const settingDefaults = {
   announcement_banner: '',
   stripe_secret_key: '',
   stripe_checkout_url: '',
-  google_api_key: '',
+  openai_api_key: '',
   default_card_template_id: '',
   nano_a4_enabled: '1',
   home_demo_video_url: '',
@@ -694,9 +694,9 @@ function refreshStripeClient() {
 
 refreshStripeClient();
 
-function googleApiKeyValue() {
-  const row = db.prepare("SELECT value FROM site_settings WHERE key = 'google_api_key'").get();
-  return String(row?.value || '').trim() || GOOGLE_API_KEY;
+function openAiApiKeyValue() {
+  const row = db.prepare("SELECT value FROM site_settings WHERE key = 'openai_api_key'").get();
+  return String(row?.value || '').trim() || OPENAI_API_KEY;
 }
 
 /* ── Page Content table ── */
@@ -3830,7 +3830,7 @@ async function httpsJsonPostWithAiRetry(url, payload, options = {}) {
   const delays = options.delays || [2500, 6000, 12000];
   for (let attempt = 0; attempt <= delays.length; attempt += 1) {
     try {
-      return await httpsJsonPost(url, payload);
+      return await httpsJsonPost(url, payload, { headers: options.headers });
     } catch (err) {
       if (!isTemporaryAiDemandError(err) || attempt === delays.length) {
         if (isTemporaryAiDemandError(err)) {
@@ -3852,18 +3852,16 @@ async function generateA4ImageFromPayload(payload, options = {}) {
   const safeResolution = ['1k', '2k', '4k'].includes(resolution) ? resolution : '2k';
   const safeWidth = Number(width);
   const safeHeight = Number(height);
-  const aspectRatio = safeOrientation === 'landscape' ? '4:3' : '3:4';
-  const imageSize = safeResolution === '4k' ? '4K' : safeResolution === '2k' ? '2K' : '1K';
-  const googleApiKey = googleApiKeyValue();
+  const imageSize = safeOrientation === 'landscape' ? '1536x1024' : '1024x1536';
+  const openAiApiKey = openAiApiKeyValue();
   if (!safePrompt) throw httpError(400, 'Prompt is required');
-  if (!googleApiKey) throw httpError(500, 'GOOGLE_API_KEY or GEMINI_API_KEY is not configured');
+  if (!openAiApiKey) throw httpError(500, 'OPENAI_API_KEY is not configured');
   if (!Number.isInteger(safeWidth) || !Number.isInteger(safeHeight) || safeWidth % 8 !== 0 || safeHeight % 8 !== 0) {
     throw httpError(400, 'Dimensions must be multiples of 8');
   }
   const rawReferenceImages = Array.isArray(referenceImages)
     ? referenceImages
     : (referenceImage?.data ? [referenceImage] : []);
-  const referenceParts = [];
   for (const refImage of rawReferenceImages.slice(0, 6)) {
     if (!refImage?.data) continue;
     const referenceMimeType = String(refImage.mimeType || 'image/png');
@@ -3871,7 +3869,6 @@ async function generateA4ImageFromPayload(payload, options = {}) {
     const referenceBytes = Buffer.byteLength(referenceData, 'base64');
     if (!/^image\/(jpeg|jpg|png|webp|gif|avif)$/i.test(referenceMimeType)) throw httpError(400, 'Reference image must be jpg, png, webp, gif, or avif.');
     if (referenceBytes > 6 * 1024 * 1024) throw httpError(413, 'Reference image is too large.');
-    referenceParts.push({ inlineData: { mimeType: referenceMimeType, data: referenceData } });
   }
   const startTime = Date.now();
   const noTextInstruction = [
@@ -3881,37 +3878,28 @@ async function generateA4ImageFromPayload(payload, options = {}) {
     'Do not include any written words, letters, numbers, prices, logos with text, labels, captions, brand names, watermarks, or readable typography in the image.',
   ].join(' ');
   const finalPrompt = `${safePrompt}\n\n${noTextInstruction}`;
-  const requestParts = referenceParts.length
-    ? [{ text: `${finalPrompt} Use the attached images only as visual style or product references; do not copy any text or logo lettering from them.` }, ...referenceParts]
-    : [{ text: finalPrompt }];
   const data = await httpsJsonPostWithAiRetry(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(NANO_BANANA_MODEL)}:generateContent?key=${encodeURIComponent(googleApiKey)}`,
+    'https://api.openai.com/v1/images/generations',
     {
-      contents: [{ role: 'user', parts: requestParts }],
-      generationConfig: {
-        responseModalities: ['TEXT', 'IMAGE'],
-        temperature: 0.45,
-        topP: 0.9,
-        topK: 16,
-        imageConfig: {
-          aspectRatio,
-          ...(/gemini-3|pro-image/i.test(NANO_BANANA_MODEL) ? { imageSize } : {}),
-        },
-      },
+      model: OPENAI_IMAGE_MODEL,
+      prompt: finalPrompt,
+      n: 1,
+      size: imageSize,
+      quality: safeResolution === '4k' ? 'high' : 'medium',
+      background: 'opaque',
+      output_format: 'png',
     },
-    options,
+    {
+      ...options,
+      headers: { Authorization: `Bearer ${openAiApiKey}` },
+    },
   );
-  const candidate = data?.candidates?.[0];
-  const parts = candidate?.content?.parts || [];
-  const imagePart = parts.find(part => part?.inlineData?.data || part?.inline_data?.data);
-  const imageData = imagePart?.inlineData || imagePart?.inline_data;
-  const textPart = parts.find(part => typeof part?.text === 'string');
-  if (!imageData?.data) {
-    if (candidate?.finishReason === 'SAFETY') throw httpError(400, 'Generation blocked by safety filters. Please modify your prompt.');
+  const imageData = data?.data?.[0];
+  if (!imageData?.b64_json) {
     throw httpError(502, 'No image data in response');
   }
-  const mimeType = imageData.mimeType || imageData.mime_type || 'image/png';
-  const imageBuffer = Buffer.from(imageData.data, 'base64');
+  const mimeType = 'image/png';
+  const imageBuffer = Buffer.from(imageData.b64_json, 'base64');
   if (imageBuffer.byteLength > 20 * 1024 * 1024) throw httpError(413, 'Generated image is too large.');
   const extension = {
     'image/jpeg': '.jpg',
@@ -3931,7 +3919,7 @@ async function generateA4ImageFromPayload(payload, options = {}) {
     orientation: safeOrientation,
     resolution: safeResolution,
     duration: Number(((Date.now() - startTime) / 1000).toFixed(1)),
-    textResponse: textPart?.text || null,
+    textResponse: imageData.revised_prompt || null,
   };
 }
 
@@ -3955,11 +3943,11 @@ app.post('/api/generate-a4-jobs', authMiddleware, (req, res) => {
       setA4GenerationJob(jobId, { status: 'complete', result });
     } catch (err) {
       const message = err.message || 'Failed to generate image';
-      const isQuotaError = /quota|rate limit|429|free_tier/i.test(message);
+      const isQuotaError = /quota|rate limit|429|insufficient_quota/i.test(message);
       setA4GenerationJob(jobId, {
         status: 'error',
         message: isQuotaError
-          ? 'Google image generation quota is currently exceeded for this API key. Check billing/quota or try again later.'
+          ? 'OpenAI image generation quota or rate limit was reached. Check billing/quota or try again later.'
           : message,
       });
     }
@@ -3977,133 +3965,14 @@ app.get('/api/generate-a4-jobs/:jobId', authMiddleware, (req, res) => {
 });
 
 app.post('/api/generate-a4', authMiddleware, async (req, res) => {
-  const { prompt, orientation, resolution, width, height, referenceImage, referenceImages } = req.body || {};
-  const safePrompt = String(prompt || '').trim();
-  const safeOrientation = orientation === 'landscape' ? 'landscape' : 'portrait';
-  const safeResolution = ['1k', '2k', '4k'].includes(resolution) ? resolution : '2k';
-  const safeWidth = Number(width);
-  const safeHeight = Number(height);
-  const aspectRatio = safeOrientation === 'landscape' ? '4:3' : '3:4';
-  const imageSize = safeResolution === '4k' ? '4K' : safeResolution === '2k' ? '2K' : '1K';
-  const googleApiKey = googleApiKeyValue();
-
-  if (!safePrompt) {
-    res.status(400).json({ message: 'Prompt is required' });
-    return;
-  }
-  if (!googleApiKey) {
-    res.status(500).json({ message: 'GOOGLE_API_KEY or GEMINI_API_KEY is not configured' });
-    return;
-  }
-  if (!Number.isInteger(safeWidth) || !Number.isInteger(safeHeight) || safeWidth % 8 !== 0 || safeHeight % 8 !== 0) {
-    res.status(400).json({ message: 'Dimensions must be multiples of 8' });
-    return;
-  }
-  const rawReferenceImages = Array.isArray(referenceImages)
-    ? referenceImages
-    : (referenceImage?.data ? [referenceImage] : []);
-  const referenceParts = [];
-  for (const refImage of rawReferenceImages.slice(0, 6)) {
-    if (!refImage?.data) continue;
-    const referenceMimeType = String(refImage.mimeType || 'image/png');
-    const referenceData = String(refImage.data || '').replace(/^data:[^,]+,/, '');
-    const referenceBytes = Buffer.byteLength(referenceData, 'base64');
-    if (!/^image\/(jpeg|jpg|png|webp|gif|avif)$/i.test(referenceMimeType)) {
-      res.status(400).json({ message: 'Reference image must be jpg, png, webp, gif, or avif.' });
-      return;
-    }
-    if (referenceBytes > 6 * 1024 * 1024) {
-      res.status(413).json({ message: 'Reference image is too large.' });
-      return;
-    }
-    referenceParts.push({
-      inlineData: {
-        mimeType: referenceMimeType,
-        data: referenceData,
-      },
-    });
-  }
-
-  const startTime = Date.now();
   try {
-    const noTextInstruction = [
-      'Important: generate background artwork only, filling the entire image edge to edge.',
-      'Do not include white margins, page borders, decorative frames, inner frames, crop marks, trim marks, registration marks, print guide lines, page outlines, or blank paper around the artwork.',
-      'Do not make it look like a poster mockup, printable sheet, framed flyer, or page placed on a white background.',
-      'Do not include any written words, letters, numbers, prices, logos with text, labels, captions, brand names, watermarks, or readable typography in the image.',
-    ].join(' ');
-    const finalPrompt = `${safePrompt}\n\n${noTextInstruction}`;
-    const requestParts = referenceParts.length
-      ? [{ text: `${finalPrompt} Use the attached images only as visual style or product references; do not copy any text or logo lettering from them.` }, ...referenceParts]
-      : [{ text: finalPrompt }];
-    const data = await httpsJsonPost(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(NANO_BANANA_MODEL)}:generateContent?key=${encodeURIComponent(googleApiKey)}`,
-      {
-        contents: [{
-          role: 'user',
-          parts: requestParts,
-        }],
-        generationConfig: {
-          responseModalities: ['TEXT', 'IMAGE'],
-          temperature: 0.45,
-          topP: 0.9,
-          topK: 16,
-          imageConfig: {
-            aspectRatio,
-            ...(/gemini-3|pro-image/i.test(NANO_BANANA_MODEL) ? { imageSize } : {}),
-          },
-        },
-      },
-    );
-    const candidate = data?.candidates?.[0];
-    const parts = candidate?.content?.parts || [];
-    const imagePart = parts.find(part => part?.inlineData?.data || part?.inline_data?.data);
-    const imageData = imagePart?.inlineData || imagePart?.inline_data;
-    const textPart = parts.find(part => typeof part?.text === 'string');
-
-    if (!imageData?.data) {
-      if (candidate?.finishReason === 'SAFETY') {
-        res.status(400).json({ message: 'Generation blocked by safety filters. Please modify your prompt.' });
-        return;
-      }
-      res.status(502).json({ message: 'No image data in response' });
-      return;
-    }
-
-    const mimeType = imageData.mimeType || imageData.mime_type || 'image/png';
-    const imageBuffer = Buffer.from(imageData.data, 'base64');
-    if (imageBuffer.byteLength > 20 * 1024 * 1024) {
-      res.status(413).json({ message: 'Generated image is too large.' });
-      return;
-    }
-    const extension = {
-      'image/jpeg': '.jpg',
-      'image/jpg': '.jpg',
-      'image/png': '.png',
-      'image/webp': '.webp',
-      'image/gif': '.gif',
-      'image/avif': '.avif',
-    }[String(mimeType).toLowerCase()] || '.png';
-    const filename = `${crypto.randomBytes(16).toString('hex')}${extension}`;
-    fs.writeFileSync(path.join(UPLOADS_DIR, filename), imageBuffer);
-    const imageUrl = `/uploads/${filename}`;
-    const duration = Number(((Date.now() - startTime) / 1000).toFixed(1));
-    res.json({
-      imageUrl,
-      mimeType,
-      width: safeWidth,
-      height: safeHeight,
-      orientation: safeOrientation,
-      resolution: safeResolution,
-      duration,
-      textResponse: textPart?.text || null,
-    });
+    res.json(await generateA4ImageFromPayload(req.body || {}));
   } catch (err) {
     const message = err.message || 'Failed to generate image';
-    const isQuotaError = /quota|rate limit|429|free_tier/i.test(message);
-    res.status(isQuotaError ? 429 : 500).json({
+    const isQuotaError = /quota|rate limit|429|insufficient_quota/i.test(message);
+    res.status(err.status || (isQuotaError ? 429 : 500)).json({
       message: isQuotaError
-        ? 'Google image generation quota is currently exceeded for this API key. Check billing/quota or try again later.'
+        ? 'OpenAI image generation quota or rate limit was reached. Check billing/quota or try again later.'
         : message,
       details: message,
     });
@@ -4131,15 +4000,17 @@ function httpsGet(url) {
   });
 }
 
-function httpsJsonPost(url, payload) {
+function httpsJsonPost(url, payload, options = {}) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify(payload);
+    const headers = {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body),
+      ...(options.headers || {}),
+    };
     const req = https.request(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body),
-      },
+      headers,
     }, res => {
       let data = '';
       res.on('data', chunk => data += chunk);

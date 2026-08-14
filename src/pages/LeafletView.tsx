@@ -4104,7 +4104,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         catch (err) {
             const message = err instanceof Error ? err.message : 'Failed to generate A4 cover.';
             const errorMessage = /quota|rate limit|429/i.test(message)
-                ? 'Google image generation quota is exceeded for this API key. Check AI Studio billing/quota or try again later.'
+                ? 'OpenAI image generation quota or rate limit was reached. Check billing/quota or try again later.'
                 : /high demand|model is busy|temporar|try again/i.test(message)
                     ? 'The AI image model is busy right now. Please try again in a minute.'
                 : message;
