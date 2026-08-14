@@ -5635,7 +5635,13 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                   <div ref={nanoConversationBottomRef}/>
                 </div>)}
                 <div className="lv-nano-prompt-wrap">
-                  <textarea className="lv-nano-prompt" value={nanoPrompt} onChange={e => setNanoPrompt(e.target.value.slice(0, 4000))} onPaste={handleNanoPromptPaste} rows={4} placeholder="Describe the background style, colors, product mood, and empty areas. Do not ask for text."/>
+                  <textarea className="lv-nano-prompt" value={nanoPrompt} onChange={e => setNanoPrompt(e.target.value.slice(0, 4000))} onPaste={handleNanoPromptPaste} onKeyDown={e => {
+                    if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing)
+                        return;
+                    e.preventDefault();
+                    if (!nanoGenerating && nanoPrompt.trim())
+                        void generateNanoCover();
+                  }} rows={4} placeholder="Describe the background style, colors, product mood, and empty areas. Do not ask for text."/>
                   <input ref={nanoReferenceInputRef} className="lv-nano-reference-input" type="file" accept="image/*" multiple onChange={e => void handleNanoReferenceUpload(e.target.files)}/>
                   <div className="lv-nano-chatbot-actions">
                     <button type="button" className="lv-nano-reference-add" onClick={() => nanoReferenceInputRef.current?.click()} disabled={nanoGenerating} aria-label="Reference image" title="Reference image">
