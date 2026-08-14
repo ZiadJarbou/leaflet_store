@@ -7622,9 +7622,9 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         return (<div key={coverBuilderElementRenderKey('surface', interactive ? 'interactive' : options.applied ? 'applied' : 'static')} data-template-id={coverBuilderRenderTemplateId()} className={surfaceClass} {...surfaceEvents}>
           {builder.visibleItems.logo && (<div key={coverBuilderElementRenderKey('logo', interactive ? 'editable' : 'static')} data-template-id={coverBuilderRenderTemplateId()} data-element-id="logo" className={cx(`lv-cb-logo-slot${builder.logoAiStyle ? ` lv-cb-logo-ai lv-cb-logo-ai--${builder.logoAiStyle}` : ''}${interactive && (coverBuilderSelected === 'logo' || coverBuilderSelectedItems.includes('logo')) ? ' selected' : ''}`, cssClass(builderElementStyle('logo')))} {...(interactive ? coverBuilderDragHandlers('logo') : {})} onClick={interactive ? e => { e.stopPropagation(); selectCoverBuilderItem('logo', e.shiftKey); } : undefined}>
               {builder.logo && <img src={builder.logo} alt="" className={cssClass({ objectPosition: elementObjectPosition('logo') })}/>}
-              <span className={cx('lv-cb-logo-text', !builder.logoText.trim() && builder.logo ? 'lv-cb-logo-text--empty' : '')}>
-                {builder.logoText.trim() || (builder.logo ? '' : 'Logo')}
-              </span>
+              {!builder.logo && (<span className="lv-cb-logo-text">
+                {builder.logoText.trim() || 'Logo'}
+              </span>)}
               {interactive && coverBuilderSelected === 'logo' && <CoverBuilderDeleteButton itemKey="logo"/>}
               {interactive && coverBuilderSelected === 'logo' && <span className="lv-cb-rotate-handle material-symbol" title="Rotate" aria-label="Rotate logo" onPointerDown={e => startCoverBuilderCanvasDrag(e, 'logo', 'rotate')}>rotate_right</span>}
               {interactive && coverBuilderSelected === 'logo' && <span className="lv-cb-resize-handle" onPointerDown={e => startCoverBuilderCanvasDrag(e, 'logo', 'resize')}/>}
