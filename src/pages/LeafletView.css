@@ -7566,16 +7566,13 @@ body.dragging-icon .lv-card-drop-layer {
   justify-content: flex-start;
 }
 .lv-nano-message-avatar {
-  display: inline-grid;
-  place-items: center;
   width: 26px;
   height: 26px;
   flex: 0 0 auto;
-  border: 1px solid rgba(96, 165, 250, .28);
   border-radius: 50%;
   background: rgba(30, 41, 59, .82);
-  color: #93c5fd;
-  font-size: 16px;
+  object-fit: contain;
+  padding: 4px;
 }
 .lv-nano-message {
   max-width: 82%;

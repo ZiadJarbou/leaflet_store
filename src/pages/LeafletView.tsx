@@ -5634,7 +5634,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 </div>)}
                 {nanoConversation.length > 0 && (<div className="lv-nano-conversation" aria-live="polite">
                   {nanoConversation.map(message => (<div key={message.id} className={cx("lv-nano-message-row", message.role === 'user' ? 'lv-nano-message-row--user' : 'lv-nano-message-row--ai')}>
-                    {message.role === 'ai' && (<span className="lv-nano-message-avatar material-symbol" aria-hidden="true">auto_awesome</span>)}
+                    {message.role === 'ai' && (<img className="lv-nano-message-avatar" src="/leafletai_nano_avatar.png" alt="" aria-hidden="true"/>)}
                     <div className={cx("lv-nano-message", `lv-nano-message--${message.role}`, message.status === 'loading' ? 'lv-nano-message--loading' : '', message.status === 'error' ? 'lv-nano-message--error' : '')}>
                       <span>{message.text}</span>
                     </div>
