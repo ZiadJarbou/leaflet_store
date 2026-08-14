@@ -5803,7 +5803,19 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         </div>);
         }
         if (coverBuilderSelected === 'logo') {
-            return (<div className="lv-cb-section-body"/>);
+            return (<div className="lv-cb-section-body">
+          {CoverBuilderInspectorControls({ itemKey: 'logo' })}
+          {renderCoverBuilderSection('right-logo-title', 'Title', (<div className="lv-cb-field lv-cb-logo-text-control">
+              <label>Logo text</label>
+              <input value={coverBuilderLogoTextDraft} onChange={e => handleCoverBuilderLogoTextChange(e.target.value)} onBlur={() => commitCoverBuilderLogoText()} onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        commitCoverBuilderLogoText(e.currentTarget.value);
+                        e.currentTarget.blur();
+                    }
+                }} placeholder="Logo"/>
+            </div>), 'lv-cb-property-section')}
+        </div>);
         }
         if (coverBuilderSelected === 'headline' || coverBuilderSelected === 'subline' || coverBuilderSelected === 'contact') {
             const labels = { headline: 'Headline', subline: 'Subline', contact: 'Contact info' } as const;
