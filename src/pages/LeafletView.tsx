@@ -5013,6 +5013,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         const style = coverBuilder.itemStyles[itemKey] ?? DEFAULT_COVER_BUILDER_ITEM_STYLES[itemKey];
         const isText = itemKey === 'headline' || itemKey === 'subline' || itemKey === 'contact';
         const isProducts = itemKey === 'products';
+        const isLogo = itemKey === 'logo';
         const button = (label: string, title: string, onClick: () => void, active = false) => (<button type="button" className={active ? 'active' : ''} title={title} aria-label={title} onPointerDown={e => e.stopPropagation()} onClick={e => {
                 e.stopPropagation();
                 onClick();
@@ -5157,6 +5158,20 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             format_clear
           </button>)}
         </>)}
+        {isLogo && (<>
+          <button type="button" className="lv-cb-toolbar-symbol-action" title="AI logo style" aria-label="AI logo style" onPointerDown={e => e.stopPropagation()} onClick={e => {
+                    e.stopPropagation();
+                    generateCoverAiLogoStyle();
+                }}>
+            auto_awesome
+          </button>
+          {coverBuilder.logoAiStyle && (<button type="button" className="lv-cb-toolbar-symbol-action" title="Clear logo style" aria-label="Clear logo style" onPointerDown={e => e.stopPropagation()} onClick={e => {
+                    e.stopPropagation();
+                    updateCoverBuilderForSelectedTemplate(prev => ({ ...prev, logoAiStyle: '' }));
+                }}>
+            format_clear
+          </button>)}
+        </>)}
         {(isText || isProducts) && group('valign', 'Vertical alignment', 'vertical_align_center', <>
           {button('vertical_align_top', 'Vertical align top', () => runAndClose(() => updateCoverBuilderItemStyle(itemKey, { valign: 'top' })), (style.valign ?? 'top') === 'top')}
           {button('vertical_align_center', 'Vertical align middle', () => runAndClose(() => updateCoverBuilderItemStyle(itemKey, { valign: 'middle' })), style.valign === 'middle')}
@@ -5205,17 +5220,44 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
           {miniColor('borderColor', 'Color', '#ffffff')}
           {miniRange('radius', 'Radius', 0, 80, 1, 'px')}
         </div>, 'lv-cb-toolbar-group--panel')}
+        {isLogo && group('logo-text-panel', 'Logo text', 'title', <div className="lv-cb-toolbar-panel-stack">
+          <label className="lv-cb-toolbar-field">
+            <span>Logo text</span>
+            <input className="lv-cb-toolbar-input" value={coverBuilderLogoTextDraft} onChange={e => handleCoverBuilderLogoTextChange(e.target.value)} onBlur={() => commitCoverBuilderLogoText()} onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            commitCoverBuilderLogoText(e.currentTarget.value);
+                            e.currentTarget.blur();
+                        }
+                    }} placeholder="Logo"/>
+          </label>
+          {miniColor('color', 'Text color', '#0f172a')}
+          {miniColor('bg', 'Background', '#ffffff')}
+        </div>, 'lv-cb-toolbar-group--panel')}
         {itemKey === 'logo' && group('content-panel', 'Logo', 'image', <div className="lv-cb-toolbar-panel-stack">
-          <>
-            <label className="lv-cb-toolbar-text-btn">
-              Upload logo
-              <input type="file" accept="image/*" className={cssClass({ display: 'none' })} onChange={e => void readCoverBuilderImage(e.target.files?.[0] || null, 'logo')}/>
-            </label>
-            {coverBuilder.logo && <button type="button" className="lv-cb-toolbar-text-btn" onClick={e => {
+          <label
+            className="lv-cb-asset-import lv-cb-logo-import lv-cb-toolbar-logo-import"
+            tabIndex={0}
+            onDragEnter={e => e.preventDefault()}
+            onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+            onDrop={handleCoverBuilderLogoDrop}
+            onPaste={handleCoverBuilderLogoPaste}
+            onKeyDown={e => {
+                        if (e.key !== 'Enter' && e.key !== ' ')
+                            return;
+                        e.preventDefault();
+                        e.currentTarget.querySelector<HTMLInputElement>('input[type="file"]')?.click();
+                    }}
+          >
+            <strong>Import logo</strong>
+            <span>Click, drag and drop, or paste an image</span>
+            <input type="file" accept="image/*" onChange={e => void readCoverBuilderImage(e.target.files?.[0] || null, 'logo')}/>
+          </label>
+          {miniRange('imageScale', 'Size', 10, 160, 1, '%')}
+          {coverBuilder.logo && <button type="button" className="lv-cb-toolbar-text-btn" onClick={e => {
                         e.stopPropagation();
                         setCoverBuilderValue('logo', '');
                     }}>Remove logo</button>}
-          </>
         </div>, 'lv-cb-toolbar-group--panel')}
         <button type="button" className="lv-cb-toolbar-delete" title={`Delete ${itemKey}`} aria-label={`Delete ${itemKey}`} onPointerDown={e => e.stopPropagation()} onClick={e => {
                 e.stopPropagation();
@@ -5761,80 +5803,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         </div>);
         }
         if (coverBuilderSelected === 'logo') {
-            const logoStyle = coverBuilder.itemStyles.logo ?? DEFAULT_COVER_BUILDER_ITEM_STYLES.logo;
-            const logoImageScale = logoStyle.imageScale ?? 82;
-            const previewLogoImageScale = (value: number, target: EventTarget & HTMLInputElement) => {
-                const nextValue = Math.max(10, Math.min(160, value));
-                const output = target.closest('.lv-cb-logo-size-slider')?.querySelector('strong');
-                if (output)
-                    output.textContent = `${nextValue}%`;
-                coverBuilderPreviewRef.current?.querySelector<HTMLElement>('.lv-cb-logo-slot')?.style.setProperty('--logo-image-size', `${nextValue}%`);
-            };
-            const commitLogoImageScale = (target: EventTarget & HTMLInputElement) => {
-                updateCoverBuilderItemStyle('logo', { imageScale: Number(target.value) });
-            };
-            return (<div className="lv-cb-section-body">
-          {CoverBuilderInspectorControls({ itemKey: 'logo' })}
-          <div className="lv-cb-headline-ai-control lv-cb-logo-ai-control">
-            <button type="button" className="lv-cb-ai-gradient-btn" onClick={generateCoverAiLogoStyle}>
-              AI logo style
-            </button>
-            {coverBuilder.logoAiStyle && (<button type="button" className="lv-cb-headline-clear-style" onClick={() => updateCoverBuilderForSelectedTemplate(prev => ({ ...prev, logoAiStyle: '' }))}>
-              Clear style
-            </button>)}
-          </div>
-          {renderCoverBuilderSection('right-logo-text', 'Logo text', (<div className="lv-cb-field lv-cb-logo-text-control">
-              <label>Logo text</label>
-              <input value={coverBuilderLogoTextDraft} onChange={e => handleCoverBuilderLogoTextChange(e.target.value)} onBlur={() => commitCoverBuilderLogoText()} onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        commitCoverBuilderLogoText(e.currentTarget.value);
-                        e.currentTarget.blur();
-                    }
-                }} placeholder="Logo"/>
-              <div className="lv-cb-logo-color-grid">
-                <div className="lv-cb-subline-color-row">
-                  <label>Text Color</label>
-                  <ColorSwatch value={logoStyle.color} onChange={v => updateCoverBuilderItemStyle('logo', { color: v })}/>
-                  <span>{logoStyle.color}</span>
-                </div>
-                <div className="lv-cb-subline-color-row">
-                  <label>Background</label>
-                  <ColorSwatch value={logoStyle.bg === 'transparent' ? '#ffffff' : logoStyle.bg} onChange={v => updateCoverBuilderItemStyle('logo', { bg: v, bgOpacity: logoStyle.bgOpacity && logoStyle.bgOpacity > 0 ? logoStyle.bgOpacity : 100 })}/>
-                  <span>{logoStyle.bg === 'transparent' ? '#ffffff' : logoStyle.bg}</span>
-                </div>
-              </div>
-            </div>), 'lv-cb-property-section')}
-          {renderCoverBuilderSection('right-logo-image-size', 'Logo image size', (<div className="lv-cb-logo-image-size">
-              <label className="lv-cb-logo-size-slider">
-                <span>Size</span>
-                <input type="range" min={10} max={160} step={1} defaultValue={logoImageScale} onInput={e => previewLogoImageScale(Number(e.currentTarget.value), e.currentTarget)} onPointerUp={e => commitLogoImageScale(e.currentTarget)} onKeyUp={e => commitLogoImageScale(e.currentTarget)} onBlur={e => commitLogoImageScale(e.currentTarget)}/>
-                <strong>{logoImageScale}%</strong>
-              </label>
-            </div>), 'lv-cb-property-section')}
-          {renderCoverBuilderSection('right-logo-content', 'Logo image', (<div className="lv-cb-field lv-cb-logo-upload-control">
-              <label>Supermarket logo</label>
-              <label
-                className="lv-cb-asset-import lv-cb-logo-import"
-                tabIndex={0}
-                onDragEnter={e => e.preventDefault()}
-                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
-                onDrop={handleCoverBuilderLogoDrop}
-                onPaste={handleCoverBuilderLogoPaste}
-                onKeyDown={e => {
-                    if (e.key !== 'Enter' && e.key !== ' ')
-                        return;
-                    e.preventDefault();
-                    e.currentTarget.querySelector<HTMLInputElement>('input[type="file"]')?.click();
-                }}
-              >
-                <strong>Import logo</strong>
-                <span>Click, drag and drop, or paste an image</span>
-                <input type="file" accept="image/*" onChange={e => void readCoverBuilderImage(e.target.files?.[0] || null, 'logo')}/>
-              </label>
-              <button type="button" className="lv-cb-logo-delete" onClick={() => toggleCoverBuilderItem('logo')}>{coverBuilder.visibleItems.logo ? 'Delete' : 'Restore'}</button>
-            </div>), 'lv-cb-property-section')}
-        </div>);
+            return (<div className="lv-cb-section-body"/>);
         }
         if (coverBuilderSelected === 'headline' || coverBuilderSelected === 'subline' || coverBuilderSelected === 'contact') {
             const labels = { headline: 'Headline', subline: 'Subline', contact: 'Contact info' } as const;

@@ -5305,6 +5305,23 @@ body.dragging-icon .lv-card-drop-layer {
 .lv-cb-toolbar-field .num-ctrl {
   width: 100%;
 }
+.lv-cb-toolbar-input {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid rgba(148, 163, 184, .24);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, .72);
+  color: #f8fafc;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  outline: none;
+  padding: 0 9px;
+}
+.lv-cb-toolbar-input:focus {
+  border-color: rgba(73, 242, 182, .62);
+  box-shadow: 0 0 0 2px rgba(73, 242, 182, .14);
+}
 .lv-cb-toolbar-field--range {
   grid-template-columns: 58px minmax(0, 1fr) 40px;
   align-items: center;
