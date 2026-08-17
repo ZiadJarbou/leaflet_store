@@ -58,6 +58,11 @@ interface SiteSettings {
     allow_signups: string;
     max_leaflets_free: string;
     free_pdf_export_limit: string;
+    ai_cover_generations_free: string;
+    ai_cover_generations_starter: string;
+    ai_cover_generations_pro: string;
+    ai_cover_generations_business: string;
+    ai_cover_generations_agency: string;
     support_email: string;
     announcement_banner: string;
     stripe_secret_key: string;
@@ -71,6 +76,13 @@ interface SiteSettings {
     help_video_5_url: string;
     help_video_6_url: string;
 }
+const AI_COVER_GENERATION_LIMIT_FIELDS = [
+    { key: 'ai_cover_generations_free', label: 'Free', icon: 'person' },
+    { key: 'ai_cover_generations_starter', label: 'Starter', icon: 'rocket_launch' },
+    { key: 'ai_cover_generations_pro', label: 'Professional', icon: 'workspace_premium' },
+    { key: 'ai_cover_generations_business', label: 'Business', icon: 'business_center' },
+    { key: 'ai_cover_generations_agency', label: 'Agency', icon: 'groups' },
+] as const;
 interface AdminIcon {
     id: number;
     label: string;
@@ -1415,30 +1427,62 @@ function AdminSettings() {
       {err && <div className="cms-error">{err}</div>}
       <div className="cms-settings-grid">
         <div className="cms-card cms-settings-general">
-          <div className="cms-card-title">General</div>
-          <div className="cms-form-row">
-            <label>Site Name</label>
-            <input value={s.site_name} onChange={e => setS({ ...s, site_name: e.target.value })}/>
+          <div className="cms-settings-card-head">
+            <div>
+              <div className="cms-card-title"><span className="material-symbol" aria-hidden="true">tune</span> General</div>
+              <p className="cms-section-sub">Manage global app details, billing keys, and AI cover image usage by subscription plan.</p>
+            </div>
           </div>
-          <div className="cms-form-row">
-            <label>Support Email</label>
-            <input type="email" value={s.support_email} onChange={e => setS({ ...s, support_email: e.target.value })}/>
-          </div>
-          <div className="cms-form-row">
-            <label>Announcement Banner</label>
-            <input value={s.announcement_banner} placeholder="Leave blank to hide" onChange={e => setS({ ...s, announcement_banner: e.target.value })}/>
-          </div>
-          <div className="cms-form-row">
-            <label>Stripe Checkout Link</label>
-            <input type="url" value={s.stripe_checkout_url || ''} placeholder="https://buy.stripe.com/..." onChange={e => setS({ ...s, stripe_checkout_url: e.target.value })}/>
-          </div>
-          <div className="cms-form-row">
-            <label>Stripe Secret Key</label>
-            <input type="password" value={s.stripe_secret_key || ''} placeholder="sk_live_..." autoComplete="off" onChange={e => setS({ ...s, stripe_secret_key: e.target.value })}/>
-          </div>
-          <div className="cms-form-row">
-            <label>OPENAI_API_KEY</label>
-            <input type="password" value={s.openai_api_key || ''} placeholder="sk-..." autoComplete="off" onChange={e => setS({ ...s, openai_api_key: e.target.value })}/>
+          <div className="cms-settings-general-layout">
+            <div className="cms-settings-group">
+              <div className="cms-settings-group-title">Website</div>
+              <div className="cms-form-row">
+                <label>Site Name</label>
+                <input value={s.site_name} onChange={e => setS({ ...s, site_name: e.target.value })}/>
+              </div>
+              <div className="cms-form-row">
+                <label>Support Email</label>
+                <input type="email" value={s.support_email} onChange={e => setS({ ...s, support_email: e.target.value })}/>
+              </div>
+              <div className="cms-form-row">
+                <label>Announcement Banner</label>
+                <input value={s.announcement_banner} placeholder="Leave blank to hide" onChange={e => setS({ ...s, announcement_banner: e.target.value })}/>
+              </div>
+            </div>
+            <div className="cms-settings-group">
+              <div className="cms-settings-group-title">Integrations</div>
+              <div className="cms-form-row">
+                <label>Stripe Checkout Link</label>
+                <input type="url" value={s.stripe_checkout_url || ''} placeholder="https://buy.stripe.com/..." onChange={e => setS({ ...s, stripe_checkout_url: e.target.value })}/>
+              </div>
+              <div className="cms-form-row">
+                <label>Stripe Secret Key</label>
+                <input type="password" value={s.stripe_secret_key || ''} placeholder="sk_live_..." autoComplete="off" onChange={e => setS({ ...s, stripe_secret_key: e.target.value })}/>
+              </div>
+              <div className="cms-form-row">
+                <label>OPENAI_API_KEY</label>
+                <input type="password" value={s.openai_api_key || ''} placeholder="sk-..." autoComplete="off" onChange={e => setS({ ...s, openai_api_key: e.target.value })}/>
+              </div>
+            </div>
+            <div className="cms-settings-group cms-ai-limit-group">
+              <div className="cms-settings-group-title">AI Image Generator</div>
+              <div className="cms-ai-limit-grid">
+                {AI_COVER_GENERATION_LIMIT_FIELDS.map(field => (
+                  <label className="cms-ai-limit-card" key={field.key}>
+                    <span className="material-symbol" aria-hidden="true">{field.icon}</span>
+                    <strong>{field.label}</strong>
+                    <input
+                      type="number"
+                      min="0"
+                      max="1000"
+                      value={s[field.key] ?? ''}
+                      onChange={e => setS({ ...s, [field.key]: e.target.value })}
+                      aria-label={`${field.label} AI cover generations per leaflet`}
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 

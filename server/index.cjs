@@ -129,6 +129,15 @@ const AI_COVER_GENERATION_LIMIT_BY_PLAN = {
   agency: 10,
   admin: 10,
 };
+const AI_COVER_GENERATION_SETTING_KEYS = {
+  free: 'ai_cover_generations_free',
+  starter: 'ai_cover_generations_starter',
+  pro: 'ai_cover_generations_pro',
+  professional: 'ai_cover_generations_pro',
+  business: 'ai_cover_generations_business',
+  agency: 'ai_cover_generations_agency',
+  admin: 'ai_cover_generations_agency',
+};
 
 function productImportLimitForUser(user) {
   const plan = String(user?.subscription_plan || 'free').trim().toLowerCase();
@@ -684,6 +693,11 @@ const settingDefaults = {
   allow_signups: '1',
   max_leaflets_free: '3',
   free_pdf_export_limit: '1',
+  ai_cover_generations_free: '1',
+  ai_cover_generations_starter: '2',
+  ai_cover_generations_pro: '4',
+  ai_cover_generations_business: '6',
+  ai_cover_generations_agency: '10',
   support_email: '',
   announcement_banner: '',
   stripe_secret_key: '',
@@ -3843,7 +3857,13 @@ function normalizeAiCoverPlan(plan) {
   return safePlan === 'professional' ? 'pro' : (safePlan || 'free');
 }
 function aiCoverGenerationLimitForPlan(plan) {
-  return AI_COVER_GENERATION_LIMIT_BY_PLAN[normalizeAiCoverPlan(plan)] ?? AI_COVER_GENERATION_LIMIT_BY_PLAN.free;
+  const safePlan = normalizeAiCoverPlan(plan);
+  const fallback = AI_COVER_GENERATION_LIMIT_BY_PLAN[safePlan] ?? AI_COVER_GENERATION_LIMIT_BY_PLAN.free;
+  const settingKey = AI_COVER_GENERATION_SETTING_KEYS[safePlan];
+  if (!settingKey) return fallback;
+  const row = db.prepare('SELECT value FROM site_settings WHERE key = ?').get(settingKey);
+  const configured = Number.parseInt(String(row?.value || '').trim(), 10);
+  return Number.isInteger(configured) && configured >= 0 ? configured : fallback;
 }
 function aiCoverPlanLabel(plan) {
   const safePlan = normalizeAiCoverPlan(plan);
