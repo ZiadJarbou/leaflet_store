@@ -370,12 +370,16 @@ function calculateA4GeneratorDimensions(orientation: 'portrait' | 'landscape') {
         dpi: A4_GENERATOR_DPI,
     };
 }
-function enhanceA4CoverPrompt(prompt: string, orientation: 'portrait' | 'landscape') {
+function enhanceA4CoverPrompt(prompt: string, orientation: 'portrait' | 'landscape', target: 'front' | 'back' = 'front') {
     const format = orientation === 'portrait'
         ? 'A4 portrait aspect ratio, vertical full-bleed composition'
         : 'A4 landscape aspect ratio, horizontal full-bleed composition';
+    const pageRole = target === 'back'
+        ? 'Design this as a distinct back cover background, not a copy or variation of the front cover. Use a calmer closing-page composition with space for contact details, QR code, store information, or final offer notes.'
+        : 'Design this as a front cover background with strong opening-page impact and space for headline offers.';
     return [
         `${format}. ${prompt.trim()}`,
+        pageRole,
         'Create background artwork only, filling the entire image edge to edge. No white margins, no page border, no decorative frame, no inner frame, no crop marks, no trim marks, no registration marks, no print guide lines, no page outline, and no blank paper area around the artwork. Do not design it as a poster mockup or printable sheet. No written words, no letters, no numbers, no prices, no labels, no badges with text, no logo text, no watermark, no readable typography anywhere. Leave clean empty areas inside the artwork for editable text overlays. Fast clean leaflet cover background, sharp commercial style.',
     ].join(' ');
 }
@@ -4070,6 +4074,8 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             setNanoError('Enter a prompt first.');
             return;
         }
+        const generationTarget = coverBuilderTarget;
+        const generationBuilder = cloneCoverBuilderState(coverBuilder);
         const userMessageId = `user-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const aiMessageId = `ai-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         setNanoConversation(previous => [
@@ -4082,7 +4088,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         setNanoError(null);
         try {
             const job = await startA4CoverImageJob({
-                prompt: enhanceA4CoverPrompt(prompt, pageSettings.orientation),
+                prompt: enhanceA4CoverPrompt(prompt, pageSettings.orientation, generationTarget),
                 orientation: pageSettings.orientation,
                 resolution: '2k',
                 width: nanoDimensions.width,
@@ -4096,9 +4102,9 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 ? job.result
                 : await waitForA4CoverImageJob(job.jobId, aiMessageId);
             saveGeneratedCoverBackground(result.imageUrl, prompt);
-            await applyGeneratedCoverImage(result.imageUrl);
+            await applyGeneratedCoverImage(result.imageUrl, generationTarget, generationBuilder);
             setNanoConversation(previous => previous.map(message => message.id === aiMessageId
-                ? { ...message, text: 'Done. I created the background, applied it to the cover, and saved it in your Library.', status: undefined }
+                ? { ...message, text: `Done. I created the background, applied it to the ${generationTarget === 'back' ? 'back cover' : 'cover'}, and saved it in your Library.`, status: undefined }
                 : message));
         }
         catch (err) {
@@ -4174,17 +4180,23 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         setNanoRecentChatsOpen(false);
         setNanoSettingsOpen(false);
     }
-    async function applyGeneratedCoverImage(imageUrl: string) {
+    async function applyGeneratedCoverImage(imageUrl: string, target: 'front' | 'back' = coverBuilderTarget, builder = coverBuilder) {
         const dynamicCoverBuilder = cloneCoverBuilderState({
-            ...coverBuilder,
+            ...builder,
             bgType: 'image',
             bgImage: imageUrl,
             aiGeneratedBg: true,
-            visibleItems: { ...coverBuilder.visibleItems },
+            visibleItems: { ...builder.visibleItems },
         });
         updateCoverBuilderForSelectedTemplate(dynamicCoverBuilder);
-        setFrontCoverBuilder(dynamicCoverBuilder);
         setCoverBuilderSelected('background');
+        if (target === 'back') {
+            setBackCoverBuilder(dynamicCoverBuilder);
+            setBackPage({ image: '', show: true, builder: true });
+            setCurrentPage(pages.length);
+            return;
+        }
+        setFrontCoverBuilder(dynamicCoverBuilder);
         setCoverPage({ image: '', show: true, builder: true });
         setCurrentPage(-1);
     }
