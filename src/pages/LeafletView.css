@@ -7631,6 +7631,34 @@ body.dragging-icon .lv-card-drop-layer {
   background: rgba(127, 29, 29, .28);
   color: #fecaca;
 }
+.lv-nano-subscribe-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  margin-top: 9px;
+  padding: 7px 10px;
+  border: 1px solid rgba(73, 242, 182, .38);
+  border-radius: 9px;
+  background: rgba(73, 242, 182, .14);
+  color: #d1fae5;
+  font: inherit;
+  font-size: .72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.lv-nano-subscribe-btn:hover:not(:disabled) {
+  background: rgba(73, 242, 182, .22);
+  border-color: rgba(73, 242, 182, .58);
+}
+.lv-nano-subscribe-btn:disabled {
+  opacity: .64;
+  cursor: default;
+}
+.lv-nano-subscribe-btn .material-symbol {
+  font-size: .95rem;
+}
 @keyframes lvNanoTypingDots {
   0%, 80%, 100% { opacity: .35; transform: translateY(0); }
   40% { opacity: 1; transform: translateY(-1px); }

@@ -2941,6 +2941,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         role: 'user' | 'ai';
         text: string;
         status?: 'loading' | 'error';
+        action?: 'subscribe';
     }[]>([]);
     const [nanoReferenceImages, setNanoReferenceImages] = useState<{
         id: string;
@@ -4116,6 +4117,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         }
         catch (err) {
             const message = err instanceof Error ? err.message : 'Failed to generate A4 cover.';
+            const isAiCoverLimitError = /AI cover generation limit reached|generation limit reached for this leaflet/i.test(message);
             const errorMessage = /quota|rate limit|429/i.test(message)
                 ? 'OpenAI image generation quota or rate limit was reached. Check billing/quota or try again later.'
                 : /high demand|model is busy|temporar|try again/i.test(message)
@@ -4123,7 +4125,14 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 : message;
             setNanoError(errorMessage);
             setNanoConversation(previous => previous.map(chatMessage => chatMessage.id === aiMessageId
-                ? { ...chatMessage, text: errorMessage, status: 'error' }
+                ? {
+                    ...chatMessage,
+                    text: isAiCoverLimitError
+                        ? 'You reached the AI image generation limit for this leaflet. Subscribe to continue creating AI cover images.'
+                        : errorMessage,
+                    status: 'error',
+                    action: isAiCoverLimitError ? 'subscribe' : undefined,
+                }
                 : chatMessage));
         }
         finally {
@@ -5698,6 +5707,10 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                     {message.role === 'ai' && (<img className="lv-nano-message-avatar" src="/leafletai_nano_avatar.png" alt="" aria-hidden="true"/>)}
                     <div className={cx("lv-nano-message", `lv-nano-message--${message.role}`, message.status === 'loading' ? 'lv-nano-message--loading' : '', message.status === 'error' ? 'lv-nano-message--error' : '')}>
                       <span>{message.text}</span>
+                      {message.action === 'subscribe' && (<button type="button" className="lv-nano-subscribe-btn" onClick={subscribeToPro} disabled={upgradeLoading}>
+                        <span className="material-symbol" aria-hidden="true">workspace_premium</span>
+                        {upgradeLoading ? 'Opening checkout...' : 'Subscribe to plan'}
+                      </button>)}
                     </div>
                   </div>))}
                   <div ref={nanoConversationBottomRef}/>
