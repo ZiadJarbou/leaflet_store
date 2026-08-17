@@ -2952,6 +2952,8 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const [nanoGenerating, setNanoGenerating] = useState(false);
     const [nanoListening, setNanoListening] = useState(false);
     const [nanoError, setNanoError] = useState<string | null>(null);
+    const shouldHideNanoPanelError = (message: string | null) => /AI cover generation limit reached/i.test(message || '');
+    const visibleNanoError = shouldHideNanoPanelError(nanoError) ? null : nanoError;
     const availableCoverDealTags = COVER_DEAL_TAGS.filter(tag => !deletedCoverDealTagKeys.includes(tag.key));
     const defaultCoverDealTag = availableCoverDealTags[0] ?? COVER_DEAL_TAGS[0];
     const [nanoA4Enabled, setNanoA4Enabled] = useState(() => typeof nanoA4VisibleOverride === 'boolean' ? nanoA4VisibleOverride : localStorage.getItem(NANO_A4_VISIBILITY_STORAGE_KEY) !== '0');
@@ -7794,7 +7796,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             </div>
           </div>
           {coverBuilderNotice && <div className="lv-cb-notice">{coverBuilderNotice}</div>}
-          {nanoError && <div className="lv-cb-error">{nanoError}</div>}
+          {visibleNanoError && <div className="lv-cb-error">{visibleNanoError}</div>}
           {(() => {
             const selectedToolbarKey = coverBuilderSelected && coverBuilderSelected !== 'background' && coverBuilder.visibleItems[coverBuilderSelected]
                 ? coverBuilderSelected
