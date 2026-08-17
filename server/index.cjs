@@ -120,6 +120,16 @@ const PRODUCT_IMPORT_LIMIT_BY_PLAN = {
   starter: 100,
 };
 
+const AI_COVER_GENERATION_LIMIT_BY_PLAN = {
+  free: 1,
+  starter: 2,
+  pro: 4,
+  professional: 4,
+  business: 6,
+  agency: 10,
+  admin: 10,
+};
+
 function productImportLimitForUser(user) {
   const plan = String(user?.subscription_plan || 'free').trim().toLowerCase();
   return PRODUCT_IMPORT_LIMIT_BY_PLAN[plan] ?? Infinity;
@@ -464,6 +474,15 @@ db.exec(`
     allow_edit INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+  CREATE TABLE IF NOT EXISTS ai_cover_generations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    leaflet_id INTEGER NOT NULL REFERENCES leaflets(id) ON DELETE CASCADE,
+    job_id TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL DEFAULT 'queued',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    completed_at TEXT
+  );
 `);
 
 /* ── Migrate: add origin ISO columns if missing ── */
@@ -524,6 +543,7 @@ if (!pdfExportCols.includes('allow_edit')) {
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_stripe_plan_prices_lookup ON stripe_plan_prices(plan, period, active);
   CREATE INDEX IF NOT EXISTS idx_stripe_plan_prices_price_id ON stripe_plan_prices(stripe_price_id);
+  CREATE INDEX IF NOT EXISTS idx_ai_cover_generations_usage ON ai_cover_generations(user_id, leaflet_id, status);
 `);
 
 const PLATFORM_DEFAULT_TEMPLATE_NAMES = Array.from({ length: 7 }, (_, i) => `Template ${i + 1}`);
@@ -3818,6 +3838,60 @@ function httpError(status, message) {
   err.status = status;
   return err;
 }
+function normalizeAiCoverPlan(plan) {
+  const safePlan = String(plan || 'free').trim().toLowerCase();
+  return safePlan === 'professional' ? 'pro' : (safePlan || 'free');
+}
+function aiCoverGenerationLimitForPlan(plan) {
+  return AI_COVER_GENERATION_LIMIT_BY_PLAN[normalizeAiCoverPlan(plan)] ?? AI_COVER_GENERATION_LIMIT_BY_PLAN.free;
+}
+function aiCoverPlanLabel(plan) {
+  const safePlan = normalizeAiCoverPlan(plan);
+  if (safePlan === 'pro') return 'Professional';
+  return safePlan.charAt(0).toUpperCase() + safePlan.slice(1);
+}
+function aiCoverUsageCount(userId, leafletId) {
+  const row = db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM ai_cover_generations
+    WHERE user_id = ?
+      AND leaflet_id = ?
+      AND status IN ('queued', 'running', 'complete')
+  `).get(userId, leafletId);
+  return Number(row?.count || 0);
+}
+const reserveAiCoverGeneration = db.transaction((userId, leafletId, jobId) => {
+  const safeLeafletId = Number(leafletId);
+  if (!Number.isInteger(safeLeafletId) || safeLeafletId <= 0) {
+    throw httpError(400, 'leafletId is required for AI cover image generation.');
+  }
+  const user = db.prepare('SELECT id, email, subscription_plan FROM users WHERE id = ?').get(userId);
+  if (!user) throw httpError(401, 'User was not found.');
+  const leaflet = db.prepare('SELECT id FROM leaflets WHERE id = ? AND user_id = ?').get(safeLeafletId, userId);
+  if (!leaflet) throw httpError(404, 'Leaflet was not found.');
+
+  const limit = aiCoverGenerationLimitForPlan(user.subscription_plan);
+  const used = aiCoverUsageCount(userId, safeLeafletId);
+  if (used >= limit) {
+    const label = aiCoverPlanLabel(user.subscription_plan);
+    throw httpError(403, `AI cover generation limit reached for this leaflet. Your ${label} plan includes ${limit} AI cover ${limit === 1 ? 'generation' : 'generations'} per leaflet.`);
+  }
+
+  db.prepare(`
+    INSERT INTO ai_cover_generations (user_id, leaflet_id, job_id, status)
+    VALUES (?, ?, ?, 'queued')
+  `).run(userId, safeLeafletId, jobId);
+
+  return { leafletId: safeLeafletId, used: used + 1, limit };
+});
+function setAiCoverGenerationStatus(jobId, status) {
+  db.prepare(`
+    UPDATE ai_cover_generations
+    SET status = ?,
+        completed_at = CASE WHEN ? = 'complete' THEN datetime('now') ELSE completed_at END
+    WHERE job_id = ?
+  `).run(status, status, jobId);
+}
 function isTemporaryAiDemandError(err) {
   const message = String(err?.message || '');
   return /high demand|overloaded|temporar|try again later|unavailable|503|502|504/i.test(message) ||
@@ -3924,13 +3998,22 @@ async function generateA4ImageFromPayload(payload, options = {}) {
 }
 
 app.post('/api/generate-a4-jobs', authMiddleware, (req, res) => {
-  cleanupA4GenerationJobs();
-  const jobId = crypto.randomBytes(16).toString('hex');
-  const createdAt = Date.now();
-  a4GenerationJobs.set(jobId, { jobId, status: 'queued', createdAt, updatedAt: createdAt });
-  res.status(202).json({ jobId, status: 'queued' });
+  let jobId = null;
+  let usage = null;
+  try {
+    cleanupA4GenerationJobs();
+    jobId = crypto.randomBytes(16).toString('hex');
+    usage = reserveAiCoverGeneration(req.user.id, req.body?.leafletId, jobId);
+    const createdAt = Date.now();
+    a4GenerationJobs.set(jobId, { jobId, status: 'queued', createdAt, updatedAt: createdAt, usage });
+    res.status(202).json({ jobId, status: 'queued', usage });
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message || 'Failed to start image generation' });
+    return;
+  }
   setImmediate(async () => {
     setA4GenerationJob(jobId, { status: 'running' });
+    setAiCoverGenerationStatus(jobId, 'running');
     try {
       const result = await generateA4ImageFromPayload(req.body || {}, {
         onRetry: (attempt, total) => {
@@ -3940,10 +4023,12 @@ app.post('/api/generate-a4-jobs', authMiddleware, (req, res) => {
           });
         },
       });
-      setA4GenerationJob(jobId, { status: 'complete', result });
+      setA4GenerationJob(jobId, { status: 'complete', result: { ...result, usage } });
+      setAiCoverGenerationStatus(jobId, 'complete');
     } catch (err) {
       const message = err.message || 'Failed to generate image';
       const isQuotaError = /quota|rate limit|429|insufficient_quota/i.test(message);
+      setAiCoverGenerationStatus(jobId, 'error');
       setA4GenerationJob(jobId, {
         status: 'error',
         message: isQuotaError
@@ -3965,9 +4050,14 @@ app.get('/api/generate-a4-jobs/:jobId', authMiddleware, (req, res) => {
 });
 
 app.post('/api/generate-a4', authMiddleware, async (req, res) => {
+  const jobId = `sync-${crypto.randomBytes(16).toString('hex')}`;
   try {
-    res.json(await generateA4ImageFromPayload(req.body || {}));
+    const usage = reserveAiCoverGeneration(req.user.id, req.body?.leafletId, jobId);
+    const result = await generateA4ImageFromPayload(req.body || {});
+    setAiCoverGenerationStatus(jobId, 'complete');
+    res.json({ ...result, usage });
   } catch (err) {
+    setAiCoverGenerationStatus(jobId, 'error');
     const message = err.message || 'Failed to generate image';
     const isQuotaError = /quota|rate limit|429|insufficient_quota/i.test(message);
     res.status(err.status || (isQuotaError ? 429 : 500)).json({

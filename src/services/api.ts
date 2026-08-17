@@ -63,6 +63,7 @@ export function saveLeafletThumbnail(id: number, thumbnail: string): Promise<{ s
 }
 
 export function generateA4CoverImage(payload: {
+  leafletId?: number | string;
   prompt: string;
   orientation: 'portrait' | 'landscape';
   resolution: '1k' | '2k' | '4k';
@@ -85,6 +86,7 @@ export function generateA4CoverImage(payload: {
   resolution: string;
   duration?: number;
   textResponse?: string | null;
+  usage?: { used: number; limit: number };
 }> {
   return request('/generate-a4', {
     method: 'POST',
@@ -101,6 +103,7 @@ export type A4CoverImageJobResult = {
   resolution: string;
   duration?: number;
   textResponse?: string | null;
+  usage?: { used: number; limit: number };
 };
 
 export type A4CoverImageJob = {
@@ -108,6 +111,7 @@ export type A4CoverImageJob = {
   status: 'queued' | 'running' | 'complete' | 'error';
   result?: A4CoverImageJobResult;
   message?: string;
+  usage?: { used: number; limit: number };
 };
 
 export function startA4CoverImageJob(payload: Parameters<typeof generateA4CoverImage>[0]): Promise<A4CoverImageJob> {

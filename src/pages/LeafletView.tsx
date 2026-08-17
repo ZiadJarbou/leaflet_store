@@ -4074,6 +4074,10 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             setNanoError('Enter a prompt first.');
             return;
         }
+        if (!id) {
+            setNanoError('Save the leaflet before generating AI cover images.');
+            return;
+        }
         const generationTarget = coverBuilderTarget;
         const generationBuilder = cloneCoverBuilderState(coverBuilder);
         const userMessageId = `user-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -4088,6 +4092,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         setNanoError(null);
         try {
             const job = await startA4CoverImageJob({
+                leafletId: id,
                 prompt: enhanceA4CoverPrompt(prompt, pageSettings.orientation, generationTarget),
                 orientation: pageSettings.orientation,
                 resolution: '2k',
