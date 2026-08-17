@@ -5529,7 +5529,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     function renderCoverBuilderFooter() {
         const templateLabel = coverBuilderAddingTemplate ? 'Saving...' : 'Save as template';
         return (<div className="lc-footer lv-cb-footer">
-          {nanoError && <span className="lc-save-err">warning {nanoError}</span>}
+          {visibleNanoError && <span className="lc-save-err">warning {visibleNanoError}</span>}
           <button type="button" className="btn ghost lc-reset-btn" onClick={resetCoverBuilderToDefault}>Reset all to default</button>
           <button type="button" className="btn ghost lv-cb-footer-template-btn" onClick={saveCoverBuilderAsTemplate} disabled={coverBuilderAddingTemplate}>
             {templateLabel}
