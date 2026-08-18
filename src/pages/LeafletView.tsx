@@ -338,6 +338,31 @@ const COVER_BACKGROUNDS = Object.entries(coverBackgroundAssetModules)
     .map(([path, url]) => ({ key: path.split('/').pop() || path, name: coverBackgroundName(path), url }))
     .sort((first, second) => first.name.localeCompare(second.name));
 const COVER_AI_TEMPLATE_PRODUCT_LIMIT = 3;
+function coverProductDiscountScore(product: LeafletProduct) {
+    return product.old_price !== null && product.current_price !== null && product.old_price > product.current_price
+        ? (product.old_price - product.current_price) / product.old_price
+        : -1;
+}
+function bestDiscountProductIds(products: LeafletProduct[], limit = COVER_AI_TEMPLATE_PRODUCT_LIMIT) {
+    return [...products]
+        .sort((a, b) => {
+        const discountDelta = coverProductDiscountScore(b) - coverProductDiscountScore(a);
+        if (discountDelta !== 0)
+            return discountDelta;
+        return (a.current_price ?? Infinity) - (b.current_price ?? Infinity);
+    })
+        .slice(0, limit)
+        .map(product => product.id);
+}
+function hasSavedCoverBuilder(value: unknown) {
+    return !!(value && typeof value === 'object' && Object.keys(value as Record<string, unknown>).length > 0);
+}
+function isPlatformCoverTemplate(template: CoverLayoutTemplate) {
+    return template.is_platform === true || template.owner_role === 'admin';
+}
+function isBackCoverTemplate(template: CoverLayoutTemplate) {
+    return /\bback\b/i.test(`${template.name || ''} ${template.template_key || ''} ${template.layout_id || ''}`);
+}
 function calculateA4GeneratorDimensions(orientation: 'portrait' | 'landscape') {
     const ratio = orientation === 'portrait' ? 297 / 210 : 210 / 297;
     let width = 0;
@@ -2718,6 +2743,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [cardLayout, setCardLayout] = useState<CardLayout | null>(null);
+    const [coverLayoutLoaded, setCoverLayoutLoaded] = useState(false);
     const [customizerOpen, setCustomizerOpen] = useState(false);
     const [templateOpen, setTemplateOpen] = useState(false);
     const [sidebarTemplates, setSidebarTemplates] = useState<LayoutTemplate[]>([]);
@@ -2820,6 +2846,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const [backCoverBuilder, setBackCoverBuilder] = useState<CoverBuilderState>(() => normalizeCoverBuilder(DEFAULT_COVER_BUILDER));
     const [coverBuilderTarget, setCoverBuilderTarget] = useState<'front' | 'back'>('front');
     const [platformCoverTemplates, setPlatformCoverTemplates] = useState<CoverLayoutTemplate[]>([]);
+    const [platformCoverTemplatesLoaded, setPlatformCoverTemplatesLoaded] = useState(false);
     const [selectedCoverTemplate, setSelectedCoverTemplate] = useState<{
         id: string;
         templateKey: string;
@@ -2968,6 +2995,8 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const nanoSpeechManualStopRef = useRef(false);
     const coverBuilderPreviewRef = useRef<HTMLDivElement>(null);
     const coverBuilderStageRef = useRef<HTMLDivElement>(null);
+    const coverBuilderLoadedFromLayoutRef = useRef({ front: false, back: false });
+    const coverBuilderDefaultsAppliedRef = useRef<string | null>(null);
     const coverBuilderLogoTextDraftRef = useRef(DEFAULT_COVER_BUILDER.logoText);
     const coverBuilderLogoTextCommittedRef = useRef(DEFAULT_COVER_BUILDER.logoText);
     const coverBuilderLogoTextCommitTimerRef = useRef<number | null>(null);
@@ -3361,6 +3390,10 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         if (!id)
             return;
         setLoading(true);
+        setCoverLayoutLoaded(false);
+        coverBackLoadedRef.current = false;
+        coverBuilderLoadedFromLayoutRef.current = { front: false, back: false };
+        coverBuilderDefaultsAppliedRef.current = null;
         const fetchLeaflet = coverBuilderOnly ? getAdminLeaflet : getLeaflet;
         const fetchLeafletLayout = coverBuilderOnly ? getAdminLeafletLayout : getLeafletLayout;
         fetchLeaflet(id)
@@ -3377,8 +3410,11 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 setCoverPage(r.layout.cover_page);
             if (r.layout.back_page)
                 setBackPage(r.layout.back_page);
-            const loadedFrontCoverBuilder = normalizeCoverBuilder(r.layout.cover_builder);
-            const loadedBackCoverBuilder = normalizeCoverBuilder(r.layout.back_cover_builder || r.layout.cover_builder);
+            const hasFrontCoverBuilder = hasSavedCoverBuilder(r.layout.cover_builder);
+            const hasBackCoverBuilder = hasSavedCoverBuilder(r.layout.back_cover_builder);
+            coverBuilderLoadedFromLayoutRef.current = { front: hasFrontCoverBuilder, back: hasBackCoverBuilder };
+            const loadedFrontCoverBuilder = normalizeCoverBuilder(hasFrontCoverBuilder ? r.layout.cover_builder : DEFAULT_COVER_BUILDER);
+            const loadedBackCoverBuilder = normalizeCoverBuilder(hasBackCoverBuilder ? r.layout.back_cover_builder : hasFrontCoverBuilder ? r.layout.cover_builder : DEFAULT_COVER_BUILDER);
             setFrontCoverBuilder(loadedFrontCoverBuilder);
             setBackCoverBuilder(loadedBackCoverBuilder);
             setCoverBuilder(loadedFrontCoverBuilder);
@@ -3398,9 +3434,13 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                     header?: boolean;
                     footer?: boolean;
                 }>);
+            setCoverLayoutLoaded(true);
             setTimeout(() => { coverBackLoadedRef.current = true; }, 0);
         })
-            .catch(() => { coverBackLoadedRef.current = true; });
+            .catch(() => {
+            setCoverLayoutLoaded(true);
+            coverBackLoadedRef.current = true;
+        });
         // Check if this leaflet is the user's default
         fetch('/api/user/default-leaflet', {
             headers: { Authorization: `Bearer ${localStorage.getItem('leafletai_token')}` },
@@ -3647,10 +3687,74 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         });
     }, []);
     useEffect(() => {
+        setPlatformCoverTemplatesLoaded(false);
         getCoverLayoutTemplates()
             .then(r => setPlatformCoverTemplates(Array.isArray(r.templates) ? r.templates.map(cloneCoverTemplate) : []))
-            .catch(() => setPlatformCoverTemplates([]));
+            .catch(() => setPlatformCoverTemplates([]))
+            .finally(() => setPlatformCoverTemplatesLoaded(true));
     }, []);
+    useEffect(() => {
+        if (coverBuilderOnly || !id || !coverLayoutLoaded || !platformCoverTemplatesLoaded || !cardLayout || !data)
+            return;
+        if (coverBuilderDefaultsAppliedRef.current === id)
+            return;
+        const productIds = bestDiscountProductIds(data.products);
+        const adminTemplates = platformCoverTemplates.filter(isPlatformCoverTemplate);
+        const frontTemplate = adminTemplates.find(template => !isBackCoverTemplate(template)) || adminTemplates[0];
+        const backTemplate = adminTemplates.find(template => template.id !== frontTemplate?.id && isBackCoverTemplate(template))
+            || adminTemplates.find(template => template.id !== frontTemplate?.id)
+            || frontTemplate;
+        const buildDefaultBuilder = (template?: CoverLayoutTemplate) => {
+            let next = normalizeCoverBuilder({
+                ...DEFAULT_COVER_BUILDER,
+                selectedProductIds: productIds,
+                productCardLayout: cardLayout,
+                visibleItems: {
+                    ...DEFAULT_COVER_BUILDER.visibleItems,
+                    products: productIds.length > 0,
+                },
+            });
+            if (template?.elements) {
+                next = applyCoverTemplateElements(next, template.elements);
+            }
+            else if (template?.styles) {
+                next.itemStyles = (Object.keys(DEFAULT_COVER_BUILDER_ITEM_STYLES) as CoverBuilderItemKey[]).reduce((acc, key) => {
+                    acc[key] = {
+                        ...DEFAULT_COVER_BUILDER_ITEM_STYLES[key],
+                        ...((template.styles?.[key] || {}) as Partial<CoverBuilderElementStyle>),
+                    };
+                    return acc;
+                }, {} as Record<CoverBuilderItemKey, CoverBuilderElementStyle>);
+            }
+            if (template) {
+                next.headlineAiStyle = template.headline_ai_style || next.headlineAiStyle;
+                next.contactAiStyle = template.contact_ai_style || next.contactAiStyle;
+                next.headlineAccentColor = template.headline_accent_color || next.headlineAccentColor;
+                next.contactAccentColor = template.contact_accent_color || next.contactAccentColor;
+                if (template.headline_lines)
+                    next.headline = formatHeadlineForAiStyle(next.headline, template.headline_lines);
+            }
+            next.selectedProductIds = productIds;
+            next.productCardLayout = next.productCardLayout || cardLayout;
+            next.visibleItems = { ...next.visibleItems, products: productIds.length > 0 };
+            return normalizeCoverBuilder(next);
+        };
+        const loadedFromLayout = coverBuilderLoadedFromLayoutRef.current;
+        const nextFrontCoverBuilder = loadedFromLayout.front ? frontCoverBuilder : buildDefaultBuilder(frontTemplate);
+        const nextBackCoverBuilder = loadedFromLayout.back ? backCoverBuilder : buildDefaultBuilder(backTemplate);
+        if (!loadedFromLayout.front) {
+            setFrontCoverBuilder(nextFrontCoverBuilder);
+            setCoverPage(prev => prev.show || prev.image ? { ...prev, builder: prev.builder ?? true } : { image: '', show: true, builder: true });
+        }
+        if (!loadedFromLayout.back) {
+            setBackCoverBuilder(nextBackCoverBuilder);
+            setBackPage(prev => prev.show || prev.image ? { ...prev, builder: prev.builder ?? true } : { image: '', show: true, builder: true });
+        }
+        if ((coverBuilderTarget === 'front' && !loadedFromLayout.front) || (coverBuilderTarget === 'back' && !loadedFromLayout.back)) {
+            setCoverBuilder(coverBuilderTarget === 'front' ? nextFrontCoverBuilder : nextBackCoverBuilder);
+        }
+        coverBuilderDefaultsAppliedRef.current = id;
+    }, [coverBuilderOnly, id, coverLayoutLoaded, platformCoverTemplatesLoaded, cardLayout, data, platformCoverTemplates, coverBuilderTarget, frontCoverBuilder, backCoverBuilder]);
     useEffect(() => {
         const readStoredNanoA4Enabled = () => localStorage.getItem(NANO_A4_VISIBILITY_STORAGE_KEY) !== '0';
         if (typeof nanoA4VisibleOverride === 'boolean') {
@@ -4745,7 +4849,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 visibleItems: { ...prev.visibleItems, [key]: true },
             };
             if (key === 'products' && next.selectedProductIds.length === 0 && products.length > 0) {
-                next.selectedProductIds = products.slice(0, 6).map(p => p.id);
+                next.selectedProductIds = bestDiscountProductIds(products);
             }
             if (key === 'dealTag' && !next.dealTagUrl) {
                 next.dealTagUrl = defaultCoverDealTag.url;
@@ -7150,7 +7254,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 } as Partial<Record<CoverBuilderItemKey, Partial<CoverBuilderElementStyle>>>,
             }
             : baseTemplate;
-        const selectedProducts = products.slice(0, COVER_AI_TEMPLATE_PRODUCT_LIMIT).map(p => p.id);
+        const selectedProducts = bestDiscountProductIds(products);
         const nextSelectedTemplate = {
             id: platformTemplate?.id || templateId,
             templateKey: platformTemplate?.template_key || templateKey,
@@ -7382,20 +7486,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         const fontFamily = pick(fonts);
         const headlineStyle = pick(headlineStyles);
         const contactStyle = contactStyles.includes(palette.contact) ? palette.contact : pick(contactStyles);
-        const selectedProducts = [...products]
-            .sort((a, b) => {
-            const discountA = a.old_price !== null && a.current_price !== null && a.old_price > a.current_price
-                ? (a.old_price - a.current_price) / a.old_price
-                : -1;
-            const discountB = b.old_price !== null && b.current_price !== null && b.old_price > b.current_price
-                ? (b.old_price - b.current_price) / b.old_price
-                : -1;
-            if (discountB !== discountA)
-                return discountB - discountA;
-            return (a.current_price ?? Infinity) - (b.current_price ?? Infinity);
-        })
-            .slice(0, COVER_AI_TEMPLATE_PRODUCT_LIMIT)
-            .map(product => product.id);
+        const selectedProducts = bestDiscountProductIds(products);
         const productStripHeight = Number((((flushFullBleedFooter && footerShowFor(safePage) ? cardH : cardHFor(safePage)) / A4_H) * 100).toFixed(2));
         const productStrip = (y: number, z: number, radius: number) => ({ x: 0, y, w: 100, h: productStripHeight, z, radius });
         const layouts = [
