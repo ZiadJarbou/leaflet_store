@@ -56,4 +56,26 @@ for (const route of fallbackDirs) {
 }
 
 fs.writeFileSync(path.join(distDir, '404.html'), indexHtml);
-console.log(`create-spa-fallbacks: wrote ${fallbackDirs.length} SPA route fallbacks and 404.html`);
+
+const htaccess = `DirectoryIndex index.html
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  RewriteRule ^index\\.html$ - [L]
+
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  RewriteCond %{REQUEST_URI} !^/api/
+  RewriteCond %{REQUEST_URI} !^/uploads/
+  RewriteRule ^ /index.html [L]
+</IfModule>
+
+ErrorDocument 404 /index.html
+`;
+fs.writeFileSync(path.join(distDir, '.htaccess'), htaccess);
+
+console.log(`create-spa-fallbacks: wrote ${fallbackDirs.length} SPA route fallbacks, 404.html, and .htaccess`);
