@@ -4130,7 +4130,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 ? {
                     ...chatMessage,
                     text: isAiCoverLimitError
-                        ? 'You reached the AI image generation limit for this leaflet. Subscribe to continue creating AI cover images.'
+                        ? 'You reached the AI image generation limit for this leaflet. Upgrade your plan to continue creating AI cover images.'
                         : errorMessage,
                     status: 'error',
                     action: isAiCoverLimitError ? 'subscribe' : undefined,
@@ -5739,11 +5739,17 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                     {message.role === 'ai' && (<img className="lv-nano-message-avatar" src="/leafletai_nano_avatar.png" alt="" aria-hidden="true"/>)}
                     <div className={cx("lv-nano-message-cluster", message.role === 'user' ? 'lv-nano-message-cluster--user' : 'lv-nano-message-cluster--ai')}>
                       <div className={cx("lv-nano-message", `lv-nano-message--${message.role}`, message.status === 'loading' ? 'lv-nano-message--loading' : '', message.status === 'error' ? 'lv-nano-message--error' : '')}>
-                        <span>{message.text}</span>
-                        {message.action === 'subscribe' && (<button type="button" className="lv-nano-subscribe-btn" onClick={subscribeToPro} disabled={upgradeLoading}>
-                          <span className="material-symbol" aria-hidden="true">workspace_premium</span>
-                          {upgradeLoading ? 'Opening checkout...' : 'Subscribe to plan'}
-                        </button>)}
+                        {message.action !== 'subscribe' && <span>{message.text}</span>}
+                        {message.action === 'subscribe' && (<div className="lv-nano-upgrade-card">
+                          <div className="lv-nano-upgrade-card-icon" aria-hidden="true">AI</div>
+                          <div>
+                            <strong>AI image limit reached</strong>
+                            <p>{message.text}</p>
+                          </div>
+                          <button type="button" className="lv-nano-subscribe-btn" onClick={() => { window.location.href = '/pricing'; }}>
+                            Upgrade plan
+                          </button>
+                        </div>)}
                       </div>
                       {message.role === 'user' && (<div className="lv-nano-message-actions" aria-label="Prompt actions">
                         <button type="button" onClick={() => editNanoUserPrompt(message.text)} disabled={nanoGenerating} aria-label="Edit prompt" title="Edit prompt">

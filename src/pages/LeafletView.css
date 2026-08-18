@@ -7673,17 +7673,57 @@ body.dragging-icon .lv-card-drop-layer {
   background: rgba(127, 29, 29, .28);
   color: #fecaca;
 }
+.lv-nano-message--error:has(.lv-nano-upgrade-card) {
+  width: min(100%, 280px);
+  padding: 0;
+  border-color: rgba(73, 242, 182, .24);
+  background: rgba(15, 23, 42, .92);
+  color: #dbeafe;
+  overflow: hidden;
+}
+.lv-nano-upgrade-card {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+}
+.lv-nano-upgrade-card-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, rgba(73,242,182,.22), rgba(59,130,246,.18));
+  color: #bbf7d0;
+  font-size: .68rem;
+  font-weight: 900;
+}
+.lv-nano-upgrade-card strong {
+  display: block;
+  color: #f8fafc;
+  font-size: .78rem;
+  font-weight: 800;
+  margin: 1px 0 4px;
+}
+.lv-nano-upgrade-card p {
+  margin: 0;
+  color: #aebed2;
+  font-size: .7rem;
+  line-height: 1.45;
+}
 .lv-nano-subscribe-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
+  grid-column: 1 / -1;
   min-height: 32px;
-  margin-top: 9px;
+  margin-top: 2px;
   padding: 7px 10px;
-  border: 1px solid rgba(73, 242, 182, .38);
+  border: 1px solid rgba(73, 242, 182, .42);
   border-radius: 9px;
-  background: rgba(73, 242, 182, .14);
+  background: rgba(73, 242, 182, .16);
   color: #d1fae5;
   font: inherit;
   font-size: .72rem;
@@ -7691,7 +7731,7 @@ body.dragging-icon .lv-card-drop-layer {
   cursor: pointer;
 }
 .lv-nano-subscribe-btn:hover:not(:disabled) {
-  background: rgba(73, 242, 182, .22);
+  background: rgba(73, 242, 182, .24);
   border-color: rgba(73, 242, 182, .58);
 }
 .lv-nano-subscribe-btn:disabled {
