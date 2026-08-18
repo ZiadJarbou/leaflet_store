@@ -7591,8 +7591,19 @@ body.dragging-icon .lv-card-drop-layer {
   object-fit: contain;
   padding: 4px;
 }
-.lv-nano-message {
+.lv-nano-message-cluster {
+  display: grid;
+  gap: 4px;
   max-width: 82%;
+  min-width: 0;
+}
+.lv-nano-message-cluster--user {
+  justify-items: end;
+}
+.lv-nano-message-cluster--ai {
+  justify-items: start;
+}
+.lv-nano-message {
   padding: 9px 11px;
   border: 1px solid rgba(148, 163, 184, .22);
   border-radius: 14px;
@@ -7601,6 +7612,37 @@ body.dragging-icon .lv-card-drop-layer {
   font-weight: 400;
   line-height: 1.4;
   overflow-wrap: anywhere;
+}
+.lv-nano-message-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  padding-right: 4px;
+  opacity: .76;
+}
+.lv-nano-message-actions button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+}
+.lv-nano-message-actions button:hover:not(:disabled) {
+  background: rgba(148, 163, 184, .12);
+  color: #e2e8f0;
+}
+.lv-nano-message-actions button:disabled {
+  opacity: .42;
+  cursor: default;
+}
+.lv-nano-message-actions .material-symbol {
+  font-size: .95rem;
 }
 .lv-nano-message--user {
   border-bottom-right-radius: 5px;

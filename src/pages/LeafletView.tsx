@@ -2943,6 +2943,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         status?: 'loading' | 'error';
         action?: 'subscribe';
     }[]>([]);
+    const [nanoCopiedMessageId, setNanoCopiedMessageId] = useState<string | null>(null);
     const [nanoReferenceImages, setNanoReferenceImages] = useState<{
         id: string;
         dataUrl: string;
@@ -2959,6 +2960,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const defaultCoverDealTag = availableCoverDealTags[0] ?? COVER_DEAL_TAGS[0];
     const [nanoA4Enabled, setNanoA4Enabled] = useState(() => typeof nanoA4VisibleOverride === 'boolean' ? nanoA4VisibleOverride : localStorage.getItem(NANO_A4_VISIBILITY_STORAGE_KEY) !== '0');
     const nanoReferenceInputRef = useRef<HTMLInputElement>(null);
+    const nanoPromptInputRef = useRef<HTMLTextAreaElement>(null);
     const nanoConversationBottomRef = useRef<HTMLDivElement>(null);
     const nanoSpeechRef = useRef<any>(null);
     const nanoSpeechBasePromptRef = useRef('');
@@ -4178,6 +4180,36 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         const enhancedPrompt = `${basePrompt.replace(/\s+$/g, '')}, full-bleed A4 ${pageSettings.orientation} supermarket leaflet background, bright professional retail lighting, clean product shelves, large empty center area for editable offers, modern commercial design, no text, no logos, no borders, no frames, no crop marks, no print guide lines.`;
         setNanoPrompt(enhancedPrompt.slice(0, 4000));
         setNanoError(null);
+    }
+    function editNanoUserPrompt(prompt: string) {
+        setNanoPrompt(prompt.slice(0, 4000));
+        setNanoError(null);
+        window.setTimeout(() => {
+            nanoPromptInputRef.current?.focus();
+            const length = nanoPromptInputRef.current?.value.length ?? 0;
+            nanoPromptInputRef.current?.setSelectionRange(length, length);
+        }, 0);
+    }
+    async function copyNanoUserPrompt(messageId: string, prompt: string) {
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(prompt);
+            } else {
+                const textArea = document.createElement('textarea');
+                textArea.value = prompt;
+                textArea.setAttribute('readonly', 'true');
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            }
+            setNanoCopiedMessageId(messageId);
+            window.setTimeout(() => setNanoCopiedMessageId(current => current === messageId ? null : current), 1400);
+        } catch {
+            setNanoError('Could not copy the prompt.');
+        }
     }
     function startNewNanoChat() {
         setNanoConversation([]);
@@ -5705,18 +5737,28 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 {nanoConversation.length > 0 && (<div className="lv-nano-conversation" aria-live="polite">
                   {nanoConversation.map(message => (<div key={message.id} className={cx("lv-nano-message-row", message.role === 'user' ? 'lv-nano-message-row--user' : 'lv-nano-message-row--ai')}>
                     {message.role === 'ai' && (<img className="lv-nano-message-avatar" src="/leafletai_nano_avatar.png" alt="" aria-hidden="true"/>)}
-                    <div className={cx("lv-nano-message", `lv-nano-message--${message.role}`, message.status === 'loading' ? 'lv-nano-message--loading' : '', message.status === 'error' ? 'lv-nano-message--error' : '')}>
-                      <span>{message.text}</span>
-                      {message.action === 'subscribe' && (<button type="button" className="lv-nano-subscribe-btn" onClick={subscribeToPro} disabled={upgradeLoading}>
-                        <span className="material-symbol" aria-hidden="true">workspace_premium</span>
-                        {upgradeLoading ? 'Opening checkout...' : 'Subscribe to plan'}
-                      </button>)}
+                    <div className={cx("lv-nano-message-cluster", message.role === 'user' ? 'lv-nano-message-cluster--user' : 'lv-nano-message-cluster--ai')}>
+                      <div className={cx("lv-nano-message", `lv-nano-message--${message.role}`, message.status === 'loading' ? 'lv-nano-message--loading' : '', message.status === 'error' ? 'lv-nano-message--error' : '')}>
+                        <span>{message.text}</span>
+                        {message.action === 'subscribe' && (<button type="button" className="lv-nano-subscribe-btn" onClick={subscribeToPro} disabled={upgradeLoading}>
+                          <span className="material-symbol" aria-hidden="true">workspace_premium</span>
+                          {upgradeLoading ? 'Opening checkout...' : 'Subscribe to plan'}
+                        </button>)}
+                      </div>
+                      {message.role === 'user' && (<div className="lv-nano-message-actions" aria-label="Prompt actions">
+                        <button type="button" onClick={() => editNanoUserPrompt(message.text)} disabled={nanoGenerating} aria-label="Edit prompt" title="Edit prompt">
+                          <span className="material-symbol" aria-hidden="true">edit</span>
+                        </button>
+                        <button type="button" onClick={() => void copyNanoUserPrompt(message.id, message.text)} aria-label="Copy prompt" title="Copy prompt">
+                          <span className="material-symbol" aria-hidden="true">{nanoCopiedMessageId === message.id ? 'check' : 'content_copy'}</span>
+                        </button>
+                      </div>)}
                     </div>
                   </div>))}
                   <div ref={nanoConversationBottomRef}/>
                 </div>)}
                 <div className="lv-nano-prompt-wrap">
-                  <textarea className="lv-nano-prompt" value={nanoPrompt} onChange={e => setNanoPrompt(e.target.value.slice(0, 4000))} onPaste={handleNanoPromptPaste} onKeyDown={e => {
+                  <textarea ref={nanoPromptInputRef} className="lv-nano-prompt" value={nanoPrompt} onChange={e => setNanoPrompt(e.target.value.slice(0, 4000))} onPaste={handleNanoPromptPaste} onKeyDown={e => {
                     if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing)
                         return;
                     e.preventDefault();
