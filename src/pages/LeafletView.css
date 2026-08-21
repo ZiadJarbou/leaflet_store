@@ -2370,9 +2370,8 @@ a.lv-card-image-license:hover {
   box-sizing: border-box;
 }
 
-/* ── Cards inside A4 use white background override ─────────────── */
+/* ── Cards inside A4 keep layout-defined backgrounds ─────────────── */
 .lv-a4-page .lv-card {
-  background: #ffffff;
   border-color: rgba(0,0,0,.08);
   color: #1e293b;
 }
