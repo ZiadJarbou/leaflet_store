@@ -14,7 +14,8 @@
   opacity: 0;
   transform: translateY(-4px);
   transition: opacity .18s ease, transform .18s ease;
-  z-index: 2;
+  z-index: 2000;
+  pointer-events: auto;
 }
 .lv-card:hover .lv-card-actions {
   opacity: 1;
@@ -611,7 +612,7 @@
 .lv-card-positioned .lv-card-actions {
   position: absolute;
   top: 6px; right: 6px;
-  z-index: 10;
+  z-index: 2000;
 }
 
 /* Image area */
@@ -5895,6 +5896,7 @@ body.dragging-icon .lv-card-drop-layer {
 }
 .lv-cb-product-card--editable .lv-card-actions {
   display: flex !important;
+  z-index: 2000;
 }
 .lv-cb-product-card--editable .lv-edit-btn {
   pointer-events: auto;
