@@ -52,7 +52,7 @@ export const LINK_ICONS: Array<{
     { key: 'custom', label: 'Custom' },
 ];
 const DEFAULT: CardLayout = {
-    card_background: '#1e1e2e', card_border_radius: 16, accent_color: '#49f2b6',
+    card_background: '#1e1e2e', card_bg_type: 'solid', card_bg_color2: '#ffffff', card_bg_gradient_angle: 135, card_border_radius: 16, accent_color: '#49f2b6',
     image_aspect_ratio: 72,
     show_image: true, show_name_lan1: true, show_name_lan2: true,
     show_origin: true, show_origin_lan1: true, show_origin_lan2: true,
@@ -174,6 +174,25 @@ function mergeElemStyles(defs: Record<TextElemKey, TextElementStyle>, overrides?
             result[k] = { ...defs[k], ...overrides[k] };
     }
     return result;
+}
+function getCardBackgroundColors(layout: CardLayout) {
+    const matches = layout.card_background?.match(/#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)/g);
+    return {
+        color1: matches?.[0] ?? (layout.card_bg_type === 'gradient' ? '#ffffff' : layout.card_background || '#1e1e2e'),
+        color2: layout.card_bg_color2 ?? matches?.[1] ?? '#ffffff',
+    };
+}
+function normalizeCardBackground(layout: CardLayout): CardLayout {
+    const isGradient = layout.card_bg_type === 'gradient' || /^linear-gradient\(/i.test(layout.card_background || '');
+    const { color1, color2 } = getCardBackgroundColors(layout);
+    const angle = layout.card_bg_gradient_angle ?? 135;
+    return {
+        ...layout,
+        card_bg_type: isGradient ? 'gradient' : 'solid',
+        card_background: isGradient ? `linear-gradient(${angle}deg, ${color1}, ${color2})` : color1,
+        card_bg_color2: color2,
+        card_bg_gradient_angle: angle,
+    };
 }
 /* ── Main component ──────────────────────────── */
 function cardBorderRadius(layout: CardLayout): string | number {
@@ -713,7 +732,7 @@ export default function LayoutCustomizer({ initial, onSave, onReset, onClose, ca
         setSaving(true);
         setSaveErr(null);
         try {
-            await onSave(layout);
+            await onSave(normalizeCardBackground(layout));
             setSaved(true);
             setTimeout(() => { setSaved(false); onClose(); }, 800);
         }
@@ -1941,11 +1960,7 @@ function DraggableCard({ layout, onPosChange, onMultiPosChange, onShapeChange, s
         </div>);
     }
     function cardGradientColors() {
-        const matches = layout.card_background.match(/#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)/g);
-        return {
-            color1: matches?.[0] ?? (layout.card_bg_type === 'gradient' ? '#ffffff' : layout.card_background),
-            color2: layout.card_bg_color2 ?? matches?.[1] ?? '#ffffff',
-        };
+        return getCardBackgroundColors(layout);
     }
     function setCardBackgroundMode(type: 'solid' | 'gradient') {
         const { color1, color2 } = cardGradientColors();
@@ -1967,14 +1982,14 @@ function DraggableCard({ layout, onPosChange, onMultiPosChange, onShapeChange, s
           {mode === 'gradient' ? (<>
             {miniColor('Color 1', color1, value => {
                     const angle = layout.card_bg_gradient_angle ?? 135;
-                    onLayoutPatch({ card_background: `linear-gradient(${angle}deg, ${value}, ${color2})` });
+                    onLayoutPatch({ card_bg_type: 'gradient', card_background: `linear-gradient(${angle}deg, ${value}, ${color2})`, card_bg_color2: color2, card_bg_gradient_angle: angle });
                 })}
             {miniColor('Color 2', color2, value => {
                     const angle = layout.card_bg_gradient_angle ?? 135;
-                    onLayoutPatch({ card_bg_color2: value, card_background: `linear-gradient(${angle}deg, ${color1}, ${value})` });
+                    onLayoutPatch({ card_bg_type: 'gradient', card_bg_color2: value, card_background: `linear-gradient(${angle}deg, ${color1}, ${value})`, card_bg_gradient_angle: angle });
                 })}
-            {miniRange('Angle', layout.card_bg_gradient_angle ?? 135, 0, 360, 1, 'deg', value => onLayoutPatch({ card_bg_gradient_angle: value, card_background: `linear-gradient(${value}deg, ${color1}, ${color2})` }))}
-          </>) : miniColor('Color', color1, value => onLayoutPatch({ card_background: value }))}
+            {miniRange('Angle', layout.card_bg_gradient_angle ?? 135, 0, 360, 1, 'deg', value => onLayoutPatch({ card_bg_type: 'gradient', card_bg_gradient_angle: value, card_background: `linear-gradient(${value}deg, ${color1}, ${color2})`, card_bg_color2: color2 }))}
+          </>) : miniColor('Color', color1, value => onLayoutPatch({ card_bg_type: 'solid', card_background: value }))}
           <button type="button" className={`lc-toolbar-text-btn${layout.card_shadow ? ' active' : ''}`} onClick={() => onLayoutPatch({ card_shadow: !layout.card_shadow })}>
             {layout.card_shadow ? 'Shadow on' : 'Shadow off'}
           </button>
