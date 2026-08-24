@@ -138,6 +138,7 @@ const AI_COVER_GENERATION_SETTING_KEYS = {
   agency: 'ai_cover_generations_agency',
   admin: 'ai_cover_generations_agency',
 };
+const AI_COVER_GENERATION_SETTING_KEY_SET = new Set(Object.values(AI_COVER_GENERATION_SETTING_KEYS));
 
 function productImportLimitForUser(user) {
   const plan = String(user?.subscription_plan || 'free').trim().toLowerCase();
@@ -4898,9 +4899,19 @@ app.delete('/api/admin/deal-tags/:key', adminMiddleware, (req, res) => {
 /* ── PUT /api/admin/settings ── */
 app.put('/api/admin/settings', adminMiddleware, (req, res) => {
   const upsert = db.prepare('INSERT OR REPLACE INTO site_settings (key,value) VALUES (?,?)');
-  const tx = db.transaction(entries => { for (const [k,v] of entries) upsert.run(k, String(v)); });
-  tx(Object.entries(req.body));
-  if (Object.prototype.hasOwnProperty.call(req.body, 'stripe_secret_key')) {
+  const body = req.body || {};
+  const normalizeSettingValue = (key, value) => {
+    if (AI_COVER_GENERATION_SETTING_KEY_SET.has(key)) {
+      const parsed = Number.parseInt(String(value ?? '').trim(), 10);
+      return String(Number.isInteger(parsed) ? Math.max(0, Math.min(1000, parsed)) : 0);
+    }
+    return String(value);
+  };
+  const tx = db.transaction(entries => {
+    for (const [k, v] of entries) upsert.run(k, normalizeSettingValue(k, v));
+  });
+  tx(Object.entries(body));
+  if (Object.prototype.hasOwnProperty.call(body, 'stripe_secret_key')) {
     refreshStripeClient();
   }
   const rows = db.prepare('SELECT key,value FROM site_settings').all();

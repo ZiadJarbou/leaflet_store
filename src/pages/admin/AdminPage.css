@@ -587,6 +587,11 @@
 .cms-ai-limit-group {
   grid-column: 1 / -1;
 }
+.cms-ai-limit-note {
+  margin: -4px 0 12px;
+  color: #94a3b8;
+  font-size: .82rem;
+}
 .cms-ai-limit-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(130px, 1fr));
@@ -597,7 +602,8 @@
   grid-template-columns: auto 1fr;
   grid-template-areas:
     "icon label"
-    "input input";
+    "input input"
+    "unit unit";
   gap: 8px 10px;
   align-items: center;
   padding: 12px;
@@ -628,6 +634,12 @@
   min-height: 38px;
   text-align: center;
   font-weight: 700;
+}
+.cms-ai-limit-card small {
+  grid-area: unit;
+  color: #94a3b8;
+  font-size: .72rem;
+  text-align: center;
 }
 
 @media (max-width: 1100px) {

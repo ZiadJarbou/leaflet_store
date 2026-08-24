@@ -83,6 +83,19 @@ const AI_COVER_GENERATION_LIMIT_FIELDS = [
     { key: 'ai_cover_generations_business', label: 'Business', icon: 'business_center' },
     { key: 'ai_cover_generations_agency', label: 'Agency', icon: 'groups' },
 ] as const;
+const DEFAULT_AI_COVER_GENERATION_LIMITS: Pick<SiteSettings,
+  'ai_cover_generations_free' |
+  'ai_cover_generations_starter' |
+  'ai_cover_generations_pro' |
+  'ai_cover_generations_business' |
+  'ai_cover_generations_agency'
+> = {
+    ai_cover_generations_free: '1',
+    ai_cover_generations_starter: '2',
+    ai_cover_generations_pro: '4',
+    ai_cover_generations_business: '6',
+    ai_cover_generations_agency: '10',
+};
 interface AdminIcon {
     id: number;
     label: string;
@@ -1406,13 +1419,16 @@ function AdminSettings() {
     const [saved, setSaved] = useState(false);
     const [err, setErr] = useState('');
     useEffect(() => {
-        adminGetSettings().then(setS).catch(e => setErr(e.message));
+        adminGetSettings()
+            .then(settings => setS({ ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...settings }))
+            .catch(e => setErr(e.message));
     }, []);
     async function save() {
         if (!s)
             return;
         try {
-            await adminSaveSettings(s);
+            const settings = await adminSaveSettings(s);
+            setS({ ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...settings });
             setSaved(true);
             setTimeout(() => setSaved(false), 2500);
         }
@@ -1466,6 +1482,7 @@ function AdminSettings() {
             </div>
             <div className="cms-settings-group cms-ai-limit-group">
               <div className="cms-settings-group-title">AI Image Generator</div>
+              <p className="cms-ai-limit-note">Set how many AI cover images each plan can generate for one leaflet.</p>
               <div className="cms-ai-limit-grid">
                 {AI_COVER_GENERATION_LIMIT_FIELDS.map(field => (
                   <label className="cms-ai-limit-card" key={field.key}>
@@ -1479,6 +1496,7 @@ function AdminSettings() {
                       onChange={e => setS({ ...s, [field.key]: e.target.value })}
                       aria-label={`${field.label} AI cover generations per leaflet`}
                     />
+                    <small>images per leaflet</small>
                   </label>
                 ))}
               </div>
