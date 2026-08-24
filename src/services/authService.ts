@@ -75,7 +75,17 @@ export async function apiSignup(name: string, email: string, password: string): 
 }
 
 export async function apiLogout(): Promise<void> {
-  try { await post('/api/logout', {}); } catch { /* ignore */ }
+  const token = getStoredToken();
+  try {
+    await fetch('/api/logout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: '{}',
+    });
+  } catch { /* ignore */ }
   clearSession();
 }
 

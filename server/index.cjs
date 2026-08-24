@@ -428,6 +428,17 @@ db.exec(`
     reset_token_expires TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+  CREATE TABLE IF NOT EXISTS user_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    session_id TEXT NOT NULL UNIQUE,
+    user_agent TEXT NOT NULL DEFAULT '',
+    ip_address TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT
+  );
   CREATE TABLE IF NOT EXISTS leaflets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id),
@@ -550,6 +561,8 @@ if (!pdfExportCols.includes('allow_edit')) {
   db.exec("ALTER TABLE leaflet_pdf_exports ADD COLUMN allow_edit INTEGER NOT NULL DEFAULT 0");
 }
 db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_user_sessions_active ON user_sessions(user_id, revoked_at, expires_at);
+  CREATE INDEX IF NOT EXISTS idx_user_sessions_sid ON user_sessions(session_id);
   CREATE INDEX IF NOT EXISTS idx_stripe_plan_prices_lookup ON stripe_plan_prices(plan, period, active);
   CREATE INDEX IF NOT EXISTS idx_stripe_plan_prices_price_id ON stripe_plan_prices(stripe_price_id);
   CREATE INDEX IF NOT EXISTS idx_ai_cover_generations_usage ON ai_cover_generations(user_id, leaflet_id, status);
@@ -1098,8 +1111,69 @@ app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 function normalizeEmail(e) { return (e || '').trim().toLowerCase(); }
 function normalizeName(n)  { return (n || '').trim().replace(/\s+/g, ' '); }
 function makeToken()       { return crypto.randomBytes(32).toString('hex'); }
-function signJwt(user) {
-  return jwt.sign({ id: user.id, name: user.name, email: user.email, role: user.role ?? 'user' }, JWT_SECRET, { expiresIn: '7d' });
+const SESSION_TTL_DAYS = 7;
+const CONCURRENT_LOGIN_LIMITS = {
+  free: 1,
+  starter: 2,
+  pro: 3,
+  professional: 3,
+  business: 5,
+  agency: 10,
+};
+function sessionExpiresAt(from = Date.now()) {
+  return new Date(from + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+}
+function signJwt(user, sessionId) {
+  return jwt.sign(
+    { id: user.id, name: user.name, email: user.email, role: user.role ?? 'user', ...(sessionId ? { sid: sessionId } : {}) },
+    JWT_SECRET,
+    { expiresIn: `${SESSION_TTL_DAYS}d` }
+  );
+}
+function concurrentLoginLimitForUser(user) {
+  if (isUnlimitedUser(user) || String(user?.role || '').toLowerCase() === 'admin') return Infinity;
+  const plan = String(user?.subscription_plan || 'free').trim().toLowerCase();
+  return CONCURRENT_LOGIN_LIMITS[plan] ?? CONCURRENT_LOGIN_LIMITS.free;
+}
+function activeSessionCount(userId) {
+  return db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM user_sessions
+    WHERE user_id = ?
+      AND revoked_at IS NULL
+      AND datetime(expires_at) > datetime('now')
+  `).get(userId)?.count ?? 0;
+}
+function createLoginSession(user, req) {
+  db.prepare(`
+    UPDATE user_sessions
+    SET revoked_at = datetime('now')
+    WHERE user_id = ?
+      AND revoked_at IS NULL
+      AND datetime(expires_at) <= datetime('now')
+  `).run(user.id);
+  const limit = concurrentLoginLimitForUser(user);
+  const active = activeSessionCount(user.id);
+  if (Number.isFinite(limit) && active >= limit) {
+    const deviceLabel = limit === 1 ? '1 device' : `${limit} devices`;
+    const planLabel = String(user.subscription_plan || 'free').trim().toLowerCase();
+    const err = new Error(`Your ${planLabel} plan allows concurrent logins on ${deviceLabel}. Log out on another device or upgrade your plan.`);
+    err.status = 403;
+    err.authErrors = { general: err.message };
+    throw err;
+  }
+  const sessionId = makeToken();
+  db.prepare(`
+    INSERT INTO user_sessions (user_id, session_id, user_agent, ip_address, expires_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(
+    user.id,
+    sessionId,
+    String(req.headers['user-agent'] || '').slice(0, 500),
+    String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim().slice(0, 120),
+    sessionExpiresAt()
+  );
+  return sessionId;
 }
 function googleOAuthRedirectUri() {
   return `${APP_URL}/api/oauth/google/callback`;
@@ -1463,7 +1537,23 @@ function authMiddleware(req, res, next) {
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : (req.query.token ? String(req.query.token) : null);
   if (!token) { res.status(401).json({ error: 'Unauthorized' }); return; }
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, JWT_SECRET);
+    if (payload.sid) {
+      const session = db.prepare(`
+        SELECT id
+        FROM user_sessions
+        WHERE user_id = ?
+          AND session_id = ?
+          AND revoked_at IS NULL
+          AND datetime(expires_at) > datetime('now')
+      `).get(payload.id, payload.sid);
+      if (!session) {
+        res.status(401).json({ error: 'This login session is no longer active. Please log in again.' });
+        return;
+      }
+      db.prepare("UPDATE user_sessions SET last_seen_at = datetime('now') WHERE id = ?").run(session.id);
+    }
+    req.user = payload;
     next();
   } catch {
     res.status(401).json({ error: 'Token expired or invalid' });
@@ -1771,8 +1861,9 @@ app.post('/api/signup', async (req, res, next) => {
       VALUES (?, ?, ?, 0, ?, ?)
     `).run(name, email, passwordHash, verifyToken, verifyExpires);
 
-    const user  = { id: result.lastInsertRowid, name, email };
-    const token = signJwt(user);
+    const user  = { id: result.lastInsertRowid, name, email, role: 'user', subscription_plan: 'free' };
+    const sessionId = createLoginSession(user, req);
+    const token = signJwt(user, sessionId);
     const verifyLink = `${APP_URL}/verify-email?token=${verifyToken}&email=${encodeURIComponent(email)}`;
     let emailSent = false;
     let emailError = null;
@@ -1802,7 +1893,10 @@ app.post('/api/signup', async (req, res, next) => {
       user, token,
       notice: 'Verification email sent. Please check your inbox to unlock all features.',
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err?.authErrors) { res.status(err.status || 403).json({ errors: err.authErrors }); return; }
+    next(err);
+  }
 });
 
 /* ── POST /api/login ── */
@@ -1816,7 +1910,7 @@ app.post('/api/login', async (req, res, next) => {
     if (!password) errors.password = 'Password is required.';
     if (Object.keys(errors).length) { res.status(422).json({ errors }); return; }
 
-    const user = db.prepare('SELECT id, name, email, password_hash FROM users WHERE email = ?').get(email);
+    const user = db.prepare('SELECT id, name, email, password_hash, role, subscription_plan FROM users WHERE email = ?').get(email);
     if (!user) {
       res.status(422).json({
         switchTo: 'signup',
@@ -1833,9 +1927,13 @@ app.post('/api/login', async (req, res, next) => {
       res.status(422).json({ errors: { password: 'Incorrect password.' }, old: { email } }); return;
     }
 
-    const token = signJwt({ id: user.id, name: user.name, email: user.email });
+    const sessionId = createLoginSession(user, req);
+    const token = signJwt(user, sessionId);
     res.json({ user: { id: user.id, name: user.name, email: user.email }, token });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err?.authErrors) { res.status(err.status || 403).json({ errors: err.authErrors }); return; }
+    next(err);
+  }
 });
 
 /* ── Google OAuth ── */
@@ -1933,7 +2031,7 @@ app.get('/api/oauth/google/callback', async (req, res, next) => {
       return;
     }
 
-    let user = db.prepare('SELECT id, name, email FROM users WHERE email = ?').get(email);
+    let user = db.prepare('SELECT id, name, email, role, subscription_plan FROM users WHERE email = ?').get(email);
     if (user) {
       db.prepare('UPDATE users SET email_verified = 1, verify_token = NULL, verify_token_expires = NULL WHERE id = ?').run(user.id);
     } else {
@@ -1942,10 +2040,18 @@ app.get('/api/oauth/google/callback', async (req, res, next) => {
         INSERT INTO users (name, email, password_hash, email_verified, verify_token, verify_token_expires)
         VALUES (?, ?, ?, 1, NULL, NULL)
       `).run(name, email, passwordHash);
-      user = { id: result.lastInsertRowid, name, email };
+      user = { id: result.lastInsertRowid, name, email, role: 'user', subscription_plan: 'free' };
     }
 
-    const appToken = signJwt(user);
+    let sessionId;
+    try {
+      sessionId = createLoginSession(user, req);
+    } catch (sessionErr) {
+      const message = sessionErr?.authErrors?.general || 'This account has reached its concurrent login limit.';
+      res.redirect(`${APP_URL}/oauth/callback?error=${encodeURIComponent(message)}`);
+      return;
+    }
+    const appToken = signJwt(user, sessionId);
     const fragment = new URLSearchParams({
       token: appToken,
       user: JSON.stringify({ id: user.id, name: user.name, email: user.email }),
@@ -1998,6 +2104,20 @@ app.put('/api/user/default-leaflet', authMiddleware, (req, res, next) => {
 
 /* ── POST /api/logout ── */
 app.post('/api/logout', (req, res) => {
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, JWT_SECRET);
+      if (payload?.id && payload?.sid) {
+        db.prepare(`
+          UPDATE user_sessions
+          SET revoked_at = datetime('now')
+          WHERE user_id = ? AND session_id = ? AND revoked_at IS NULL
+        `).run(payload.id, payload.sid);
+      }
+    } catch {}
+  }
   res.json({ ok: true });
 });
 
@@ -3517,7 +3637,7 @@ app.put('/api/user/profile', authMiddleware, (req, res) => {
   if (!name || !name.trim()) { res.status(400).json({ error: 'Name is required.' }); return; }
   db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name.trim(), req.user.id);
   const user = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(req.user.id);
-  const token = generateToken(user);
+  const token = signJwt({ ...user, role: req.user.role }, req.user.sid);
   res.json({ token, name: user.name });
 });
 
