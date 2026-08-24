@@ -18,6 +18,15 @@ type PageDef = {
     icon: string;
     sections: SectionDef[];
 };
+function stripeSyncMessage(stripeSync: any) {
+    if (!stripeSync) return 'Saved successfully!';
+    if (stripeSync.warning) return `Saved. ${stripeSync.warning}`;
+    if (!Array.isArray(stripeSync)) return 'Saved successfully!';
+    const changed = stripeSync.filter(item => item?.changed);
+    if (!changed.length) return 'Saved successfully! Stripe prices already matched.';
+    const labels = changed.map(item => `${item.plan}/${item.period}`).join(', ');
+    return `Saved successfully! Stripe prices synced: ${labels}.`;
+}
 /* â”€â”€ page/section/field schema â”€â”€ */
 const PAGES: PageDef[] = [
     {
@@ -351,8 +360,7 @@ export default function AdminPages() {
         try {
             const result = await adminSavePageContent(activePage, pageContent);
             setDirty(new Set());
-            const stripeWarning = result?.stripeSync?.warning;
-            setSaveMsg(stripeWarning ? `Saved. ${stripeWarning}` : 'Saved successfully!');
+            setSaveMsg(stripeSyncMessage(result?.stripeSync));
             // invalidate frontend cache
             setTimeout(() => setSaveMsg(''), 3000);
         }

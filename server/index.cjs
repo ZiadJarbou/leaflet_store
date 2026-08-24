@@ -331,10 +331,14 @@ function getCheckoutPlanPrice(plan, period) {
   }
   const source = planDef || fallback;
   const monthlyRate = parsePlanAmount(period === 'annual' ? source?.yearlyPrice : source?.monthlyPrice);
-  if (!monthlyRate) return null;
+  const annualTotal = parsePlanAmount(source?.annualPrice);
+  if (!monthlyRate && !(period === 'annual' && annualTotal)) return null;
+  const unitAmount = period === 'annual'
+    ? Math.round((annualTotal || monthlyRate * 12) * 100)
+    : Math.round(monthlyRate * 100);
   return {
     name: source?.name || fallback?.name || plan,
-    unitAmount: Math.round((period === 'annual' ? monthlyRate * 12 : monthlyRate) * 100),
+    unitAmount,
     currency: 'usd',
   };
 }
