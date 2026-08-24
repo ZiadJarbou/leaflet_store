@@ -47,7 +47,7 @@ const DEFAULT_FEATURES: PlanFeature[] = [
   { label: 'PDF and PNG export',       free: false, starter: true, pro: true, business: true, agency: true },
   { label: 'Watermark removed',        free: false, starter: true, pro: true, business: true, agency: true },
   { label: 'Brand kits and templates', free: false, starter: false, pro: true, business: true, agency: true },
-  { label: 'Team members',             free: '1', starter: '1', pro: '1', business: '5', agency: '10+' },
+  { label: 'Concurrent logins',        free: '1 device', starter: '2 devices', pro: '3 devices', business: '5 devices', agency: '10+ devices' },
 ];
 
 const DEFAULT_PLANS: PricingPlan[] = [
@@ -71,7 +71,7 @@ const DEFAULT_PLANS: PricingPlan[] = [
       '2-language support',
       'Standard-quality export',
       'LeafletAI watermark',
-      '1 user',
+      'Concurrent logins: 1 device',
     ],
   },
   {
@@ -95,7 +95,7 @@ const DEFAULT_PLANS: PricingPlan[] = [
       'PDF and PNG export',
       'No LeafletAI watermark',
       'Save and edit your leaflets',
-      '1 user',
+      'Concurrent logins: 2 devices',
     ],
   },
   {
@@ -121,7 +121,7 @@ const DEFAULT_PLANS: PricingPlan[] = [
       'Background removal tools',
       'Custom reusable templates',
       'Priority support',
-      '1 user',
+      'Concurrent logins: 3 devices',
     ],
   },
   {
@@ -138,7 +138,7 @@ const DEFAULT_PLANS: PricingPlan[] = [
     checkoutPlanId: 'business',
     features: [
       'Up to 100 leaflets per month',
-      'Up to 5 team members',
+      'Concurrent logins: 5 devices',
       'Multiple brands and branches',
       'Shared product library',
       'Shared brand assets and templates',
@@ -167,7 +167,7 @@ const DEFAULT_PLANS: PricingPlan[] = [
     features: [
       'High-volume or unlimited leaflet creation',
       'Multiple client workspaces',
-      '10 or more team members',
+      'Concurrent logins: 10+ devices',
       'Separate brand kits for each client',
       'White-label leaflet exports',
       'Advanced team permissions',

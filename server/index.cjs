@@ -90,11 +90,11 @@ const DEFAULT_STRIPE_PLAN_PRICES = {
 };
 
 const DEFAULT_PRICING_PLANS = [
-  { id:'free', name:'Free', badge:null, monthlyPrice:0, yearlyPrice:0, annualPrice:0, desc:'Explore LeafletAI and create your first promotional leaflet.', cta:'Start for Free', ctaVariant:'ghost', highlight:false, checkoutPlanId:'free', features:['1 leaflet per month','Up to 20 products per leaflet','Basic leaflet templates','CSV and XLSX product import','2-language support','Standard-quality export','LeafletAI watermark','1 user'] },
-  { id:'starter', name:'Starter', badge:null, monthlyPrice:13.34, yearlyPrice:133.42 / 12, annualPrice:133.42, desc:'Perfect for small shops and businesses that create promotional leaflets occasionally.', cta:'Choose Starter', ctaVariant:'ghost', highlight:false, checkoutPlanId:'starter', features:['Up to 5 leaflets per month','Up to 100 products per leaflet','CSV and XLSX product import','2-language layouts','Basic template library','PDF and PNG export','No LeafletAI watermark','Save and edit your leaflets','1 user'] },
-  { id:'pro', name:'Professional', badge:'Most Popular', monthlyPrice:26.96, yearlyPrice:269.57 / 12, annualPrice:269.57, desc:'The best choice for supermarkets and active retailers that regularly create promotional campaigns.', cta:'Choose Professional', ctaVariant:'primary', highlight:true, checkoutPlanId:'pro', features:['Up to 25 leaflets per month','Large product imports','Access to all premium templates','High-quality print-ready PDF export','2-language layouts','Custom fonts','Brand kit with logos, colors, and fonts','Background removal tools','Custom reusable templates','Priority support','1 user'] },
-  { id:'business', name:'Business', badge:null, monthlyPrice:67.80, yearlyPrice:677.99 / 12, annualPrice:677.99, desc:'Designed for marketing teams, multi-branch retailers, and businesses managing frequent promotional campaigns.', cta:'Choose Business', ctaVariant:'brand2', highlight:false, checkoutPlanId:'business', features:['Up to 100 leaflets per month','Up to 5 team members','Multiple brands and branches','Shared product library','Shared brand assets and templates','Team collaboration','User roles and permissions','High-quality PDF and PNG export','Advanced AI tools','Higher AI usage limits','Priority customer support','Branch-specific logos and contact details'] },
-  { id:'agency', name:'Agency', badge:null, monthlyPrice:163.10, yearlyPrice:0, annualPriceLabel:'Custom annual pricing', pricePrefix:'Starting from', desc:'Built for agencies and large organizations managing multiple brands, stores, or clients.', cta:'Contact Sales', ctaVariant:'ghost', highlight:false, checkoutPlanId:'contact', features:['High-volume or unlimited leaflet creation','Multiple client workspaces','10 or more team members','Separate brand kits for each client','White-label leaflet exports','Advanced team permissions','Bulk product and design management','Custom templates for each client','Batch export tools','Premium customer support','Custom onboarding and training'] },
+  { id:'free', name:'Free', badge:null, monthlyPrice:0, yearlyPrice:0, annualPrice:0, desc:'Explore LeafletAI and create your first promotional leaflet.', cta:'Start for Free', ctaVariant:'ghost', highlight:false, checkoutPlanId:'free', features:['1 leaflet per month','Up to 20 products per leaflet','Basic leaflet templates','CSV and XLSX product import','2-language support','Standard-quality export','LeafletAI watermark','Concurrent logins: 1 device'] },
+  { id:'starter', name:'Starter', badge:null, monthlyPrice:13.34, yearlyPrice:133.42 / 12, annualPrice:133.42, desc:'Perfect for small shops and businesses that create promotional leaflets occasionally.', cta:'Choose Starter', ctaVariant:'ghost', highlight:false, checkoutPlanId:'starter', features:['Up to 5 leaflets per month','Up to 100 products per leaflet','CSV and XLSX product import','2-language layouts','Basic template library','PDF and PNG export','No LeafletAI watermark','Save and edit your leaflets','Concurrent logins: 2 devices'] },
+  { id:'pro', name:'Professional', badge:'Most Popular', monthlyPrice:26.96, yearlyPrice:269.57 / 12, annualPrice:269.57, desc:'The best choice for supermarkets and active retailers that regularly create promotional campaigns.', cta:'Choose Professional', ctaVariant:'primary', highlight:true, checkoutPlanId:'pro', features:['Up to 25 leaflets per month','Large product imports','Access to all premium templates','High-quality print-ready PDF export','2-language layouts','Custom fonts','Brand kit with logos, colors, and fonts','Background removal tools','Custom reusable templates','Priority support','Concurrent logins: 3 devices'] },
+  { id:'business', name:'Business', badge:null, monthlyPrice:67.80, yearlyPrice:677.99 / 12, annualPrice:677.99, desc:'Designed for marketing teams, multi-branch retailers, and businesses managing frequent promotional campaigns.', cta:'Choose Business', ctaVariant:'brand2', highlight:false, checkoutPlanId:'business', features:['Up to 100 leaflets per month','Concurrent logins: 5 devices','Multiple brands and branches','Shared product library','Shared brand assets and templates','Team collaboration','User roles and permissions','High-quality PDF and PNG export','Advanced AI tools','Higher AI usage limits','Priority customer support','Branch-specific logos and contact details'] },
+  { id:'agency', name:'Agency', badge:null, monthlyPrice:163.10, yearlyPrice:0, annualPriceLabel:'Custom annual pricing', pricePrefix:'Starting from', desc:'Built for agencies and large organizations managing multiple brands, stores, or clients.', cta:'Contact Sales', ctaVariant:'ghost', highlight:false, checkoutPlanId:'contact', features:['High-volume or unlimited leaflet creation','Multiple client workspaces','Concurrent logins: 10+ devices','Separate brand kits for each client','White-label leaflet exports','Advanced team permissions','Bulk product and design management','Custom templates for each client','Batch export tools','Premium customer support','Custom onboarding and training'] },
 ];
 
 const DEFAULT_PRICING_FEATURES = [
@@ -105,7 +105,7 @@ const DEFAULT_PRICING_FEATURES = [
   { label:'PDF and PNG export', free:false, starter:true, pro:true, business:true, agency:true },
   { label:'Watermark removed', free:false, starter:true, pro:true, business:true, agency:true },
   { label:'Brand kits and templates', free:false, starter:false, pro:true, business:true, agency:true },
-  { label:'Team members', free:'1', starter:'1', pro:'1', business:'5', agency:'10+' },
+  { label:'Concurrent logins', free:'1 device', starter:'2 devices', pro:'3 devices', business:'5 devices', agency:'10+ devices' },
 ];
 
 const DEFAULT_PRICING_ANNUAL_ITEMS = [
@@ -774,9 +774,9 @@ const pcDefaults = [
   ['home','pricing','section_subtitle', "Start small, grow fast — switch to yearly and save more."],
   ['home','pricing','visible',          "1"],
   ['home','pricing','plans', JSON.stringify([
-    { name:'Starter',      desc:'Perfect for personal projects & quick sharing.',    price:'$16', period:'/mo', save:'$192 billed annually — save $228', features:['1 user','5 flipbooks','Basic templates','Share links & QR codes','Export to PDF'] },
-    { name:'Professional', desc:'Everything you need to create like a pro.',         price:'$16', period:'/mo', save:'$192 billed annually — save $228', features:['1 user','5 flipbooks','Full templates library','Customization controls','Export to PDF'] },
-    { name:'Business',     desc:'Built for selling & growth.',                       price:'$16', period:'/mo', save:'$192 billed annually — save $228', features:['1 user','5 flipbooks','Unlimited product links','Priority support','Export to PDF'], best:true, badge:'Best Value — Save 20% + Priority support' },
+    { name:'Starter',      desc:'Perfect for personal projects & quick sharing.',    price:'$16', period:'/mo', save:'$192 billed annually — save $228', features:['Concurrent logins: 2 devices','5 flipbooks','Basic templates','Share links & QR codes','Export to PDF'] },
+    { name:'Professional', desc:'Everything you need to create like a pro.',         price:'$16', period:'/mo', save:'$192 billed annually — save $228', features:['Concurrent logins: 3 devices','5 flipbooks','Full templates library','Customization controls','Export to PDF'] },
+    { name:'Business',     desc:'Built for selling & growth.',                       price:'$16', period:'/mo', save:'$192 billed annually — save $228', features:['Concurrent logins: 5 devices','5 flipbooks','Unlimited product links','Priority support','Export to PDF'], best:true, badge:'Best Value — Save 20% + Priority support' },
     { name:'Enterprise',   desc:'Scale, control & dedicated support.',               price:'Custom', period:'', save:"Let's tailor a plan for your team", features:['Multi-user access','Advanced store limits','Dedicated support','Security & compliance options','Custom onboarding'] },
   ])],
   /* HOME — faq section */
@@ -843,6 +843,64 @@ if (!hasMigration('pricing_tiers_2026_08_05_v1')) {
     markMigration('pricing_tiers_2026_08_05_v1');
   });
   migratePricing();
+}
+
+if (!hasMigration('pricing_concurrent_logins_2026_08_24_v1')) {
+  const loginFeatureByPlan = {
+    free: 'Concurrent logins: 1 device',
+    starter: 'Concurrent logins: 2 devices',
+    pro: 'Concurrent logins: 3 devices',
+    business: 'Concurrent logins: 5 devices',
+    agency: 'Concurrent logins: 10+ devices',
+  };
+  const loginFeatureByName = {
+    Starter: 'Concurrent logins: 2 devices',
+    Professional: 'Concurrent logins: 3 devices',
+    Business: 'Concurrent logins: 5 devices',
+    Agency: 'Concurrent logins: 10+ devices',
+  };
+  const oldLoginFeatureRe = /\b(?:\d+\s+user|up to\s+\d+\s+team members|10 or more team members|concurrent logins?:|devices?)\b/i;
+  const readContentJson = db.prepare('SELECT value FROM page_content WHERE page = ? AND section = ? AND field = ?');
+  const writeContentJson = db.prepare(`
+    INSERT INTO page_content (page, section, field, value)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(page, section, field) DO UPDATE SET value = excluded.value
+  `);
+  const migrateLoginPricing = db.transaction(() => {
+    const plansRow = readContentJson.get('pricing', 'plans', 'items');
+    let plans = DEFAULT_PRICING_PLANS;
+    try {
+      const parsed = JSON.parse(plansRow?.value || '[]');
+      if (Array.isArray(parsed) && parsed.length) plans = parsed;
+    } catch {}
+    plans = plans.map(plan => {
+      const loginFeature = loginFeatureByPlan[plan?.id] || loginFeatureByName[plan?.name];
+      if (!loginFeature) return plan;
+      const features = Array.isArray(plan.features) ? plan.features.filter(f => !oldLoginFeatureRe.test(String(f))) : [];
+      return { ...plan, features: [...features, loginFeature] };
+    });
+    writeContentJson.run('pricing', 'plans', 'items', JSON.stringify(plans));
+
+    writeContentJson.run('pricing', 'features', 'items', JSON.stringify(DEFAULT_PRICING_FEATURES));
+
+    const homePlansRow = readContentJson.get('home', 'pricing', 'plans');
+    if (homePlansRow?.value) {
+      try {
+        const homePlans = JSON.parse(homePlansRow.value);
+        if (Array.isArray(homePlans)) {
+          const nextHomePlans = homePlans.map(plan => {
+            const loginFeature = loginFeatureByName[plan?.name];
+            if (!loginFeature) return plan;
+            const features = Array.isArray(plan.features) ? plan.features.filter(f => !oldLoginFeatureRe.test(String(f))) : [];
+            return { ...plan, features: [loginFeature, ...features] };
+          });
+          writeContentJson.run('home', 'pricing', 'plans', JSON.stringify(nextHomePlans));
+        }
+      } catch {}
+    }
+    markMigration('pricing_concurrent_logins_2026_08_24_v1');
+  });
+  migrateLoginPricing();
 }
 
 const app = express();
