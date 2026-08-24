@@ -340,13 +340,17 @@ export default function PricingPage() {
     }).format(rounded);
   }
 
-  function displayPrice(planId: string, baseMonthlyAmount: number, billedAnnually: boolean) {
+  function displayPrice(planId: string, baseMonthlyAmount: number, billedAnnually: boolean, baseAnnualAmount?: number) {
     const planQuote = (planId === 'starter' || planId === 'pro' || planId === 'business' || planId === 'agency') ? localizedPricing?.plans?.[planId] : undefined;
     const quote = billedAnnually ? planQuote?.annual : planQuote?.monthly;
     const annualQuote = billedAnnually ? planQuote?.annual : undefined;
     const currency = quote?.currency || '';
-    const monthlyAmount = quote?.amount ?? baseMonthlyAmount;
-    const annualTotal = billedAnnually ? (annualQuote?.totalAmount ?? baseMonthlyAmount * 12) : null;
+    const quoteCurrency = String(currency || '').toUpperCase();
+    const useLocalizedQuote = quote && quoteCurrency && quoteCurrency !== 'USD';
+    const monthlyAmount = useLocalizedQuote ? quote.amount : baseMonthlyAmount;
+    const annualTotal = billedAnnually
+      ? (useLocalizedQuote ? (annualQuote?.totalAmount ?? baseAnnualAmount ?? baseMonthlyAmount * 12) : (baseAnnualAmount ?? baseMonthlyAmount * 12))
+      : null;
     return {
       monthlyLabel: formatMoney(monthlyAmount, currency || 'USD'),
       annualLabel: annualTotal !== null ? formatMoney(annualTotal, currency || 'USD') : '',
@@ -451,9 +455,9 @@ export default function PricingPage() {
             const period  = annual ? 'annual' : 'monthly';
             const loadKey = `${plan.id}_${period}`;
             const current = isCurrentPlan(plan);
-            const localizedPrice = displayPrice(plan.id, price, annual);
             const planFeatures = Array.isArray(plan.features) ? plan.features : [];
             const annualTotal = Number(plan.annualPrice || (Number(plan.yearlyPrice) || 0) * 12);
+            const localizedPrice = displayPrice(plan.id, price, annual, annualTotal);
 
             return (
               <div

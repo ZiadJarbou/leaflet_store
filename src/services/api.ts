@@ -807,6 +807,7 @@ export function getLocalizedPricing(): Promise<LocalizedPricing> {
   const params = new URLSearchParams();
   if (locale) params.set('locale', locale);
   if (country) params.set('country', country);
+  params.set('t', String(Date.now()));
   return request<LocalizedPricing>(`/stripe/localized-pricing?${params.toString()}`);
 }
 

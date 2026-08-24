@@ -8,8 +8,8 @@ export function useCmsContent(page: string): PageContent {
   const [content, setContent] = useState<PageContent>(cache[page] ?? {});
 
   useEffect(() => {
-    if (cache[page]) { setContent(cache[page]); return; }
-    fetch(`/api/pages/${page}`)
+    if (cache[page]) setContent(cache[page]);
+    fetch(`/api/pages/${page}?t=${Date.now()}`, { cache: 'no-store' })
       .then(r => r.ok ? r.json() : {})
       .then((data: PageContent) => { cache[page] = data; setContent(data); })
       .catch(() => {});

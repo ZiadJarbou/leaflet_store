@@ -172,15 +172,17 @@ export default function HomePage() {
             currency,
         }).format(rounded);
     }
-    function displayPrice(planId: string, baseMonthlyAmount: number, billedAnnually: boolean) {
+    function displayPrice(planId: string, baseMonthlyAmount: number, billedAnnually: boolean, baseAnnualAmount?: number) {
         const planQuote = planId === 'starter' || planId === 'pro' || planId === 'business' || planId === 'agency'
             ? localizedPricing?.plans?.[planId]
             : undefined;
         const quote = billedAnnually ? planQuote?.annual : planQuote?.monthly;
         const currency = quote?.currency || '';
-        const monthlyAmount = quote?.amount ?? baseMonthlyAmount;
+        const quoteCurrency = String(currency || '').toUpperCase();
+        const useLocalizedQuote = quote && quoteCurrency && quoteCurrency !== 'USD';
+        const monthlyAmount = useLocalizedQuote ? quote.amount : baseMonthlyAmount;
         const annualTotal = billedAnnually
-            ? (planQuote?.annual?.totalAmount ?? baseMonthlyAmount * 12)
+            ? (useLocalizedQuote ? (planQuote?.annual?.totalAmount ?? baseAnnualAmount ?? baseMonthlyAmount * 12) : (baseAnnualAmount ?? baseMonthlyAmount * 12))
             : null;
         return {
             monthlyLabel: formatMoney(monthlyAmount, currency || 'USD'),
@@ -337,7 +339,8 @@ export default function HomePage() {
               {visiblePlans.map((plan: any) => {
                 const price = annual ? plan.yearlyPrice : plan.monthlyPrice;
                 const current = isCurrentPlan(plan);
-                const localizedPrice = displayPrice(plan.id, price, annual);
+                const annualTotal = Number(plan.annualPrice || (Number(plan.yearlyPrice) || 0) * 12);
+                const localizedPrice = displayPrice(plan.id, price, annual, annualTotal);
                 return (<div key={plan.id} className={`pp-card${plan.highlight ? ' pp-card--highlight' : ''}${current ? ' pp-card--current' : ''}`}>
                     {plan.badge && <div className="pp-card-badge">{plan.badge}</div>}
                     {current && <div className="pp-card-current-badge">Your plan</div>}
@@ -352,7 +355,7 @@ export default function HomePage() {
                             <span className="pp-price-period">/mo</span>
                           </>)}
                       </div>
-                      {annual && price > 0 && (<p className="pp-billed-note">Billed {localizedPrice.annualLabel}/year</p>)}
+                      {annual && annualTotal > 0 && (<p className="pp-billed-note">Billed {localizedPrice.annualLabel}/year</p>)}
                       {annual && plan.annualPriceLabel && (<p className="pp-billed-note">{plan.annualPriceLabel}</p>)}
                     </div>
 

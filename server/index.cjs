@@ -4173,6 +4173,7 @@ app.post('/api/stripe/confirm-session', authMiddleware, async (req, res) => {
 
 /* ── POST /api/stripe/create-checkout-session ── */
 app.get('/api/stripe/localized-pricing', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
   const queryCountry = normalizeCountryCode(req.query.country);
   const quoteCountry = detectCheckoutCountry(req, queryCountry);
   const plans = {};
@@ -5648,6 +5649,7 @@ function buildPageContent(rows) {
 
 /* GET /api/pages/:page  (public — no auth) */
 app.get('/api/pages/:page', (req, res) => {
+  res.set('Cache-Control', 'no-store');
   const rows = db.prepare('SELECT section,field,value FROM page_content WHERE page=?').all(req.params.page);
   res.json(buildPageContent(rows));
 });
