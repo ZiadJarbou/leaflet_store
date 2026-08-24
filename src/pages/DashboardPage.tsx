@@ -75,7 +75,7 @@ function LeafletDropdown({ leaflets, selected, onChange }: LeafletDropdownProps)
     </div>);
 }
 const PLAN_COLOR: Record<string, string> = {
-    free: '#64748b', pro: '#49f2b6', business: '#7c5cff',
+    free: '#64748b', starter: '#38bdf8', pro: '#49f2b6', business: '#7c5cff', admin: '#f59e0b',
 };
 function planBadge(plan: string) {
     return (<span className={cx("db-plan-badge", cssClass({ background: `${PLAN_COLOR[plan] ?? '#64748b'}22`, color: PLAN_COLOR[plan] ?? '#64748b', borderColor: `${PLAN_COLOR[plan] ?? '#64748b'}44` }))}>
@@ -84,6 +84,14 @@ function planBadge(plan: string) {
 }
 function fmt(iso: string) {
     return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+function fmtMaybe(iso: string | null | undefined) {
+    if (!iso)
+        return 'Not available';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime()))
+        return 'Not available';
+    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 function timeSince(iso: string): string {
     const diff = Date.now() - new Date(iso).getTime();
@@ -309,6 +317,10 @@ export default function DashboardPage() {
                       <span className={`db-sub-status db-sub-status--${stats?.subscription_status}`}>
                         {stats?.subscription_status}
                       </span>
+                    </div>
+                    <div className="db-sub-row">
+                      <span className="db-sub-key">Expiry date</span>
+                      <span className="db-sub-val">{fmtMaybe(stats?.subscription_end)}</span>
                     </div>
                   </>)}
                 <div className="db-sub-actions">
