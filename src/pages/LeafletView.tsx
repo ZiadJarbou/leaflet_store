@@ -9069,6 +9069,9 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
 
           <SbSection id="templates" open={openSbSection === 'templates'} onToggle={() => { }} title="Card Template" tooltip={SB_TOOLTIPS.templates}>
             <div className="lv-sb-template-panel">
+              <button type="button" className="lv-sb-template-customize" onClick={() => setCustomizerOpen(true)}>
+                {'\u{1F3A8}'} Customize Layout
+              </button>
               <div className="lv-sb-template-toolbar">
                 <button type="button" className="lv-sb-template-action" onClick={loadSidebarTemplates}>
                   Refresh
@@ -9695,7 +9698,6 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
           <div className="lv-header-right">
             {editorTourSkipped && !editorTourOpen && (<span className="lv-tour-reminder">Editor tour available</span>)}
             <button className="btn ghost lv-tour-replay" onClick={startEditorTour}>Show Tour Again</button>
-            <button className="btn ghost" onClick={() => setCustomizerOpen(true)}>{'\u{1F3A8}'} Customize Layout</button>
 
           </div>
         </div>

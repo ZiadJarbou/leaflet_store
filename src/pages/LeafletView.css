@@ -2124,6 +2124,20 @@ a.lv-card-image-license:hover {
   gap: 14px;
 }
 
+.lv-sb-template-customize {
+  width: 100%;
+  min-height: 38px;
+  border-radius: 8px;
+  border: 1px solid rgba(73,242,182,.34);
+  background: rgba(73,242,182,.14);
+  color: #f8fafc;
+  font-weight: 800;
+  cursor: pointer;
+}
+.lv-sb-template-customize:hover {
+  background: rgba(73,242,182,.22);
+}
+
 .lv-sb-template-toolbar {
   display: grid;
   grid-template-columns: 1fr 1fr;
