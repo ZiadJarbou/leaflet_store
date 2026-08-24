@@ -2,7 +2,8 @@ import { cssClass, cx } from '../utils/styleClass';
 import { useState, useEffect, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import type { FieldErrors } from '../services/authService';
+import { revokeLoginDevices } from '../services/authService';
+import type { DeviceLimitInfo, FieldErrors } from '../services/authService';
 const EyeIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
     <circle cx="12" cy="12" r="3"></circle>
@@ -29,6 +30,10 @@ export default function AuthModal() {
     const [loginEmail, setLoginEmail] = useState('');
     const [loginPassword, setLoginPassword] = useState('');
     const [loginErrors, setLoginErrors] = useState<FieldErrors>({});
+    const [deviceLimit, setDeviceLimit] = useState<DeviceLimitInfo | null>(null);
+    const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
+    const [deviceActionLoading, setDeviceActionLoading] = useState(false);
+    const [deviceActionError, setDeviceActionError] = useState('');
     const [showLoginPw, setShowLoginPw] = useState(false);
     const [loginLoading, setLoginLoading] = useState(false);
     const [signupName, setSignupName] = useState('');
@@ -54,6 +59,9 @@ export default function AuthModal() {
     function switchView(v: 'login' | 'signup') {
         setLoginErrors({});
         setSignupErrors({});
+        setDeviceLimit(null);
+        setSelectedSessions(new Set());
+        setDeviceActionError('');
         setTermsError(false);
         setAuthView(v);
     }
@@ -95,10 +103,17 @@ export default function AuthModal() {
         }
         setLoginLoading(true);
         setLoginErrors({});
+        setDeviceLimit(null);
+        setSelectedSessions(new Set());
+        setDeviceActionError('');
         try {
             const res = await submitLogin(loginEmail.trim().toLowerCase(), loginPassword);
             if (res.errors) {
                 setLoginErrors(res.errors);
+                if (res.deviceLimit) {
+                    setDeviceLimit(res.deviceLimit);
+                    setSelectedSessions(new Set());
+                }
                 if (res.switchTo === 'signup') {
                     setSignupEmail(res.old?.email || loginEmail);
                     setSignupErrors(res.errors);
@@ -115,6 +130,58 @@ export default function AuthModal() {
         finally {
             setLoginLoading(false);
         }
+    }
+    async function revokeDevices(options: { all?: boolean }) {
+        if (!loginEmail.trim() || !loginPassword) {
+            setDeviceActionError('Enter your email and password first.');
+            return;
+        }
+        const sessionIds = Array.from(selectedSessions);
+        if (!options.all && sessionIds.length === 0) {
+            setDeviceActionError('Choose at least one device to log out.');
+            return;
+        }
+        setDeviceActionLoading(true);
+        setDeviceActionError('');
+        try {
+            const res = await revokeLoginDevices(loginEmail.trim().toLowerCase(), loginPassword, {
+                all: options.all,
+                sessionIds,
+            });
+            if (res.errors) {
+                setDeviceActionError(res.errors.general || 'Could not log out selected devices.');
+                return;
+            }
+            setDeviceLimit(prev => prev ? { ...prev, sessions: res.sessions ?? [] } : prev);
+            setSelectedSessions(new Set());
+            const loginRes = await submitLogin(loginEmail.trim().toLowerCase(), loginPassword);
+            if (loginRes.errors) {
+                setLoginErrors(loginRes.errors);
+                setDeviceLimit(loginRes.deviceLimit ?? null);
+                return;
+            }
+            closeAuthModal();
+        }
+        catch (err) {
+            setDeviceActionError(err instanceof Error ? err.message : 'Could not log out selected devices.');
+        }
+        finally {
+            setDeviceActionLoading(false);
+        }
+    }
+    function toggleSession(id: string) {
+        setSelectedSessions(prev => {
+            const next = new Set(prev);
+            if (next.has(id))
+                next.delete(id);
+            else
+                next.add(id);
+            return next;
+        });
+    }
+    function formatSessionTime(value: string) {
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? '' : date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
     }
     async function handleSignup(e: FormEvent) {
         e.preventDefault();
@@ -185,6 +252,46 @@ export default function AuthModal() {
           {/* ── LOGIN VIEW ── */}
           {authView === 'login' && (<div>
               {loginErrors.general && <div className={cx("field-error", cssClass({ marginBottom: 10 }))}>{loginErrors.general}</div>}
+              {deviceLimit && (<div className={cssClass({
+                display: 'grid',
+                gap: 10,
+                padding: 12,
+                marginBottom: 12,
+                border: '1px solid rgba(73,242,182,.28)',
+                borderRadius: 10,
+                background: 'rgba(73,242,182,.08)',
+              })}>
+                <div className={cssClass({ color: '#e2e8f0', fontSize: 13, fontWeight: 800 })}>
+                  Active devices for your {deviceLimit.plan} plan
+                </div>
+                {deviceLimit.canChooseDevices && deviceLimit.sessions.length > 0 && (<div className={cssClass({ display: 'grid', gap: 8 })}>
+                  {deviceLimit.sessions.map(session => (<label key={session.id} className={cssClass({
+                    display: 'grid',
+                    gridTemplateColumns: 'auto 1fr',
+                    gap: 8,
+                    alignItems: 'start',
+                    padding: 8,
+                    border: '1px solid rgba(255,255,255,.12)',
+                    borderRadius: 8,
+                    background: 'rgba(15,23,42,.38)',
+                    cursor: 'pointer',
+                  })}>
+                    <input type="checkbox" checked={selectedSessions.has(session.id)} onChange={() => toggleSession(session.id)} />
+                    <span className={cssClass({ display: 'grid', gap: 2 })}>
+                      <strong className={cssClass({ color: '#f8fafc', fontSize: 12 })}>{session.device}</strong>
+                      <span className={cssClass({ color: '#94a3b8', fontSize: 11 })}>Last active {formatSessionTime(session.last_seen_at)}</span>
+                      {session.ip_address && <span className={cssClass({ color: '#64748b', fontSize: 11 })}>{session.ip_address}</span>}
+                    </span>
+                  </label>))}
+                  <button type="button" className="btn ghost" disabled={deviceActionLoading || selectedSessions.size === 0} onClick={() => revokeDevices({})}>
+                    {deviceActionLoading ? 'Logging out…' : 'Log out selected devices'}
+                  </button>
+                </div>)}
+                <button type="button" className="btn ghost" disabled={deviceActionLoading} onClick={() => revokeDevices({ all: true })}>
+                  {deviceActionLoading ? 'Logging out…' : 'Log out from all other devices'}
+                </button>
+                {deviceActionError && <div className="field-error">{deviceActionError}</div>}
+              </div>)}
               <OAuthButtons mode="login" />
               <form onSubmit={handleLogin} noValidate>
                 <div className="form-group">

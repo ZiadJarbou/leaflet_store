@@ -11,11 +11,28 @@ export interface FieldErrors {
   password?: string;
 }
 
+export interface LoginDeviceSession {
+  id: string;
+  device: string;
+  ip_address: string;
+  created_at: string;
+  last_seen_at: string;
+  expires_at: string;
+}
+
+export interface DeviceLimitInfo {
+  plan: string;
+  limit: number;
+  sessions: LoginDeviceSession[];
+  canChooseDevices: boolean;
+}
+
 export interface AuthResponse {
   user?: AuthUser;
   token?: string;
   notice?: string;
   errors?: FieldErrors;
+  deviceLimit?: DeviceLimitInfo | null;
   switchTo?: 'login' | 'signup';
   old?: { name?: string; email?: string };
 }
@@ -68,6 +85,15 @@ async function post<T = AuthResponse>(path: string, body: object): Promise<T> {
 
 export async function apiLogin(email: string, password: string): Promise<AuthResponse> {
   return post('/api/login', { email, password });
+}
+
+export async function revokeLoginDevices(email: string, password: string, options: { all?: boolean; sessionIds?: string[] }): Promise<{ ok: boolean; sessions: LoginDeviceSession[]; errors?: FieldErrors }> {
+  return post('/api/login/sessions/revoke', {
+    email,
+    password,
+    all: options.all === true,
+    session_ids: options.sessionIds ?? [],
+  });
 }
 
 export async function apiSignup(name: string, email: string, password: string): Promise<AuthResponse> {

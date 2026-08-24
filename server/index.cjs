@@ -1144,6 +1144,38 @@ function activeSessionCount(userId) {
       AND datetime(expires_at) > datetime('now')
   `).get(userId)?.count ?? 0;
 }
+function describeUserAgent(userAgent) {
+  const ua = String(userAgent || '');
+  const browser = /Edg\//.test(ua) ? 'Edge'
+    : /Chrome\//.test(ua) ? 'Chrome'
+    : /Firefox\//.test(ua) ? 'Firefox'
+    : /Safari\//.test(ua) ? 'Safari'
+    : 'Browser';
+  const os = /Windows/i.test(ua) ? 'Windows'
+    : /Mac OS X|Macintosh/i.test(ua) ? 'macOS'
+    : /Android/i.test(ua) ? 'Android'
+    : /iPhone|iPad|iOS/i.test(ua) ? 'iOS'
+    : /Linux/i.test(ua) ? 'Linux'
+    : 'Device';
+  return `${browser} on ${os}`;
+}
+function listActiveSessions(userId) {
+  return db.prepare(`
+    SELECT session_id, user_agent, ip_address, created_at, last_seen_at, expires_at
+    FROM user_sessions
+    WHERE user_id = ?
+      AND revoked_at IS NULL
+      AND datetime(expires_at) > datetime('now')
+    ORDER BY datetime(last_seen_at) DESC, datetime(created_at) DESC
+  `).all(userId).map(row => ({
+    id: row.session_id,
+    device: describeUserAgent(row.user_agent),
+    ip_address: row.ip_address || '',
+    created_at: row.created_at,
+    last_seen_at: row.last_seen_at,
+    expires_at: row.expires_at,
+  }));
+}
 function createLoginSession(user, req) {
   db.prepare(`
     UPDATE user_sessions
@@ -1160,6 +1192,12 @@ function createLoginSession(user, req) {
     const err = new Error(`Your ${planLabel} plan allows concurrent logins on ${deviceLabel}. Log out on another device or upgrade your plan.`);
     err.status = 403;
     err.authErrors = { general: err.message };
+    err.deviceLimit = {
+      plan: planLabel,
+      limit,
+      sessions: listActiveSessions(user.id),
+      canChooseDevices: limit > 1,
+    };
     throw err;
   }
   const sessionId = makeToken();
@@ -1931,9 +1969,55 @@ app.post('/api/login', async (req, res, next) => {
     const token = signJwt(user, sessionId);
     res.json({ user: { id: user.id, name: user.name, email: user.email }, token });
   } catch (err) {
-    if (err?.authErrors) { res.status(err.status || 403).json({ errors: err.authErrors }); return; }
+    if (err?.authErrors) {
+      res.status(err.status || 403).json({ errors: err.authErrors, deviceLimit: err.deviceLimit || null });
+      return;
+    }
     next(err);
   }
+});
+
+/* ── POST /api/login/sessions/revoke ── revoke devices after password verification ── */
+app.post('/api/login/sessions/revoke', async (req, res, next) => {
+  try {
+    const email = normalizeEmail(req.body.email || '');
+    const password = req.body.password || '';
+    const all = req.body.all === true;
+    const sessionIds = Array.isArray(req.body.session_ids) ? req.body.session_ids.map(String).filter(Boolean) : [];
+
+    if (!email || !password) {
+      res.status(422).json({ errors: { general: 'Email and password are required to manage logged-in devices.' } });
+      return;
+    }
+    const user = db.prepare('SELECT id, password_hash FROM users WHERE email = ?').get(email);
+    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+      res.status(422).json({ errors: { general: 'Email or password is incorrect.' } });
+      return;
+    }
+    if (!all && sessionIds.length === 0) {
+      res.status(422).json({ errors: { general: 'Choose at least one device to log out.' } });
+      return;
+    }
+
+    if (all) {
+      db.prepare(`
+        UPDATE user_sessions
+        SET revoked_at = datetime('now')
+        WHERE user_id = ? AND revoked_at IS NULL
+      `).run(user.id);
+    } else {
+      const revoke = db.prepare(`
+        UPDATE user_sessions
+        SET revoked_at = datetime('now')
+        WHERE user_id = ? AND session_id = ? AND revoked_at IS NULL
+      `);
+      const tx = db.transaction(ids => {
+        for (const sid of ids) revoke.run(user.id, sid);
+      });
+      tx(sessionIds);
+    }
+    res.json({ ok: true, sessions: listActiveSessions(user.id) });
+  } catch (err) { next(err); }
 });
 
 /* ── Google OAuth ── */
