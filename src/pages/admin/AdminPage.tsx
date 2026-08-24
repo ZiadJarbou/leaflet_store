@@ -66,6 +66,14 @@ interface SiteSettings {
     concurrent_logins_pro: string;
     concurrent_logins_business: string;
     concurrent_logins_agency: string;
+    plan_price_starter_monthly: string;
+    plan_price_starter_annual: string;
+    plan_price_pro_monthly: string;
+    plan_price_pro_annual: string;
+    plan_price_business_monthly: string;
+    plan_price_business_annual: string;
+    plan_price_agency_monthly: string;
+    plan_price_agency_annual: string;
     free_pdf_export_limit: string;
     ai_cover_generations_free: string;
     ai_cover_generations_starter: string;
@@ -106,6 +114,12 @@ const CONCURRENT_LOGIN_LIMIT_FIELDS = [
     { key: 'concurrent_logins_business', label: 'Business', icon: 'business_center' },
     { key: 'concurrent_logins_agency', label: 'Agency', icon: 'groups' },
 ] as const;
+const PLAN_PRICE_FIELDS = [
+    { plan: 'starter', label: 'Starter', icon: 'rocket_launch', monthlyKey: 'plan_price_starter_monthly', annualKey: 'plan_price_starter_annual' },
+    { plan: 'pro', label: 'Professional', icon: 'workspace_premium', monthlyKey: 'plan_price_pro_monthly', annualKey: 'plan_price_pro_annual' },
+    { plan: 'business', label: 'Business', icon: 'business_center', monthlyKey: 'plan_price_business_monthly', annualKey: 'plan_price_business_annual' },
+    { plan: 'agency', label: 'Agency', icon: 'groups', monthlyKey: 'plan_price_agency_monthly', annualKey: 'plan_price_agency_annual' },
+] as const;
 const DEFAULT_LEAFLET_CREATION_LIMITS: Pick<SiteSettings,
   'max_leaflets_free' |
   'max_leaflets_starter' |
@@ -144,6 +158,25 @@ const DEFAULT_AI_COVER_GENERATION_LIMITS: Pick<SiteSettings,
     ai_cover_generations_pro: '4',
     ai_cover_generations_business: '6',
     ai_cover_generations_agency: '10',
+};
+const DEFAULT_PLAN_PRICES: Pick<SiteSettings,
+  'plan_price_starter_monthly' |
+  'plan_price_starter_annual' |
+  'plan_price_pro_monthly' |
+  'plan_price_pro_annual' |
+  'plan_price_business_monthly' |
+  'plan_price_business_annual' |
+  'plan_price_agency_monthly' |
+  'plan_price_agency_annual'
+> = {
+    plan_price_starter_monthly: '13.34',
+    plan_price_starter_annual: '133.42',
+    plan_price_pro_monthly: '26.96',
+    plan_price_pro_annual: '269.57',
+    plan_price_business_monthly: '67.80',
+    plan_price_business_annual: '677.99',
+    plan_price_agency_monthly: '163.10',
+    plan_price_agency_annual: '',
 };
 interface AdminIcon {
     id: number;
@@ -1469,7 +1502,7 @@ function AdminSettings() {
     const [err, setErr] = useState('');
     useEffect(() => {
         adminGetSettings()
-            .then(settings => setS({ ...DEFAULT_LEAFLET_CREATION_LIMITS, ...DEFAULT_CONCURRENT_LOGIN_LIMITS, ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...settings }))
+            .then(settings => setS({ ...DEFAULT_LEAFLET_CREATION_LIMITS, ...DEFAULT_CONCURRENT_LOGIN_LIMITS, ...DEFAULT_PLAN_PRICES, ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...settings }))
             .catch(e => setErr(e.message));
     }, []);
     async function save() {
@@ -1477,7 +1510,7 @@ function AdminSettings() {
             return;
         try {
             const settings = await adminSaveSettings(s);
-            setS({ ...DEFAULT_LEAFLET_CREATION_LIMITS, ...DEFAULT_CONCURRENT_LOGIN_LIMITS, ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...settings });
+            setS({ ...DEFAULT_LEAFLET_CREATION_LIMITS, ...DEFAULT_CONCURRENT_LOGIN_LIMITS, ...DEFAULT_PLAN_PRICES, ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...settings });
             setSaved(true);
             setTimeout(() => setSaved(false), 2500);
         }
@@ -1527,6 +1560,42 @@ function AdminSettings() {
               <div className="cms-form-row">
                 <label>OPENAI_API_KEY</label>
                 <input type="password" value={s.openai_api_key || ''} placeholder="sk-..." autoComplete="off" onChange={e => setS({ ...s, openai_api_key: e.target.value })}/>
+              </div>
+            </div>
+            <div className="cms-settings-group cms-plan-price-group">
+              <div className="cms-settings-group-title">Plan Prices</div>
+              <p className="cms-plan-price-note">Set the monthly price and the annual total shown on the admin pricing editor, pricing page, and checkout.</p>
+              <div className="cms-plan-price-grid">
+                {PLAN_PRICE_FIELDS.map(field => (
+                  <div className="cms-plan-price-card" key={field.plan}>
+                    <div className="cms-plan-price-head">
+                      <span className="material-symbol" aria-hidden="true">{field.icon}</span>
+                      <strong>{field.label}</strong>
+                    </div>
+                    <label>
+                      <span>Monthly</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={s[field.monthlyKey] ?? ''}
+                        onChange={e => setS({ ...s, [field.monthlyKey]: e.target.value })}
+                        aria-label={`${field.label} monthly price`}
+                      />
+                    </label>
+                    <label>
+                      <span>Annual Total</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={s[field.annualKey] ?? ''}
+                        onChange={e => setS({ ...s, [field.annualKey]: e.target.value })}
+                        aria-label={`${field.label} annual total price`}
+                      />
+                    </label>
+                  </div>
+                ))}
               </div>
             </div>
             <div className="cms-settings-group cms-plan-limit-group">

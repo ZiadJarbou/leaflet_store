@@ -114,6 +114,25 @@ const DEFAULT_PRICING_ANNUAL_ITEMS = [
   'Business: $677.99 per year',
   'Agency: Custom annual pricing',
 ];
+const PLAN_PRICE_SETTING_MAP = {
+  starter: {
+    monthly: 'plan_price_starter_monthly',
+    annual: 'plan_price_starter_annual',
+  },
+  pro: {
+    monthly: 'plan_price_pro_monthly',
+    annual: 'plan_price_pro_annual',
+  },
+  business: {
+    monthly: 'plan_price_business_monthly',
+    annual: 'plan_price_business_annual',
+  },
+  agency: {
+    monthly: 'plan_price_agency_monthly',
+    annual: 'plan_price_agency_annual',
+  },
+};
+const PLAN_PRICE_SETTING_KEYS = new Set(Object.values(PLAN_PRICE_SETTING_MAP).flatMap(keys => Object.values(keys)));
 
 const PRODUCT_IMPORT_LIMIT_BY_PLAN = {
   free: 20,
@@ -393,6 +412,65 @@ function getPricingDefinitionsFromPlansValue(rawValue) {
     defs.push({ plan, period: 'annual',  name, amountCents: Math.round((annualTotal || annualMonthly * 12) * 100), currency: 'usd', interval: 'year' });
   }
   return defs;
+}
+
+function syncPlanPriceSettingsToPricingContent(settings) {
+  const row = db.prepare(
+    "SELECT value FROM page_content WHERE page='pricing' AND section='plans' AND field='items'"
+  ).get();
+  let plans = DEFAULT_PRICING_PLANS;
+  try {
+    const parsed = JSON.parse(row?.value || '[]');
+    if (Array.isArray(parsed) && parsed.length) plans = parsed;
+  } catch {}
+
+  const nextPlans = plans.map(plan => {
+    const planId = String(plan?.id || plan?.checkoutPlanId || '').trim().toLowerCase();
+    const keys = PLAN_PRICE_SETTING_MAP[planId];
+    if (!keys) return plan;
+
+    const monthly = parsePlanAmount(settings[keys.monthly]);
+    const annual = parsePlanAmount(settings[keys.annual]);
+    const next = { ...plan };
+    if (monthly !== null) next.monthlyPrice = monthly;
+    if (annual !== null) {
+      next.annualPrice = annual;
+      next.yearlyPrice = annual / 12;
+      if (annual > 0 && next.annualPriceLabel) delete next.annualPriceLabel;
+    }
+    return next;
+  });
+
+  const value = JSON.stringify(nextPlans);
+  db.prepare(`
+    INSERT INTO page_content (page, section, field, value)
+    VALUES ('pricing', 'plans', 'items', ?)
+    ON CONFLICT(page, section, field) DO UPDATE SET value = excluded.value
+  `).run(value);
+  return value;
+}
+
+function pricingSettingsFromPricingContent() {
+  const row = db.prepare(
+    "SELECT value FROM page_content WHERE page='pricing' AND section='plans' AND field='items'"
+  ).get();
+  let plans = DEFAULT_PRICING_PLANS;
+  try {
+    const parsed = JSON.parse(row?.value || '[]');
+    if (Array.isArray(parsed) && parsed.length) plans = parsed;
+  } catch {}
+
+  const settings = {};
+  for (const plan of plans) {
+    const planId = String(plan?.id || plan?.checkoutPlanId || '').trim().toLowerCase();
+    const keys = PLAN_PRICE_SETTING_MAP[planId];
+    if (!keys) continue;
+    const monthly = parsePlanAmount(plan?.monthlyPrice);
+    const annual = parsePlanAmount(plan?.annualPrice);
+    if (monthly !== null) settings[keys.monthly] = monthly.toFixed(2);
+    if (annual !== null) settings[keys.annual] = annual.toFixed(2);
+  }
+  return settings;
 }
 
 async function updateSubscriptionsToStripePrice(oldPriceId, newPriceId, plan, period) {
@@ -815,6 +893,14 @@ const settingDefaults = {
   ai_cover_generations_pro: '4',
   ai_cover_generations_business: '6',
   ai_cover_generations_agency: '10',
+  plan_price_starter_monthly: '13.34',
+  plan_price_starter_annual: '133.42',
+  plan_price_pro_monthly: '26.96',
+  plan_price_pro_annual: '269.57',
+  plan_price_business_monthly: '67.80',
+  plan_price_business_annual: '677.99',
+  plan_price_agency_monthly: '163.10',
+  plan_price_agency_annual: '',
   support_email: '',
   announcement_banner: '',
   stripe_secret_key: '',
@@ -5002,6 +5088,7 @@ app.delete('/api/admin/icons/:id', adminMiddleware, (req, res) => {
 app.get('/api/admin/settings', adminMiddleware, (req, res) => {
   const rows = db.prepare('SELECT key,value FROM site_settings').all();
   const settings = Object.fromEntries(rows.map(r => [r.key, r.value]));
+  Object.assign(settings, pricingSettingsFromPricingContent());
   res.json(settings);
 });
 
@@ -5071,10 +5158,14 @@ app.delete('/api/admin/deal-tags/:key', adminMiddleware, (req, res) => {
 });
 
 /* ── PUT /api/admin/settings ── */
-app.put('/api/admin/settings', adminMiddleware, (req, res) => {
+app.put('/api/admin/settings', adminMiddleware, async (req, res) => {
   const upsert = db.prepare('INSERT OR REPLACE INTO site_settings (key,value) VALUES (?,?)');
   const body = req.body || {};
   const normalizeSettingValue = (key, value) => {
+    if (PLAN_PRICE_SETTING_KEYS.has(key)) {
+      const parsed = parsePlanAmount(value);
+      return parsed === null ? '' : parsed.toFixed(2);
+    }
     if (CONCURRENT_LOGIN_SETTING_KEY_SET.has(key)) {
       const parsed = Number.parseInt(String(value ?? '').trim(), 10);
       return String(Number.isInteger(parsed) ? Math.max(1, Math.min(1000, parsed)) : 1);
@@ -5092,8 +5183,23 @@ app.put('/api/admin/settings', adminMiddleware, (req, res) => {
   if (Object.prototype.hasOwnProperty.call(body, 'stripe_secret_key')) {
     refreshStripeClient();
   }
+  const hasPriceSetting = Object.keys(body).some(key => PLAN_PRICE_SETTING_KEYS.has(key));
+  if (hasPriceSetting) {
+    const settingsRows = db.prepare('SELECT key,value FROM site_settings').all();
+    const settings = Object.fromEntries(settingsRows.map(r => [r.key, r.value]));
+    const plansValue = syncPlanPriceSettingsToPricingContent(settings);
+    if (stripe) {
+      try {
+        await syncStripePricingFromPlansValue(plansValue);
+      } catch (err) {
+        console.error('[stripe-sync] pricing sync failed after settings save:', err);
+      }
+    }
+  }
   const rows = db.prepare('SELECT key,value FROM site_settings').all();
-  res.json(Object.fromEntries(rows.map(r => [r.key, r.value])));
+  const settings = Object.fromEntries(rows.map(r => [r.key, r.value]));
+  Object.assign(settings, pricingSettingsFromPricingContent());
+  res.json(settings);
 });
 
 function readCoverLayoutTemplates() {

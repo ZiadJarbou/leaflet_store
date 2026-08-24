@@ -585,16 +585,61 @@
   margin-bottom: 0;
 }
 .cms-ai-limit-group,
+.cms-plan-price-group,
 .cms-plan-limit-group,
 .cms-device-limit-group {
   grid-column: 1 / -1;
 }
 .cms-ai-limit-note,
+.cms-plan-price-note,
 .cms-plan-limit-note,
 .cms-device-limit-note {
   margin: -4px 0 12px;
   color: #94a3b8;
   font-size: .82rem;
+}
+.cms-plan-price-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(170px, 1fr));
+  gap: 12px;
+}
+.cms-plan-price-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 12px;
+  background: rgba(11,15,30,.36);
+}
+.cms-plan-price-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #cbd5e1;
+  font-size: .8rem;
+  font-weight: 600;
+}
+.cms-plan-price-head .material-symbol {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: rgba(73,242,182,.12);
+  color: #49f2b6;
+  font-size: 1.05rem;
+}
+.cms-plan-price-card label {
+  display: grid;
+  gap: 6px;
+  color: #94a3b8;
+  font-size: .72rem;
+}
+.cms-plan-price-card input[type=number] {
+  width: 100%;
+  min-height: 38px;
+  text-align: center;
+  font-weight: 700;
 }
 .cms-ai-limit-grid,
 .cms-plan-limit-grid,
@@ -661,6 +706,7 @@
 @media (max-width: 1100px) {
   .cms-settings-general-layout,
   .cms-ai-limit-group,
+  .cms-plan-price-group,
   .cms-plan-limit-group,
   .cms-device-limit-group {
     grid-column: auto;
@@ -669,6 +715,7 @@
     grid-template-columns: 1fr;
   }
   .cms-ai-limit-grid,
+  .cms-plan-price-grid,
   .cms-plan-limit-grid,
   .cms-device-limit-grid {
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
