@@ -120,6 +120,26 @@ const PRODUCT_IMPORT_LIMIT_BY_PLAN = {
   starter: 100,
 };
 
+const LEAFLET_CREATION_LIMIT_BY_PLAN = {
+  free: 3,
+  starter: 5,
+  pro: 25,
+  professional: 25,
+  business: 100,
+  agency: 1000,
+  admin: 1000,
+};
+const LEAFLET_CREATION_SETTING_KEYS = {
+  free: 'max_leaflets_free',
+  starter: 'max_leaflets_starter',
+  pro: 'max_leaflets_pro',
+  professional: 'max_leaflets_pro',
+  business: 'max_leaflets_business',
+  agency: 'max_leaflets_agency',
+  admin: 'max_leaflets_agency',
+};
+const LEAFLET_CREATION_SETTING_KEY_SET = new Set(Object.values(LEAFLET_CREATION_SETTING_KEYS));
+
 const AI_COVER_GENERATION_LIMIT_BY_PLAN = {
   free: 1,
   starter: 2,
@@ -152,6 +172,41 @@ function productImportLimitPayload(user) {
     limit: Number.isFinite(limit) ? limit : null,
     unlimited: !Number.isFinite(limit),
   };
+}
+
+function normalizeSubscriptionPlan(plan) {
+  const safePlan = String(plan || 'free').trim().toLowerCase();
+  return safePlan === 'professional' ? 'pro' : (safePlan || 'free');
+}
+
+function leafletCreationLimitForUser(user) {
+  if (isUnlimitedUser(user) || String(user?.role || '').toLowerCase() === 'admin') return Infinity;
+  const safePlan = normalizeSubscriptionPlan(user?.subscription_plan);
+  const fallback = LEAFLET_CREATION_LIMIT_BY_PLAN[safePlan] ?? LEAFLET_CREATION_LIMIT_BY_PLAN.free;
+  const settingKey = LEAFLET_CREATION_SETTING_KEYS[safePlan];
+  if (!settingKey) return fallback;
+  const row = db.prepare('SELECT value FROM site_settings WHERE key = ?').get(settingKey);
+  const configured = Number.parseInt(String(row?.value || '').trim(), 10);
+  return Number.isInteger(configured) && configured >= 0 ? configured : fallback;
+}
+
+function leafletPlanLabel(plan) {
+  const safePlan = normalizeSubscriptionPlan(plan);
+  if (safePlan === 'pro') return 'Professional';
+  return safePlan.charAt(0).toUpperCase() + safePlan.slice(1);
+}
+
+function assertCanCreateLeaflet(userId) {
+  const user = db.prepare('SELECT email, role, subscription_plan FROM users WHERE id = ?').get(userId);
+  if (!user) throw httpError(401, 'User was not found.');
+  const limit = leafletCreationLimitForUser(user);
+  if (!Number.isFinite(limit)) return { user, limit, used: 0 };
+  const used = Number(db.prepare('SELECT COUNT(*) AS count FROM leaflets WHERE user_id = ?').get(userId)?.count || 0);
+  if (used >= limit) {
+    const label = leafletPlanLabel(user.subscription_plan);
+    throw httpError(403, `Leaflet limit reached. Your ${label} plan allows ${limit} ${limit === 1 ? 'leaflet' : 'leaflets'}. Delete an old leaflet or upgrade your plan.`);
+  }
+  return { user, limit, used };
 }
 
 function parsePlanAmount(value) {
@@ -706,6 +761,10 @@ const settingDefaults = {
   maintenance_mode: '0',
   allow_signups: '1',
   max_leaflets_free: '3',
+  max_leaflets_starter: '5',
+  max_leaflets_pro: '25',
+  max_leaflets_business: '100',
+  max_leaflets_agency: '1000',
   free_pdf_export_limit: '1',
   ai_cover_generations_free: '1',
   ai_cover_generations_starter: '2',
@@ -2253,6 +2312,7 @@ app.post('/api/leaflets/:id/duplicate', authMiddleware, (req, res, next) => {
   try {
     const src = db.prepare('SELECT * FROM leaflets WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
     if (!src) { res.status(404).json({ error: 'Leaflet not found.' }); return; }
+    assertCanCreateLeaflet(req.user.id);
 
     const newTitle = (req.body?.title || '').trim() || `${src.title} (Copy)`;
     const ins = db.prepare(`INSERT INTO leaflets (user_id, title, description, language_mode, layout_json) VALUES (?, ?, ?, ?, ?)`);
@@ -2425,7 +2485,7 @@ app.post('/api/leaflets', authMiddleware, (req, res, next) => {
     if (!title || !String(title).trim()) {
       res.status(422).json({ error: 'Title is required.' }); return;
     }
-    const user = db.prepare('SELECT email, subscription_plan FROM users WHERE id = ?').get(req.user.id);
+    const { user } = assertCanCreateLeaflet(req.user.id);
     const productLimit = productImportLimitForUser(user);
     const incomingProducts = Array.isArray(products) ? products : [];
     const productsToInsert = Number.isFinite(productLimit)
@@ -4901,9 +4961,9 @@ app.put('/api/admin/settings', adminMiddleware, (req, res) => {
   const upsert = db.prepare('INSERT OR REPLACE INTO site_settings (key,value) VALUES (?,?)');
   const body = req.body || {};
   const normalizeSettingValue = (key, value) => {
-    if (AI_COVER_GENERATION_SETTING_KEY_SET.has(key)) {
+    if (AI_COVER_GENERATION_SETTING_KEY_SET.has(key) || LEAFLET_CREATION_SETTING_KEY_SET.has(key)) {
       const parsed = Number.parseInt(String(value ?? '').trim(), 10);
-      return String(Number.isInteger(parsed) ? Math.max(0, Math.min(1000, parsed)) : 0);
+      return String(Number.isInteger(parsed) ? Math.max(0, Math.min(10000, parsed)) : 0);
     }
     return String(value);
   };

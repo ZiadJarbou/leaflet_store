@@ -57,6 +57,10 @@ interface SiteSettings {
     maintenance_mode: string;
     allow_signups: string;
     max_leaflets_free: string;
+    max_leaflets_starter: string;
+    max_leaflets_pro: string;
+    max_leaflets_business: string;
+    max_leaflets_agency: string;
     free_pdf_export_limit: string;
     ai_cover_generations_free: string;
     ai_cover_generations_starter: string;
@@ -83,6 +87,26 @@ const AI_COVER_GENERATION_LIMIT_FIELDS = [
     { key: 'ai_cover_generations_business', label: 'Business', icon: 'business_center' },
     { key: 'ai_cover_generations_agency', label: 'Agency', icon: 'groups' },
 ] as const;
+const LEAFLET_CREATION_LIMIT_FIELDS = [
+    { key: 'max_leaflets_free', label: 'Free', icon: 'person' },
+    { key: 'max_leaflets_starter', label: 'Starter', icon: 'rocket_launch' },
+    { key: 'max_leaflets_pro', label: 'Professional', icon: 'workspace_premium' },
+    { key: 'max_leaflets_business', label: 'Business', icon: 'business_center' },
+    { key: 'max_leaflets_agency', label: 'Agency', icon: 'groups' },
+] as const;
+const DEFAULT_LEAFLET_CREATION_LIMITS: Pick<SiteSettings,
+  'max_leaflets_free' |
+  'max_leaflets_starter' |
+  'max_leaflets_pro' |
+  'max_leaflets_business' |
+  'max_leaflets_agency'
+> = {
+    max_leaflets_free: '3',
+    max_leaflets_starter: '5',
+    max_leaflets_pro: '25',
+    max_leaflets_business: '100',
+    max_leaflets_agency: '1000',
+};
 const DEFAULT_AI_COVER_GENERATION_LIMITS: Pick<SiteSettings,
   'ai_cover_generations_free' |
   'ai_cover_generations_starter' |
@@ -1420,7 +1444,7 @@ function AdminSettings() {
     const [err, setErr] = useState('');
     useEffect(() => {
         adminGetSettings()
-            .then(settings => setS({ ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...settings }))
+            .then(settings => setS({ ...DEFAULT_LEAFLET_CREATION_LIMITS, ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...settings }))
             .catch(e => setErr(e.message));
     }, []);
     async function save() {
@@ -1428,7 +1452,7 @@ function AdminSettings() {
             return;
         try {
             const settings = await adminSaveSettings(s);
-            setS({ ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...settings });
+            setS({ ...DEFAULT_LEAFLET_CREATION_LIMITS, ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...settings });
             setSaved(true);
             setTimeout(() => setSaved(false), 2500);
         }
@@ -1480,6 +1504,27 @@ function AdminSettings() {
                 <input type="password" value={s.openai_api_key || ''} placeholder="sk-..." autoComplete="off" onChange={e => setS({ ...s, openai_api_key: e.target.value })}/>
               </div>
             </div>
+            <div className="cms-settings-group cms-plan-limit-group">
+              <div className="cms-settings-group-title">Leaflets Created</div>
+              <p className="cms-plan-limit-note">Set how many saved leaflets each plan can create.</p>
+              <div className="cms-plan-limit-grid">
+                {LEAFLET_CREATION_LIMIT_FIELDS.map(field => (
+                  <label className="cms-plan-limit-card" key={field.key}>
+                    <span className="material-symbol" aria-hidden="true">{field.icon}</span>
+                    <strong>{field.label}</strong>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10000"
+                      value={s[field.key] ?? ''}
+                      onChange={e => setS({ ...s, [field.key]: e.target.value })}
+                      aria-label={`${field.label} created leaflets limit`}
+                    />
+                    <small>leaflets total</small>
+                  </label>
+                ))}
+              </div>
+            </div>
             <div className="cms-settings-group cms-ai-limit-group">
               <div className="cms-settings-group-title">AI Image Generator</div>
               <p className="cms-ai-limit-note">Set how many AI cover images each plan can generate for one leaflet.</p>
@@ -1519,10 +1564,6 @@ function AdminSettings() {
               <input type="checkbox" checked={s.allow_signups === '1'} onChange={e => setS({ ...s, allow_signups: e.target.checked ? '1' : '0' })}/>
               <span className="cms-toggle-track"/>
             </label>
-          </div>
-          <div className="cms-form-row">
-            <label>Max Leaflets (Free plan)</label>
-            <input type="number" min="1" max="100" value={s.max_leaflets_free} onChange={e => setS({ ...s, max_leaflets_free: e.target.value })} className={cssClass({ width: 80 })}/>
           </div>
           <div className="cms-form-row">
             <label>PDF Exports (Free plan)</label>
