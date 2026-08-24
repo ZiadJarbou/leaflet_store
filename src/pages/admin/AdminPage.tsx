@@ -61,6 +61,11 @@ interface SiteSettings {
     max_leaflets_pro: string;
     max_leaflets_business: string;
     max_leaflets_agency: string;
+    concurrent_logins_free: string;
+    concurrent_logins_starter: string;
+    concurrent_logins_pro: string;
+    concurrent_logins_business: string;
+    concurrent_logins_agency: string;
     free_pdf_export_limit: string;
     ai_cover_generations_free: string;
     ai_cover_generations_starter: string;
@@ -94,6 +99,13 @@ const LEAFLET_CREATION_LIMIT_FIELDS = [
     { key: 'max_leaflets_business', label: 'Business', icon: 'business_center' },
     { key: 'max_leaflets_agency', label: 'Agency', icon: 'groups' },
 ] as const;
+const CONCURRENT_LOGIN_LIMIT_FIELDS = [
+    { key: 'concurrent_logins_free', label: 'Free', icon: 'person' },
+    { key: 'concurrent_logins_starter', label: 'Starter', icon: 'rocket_launch' },
+    { key: 'concurrent_logins_pro', label: 'Professional', icon: 'workspace_premium' },
+    { key: 'concurrent_logins_business', label: 'Business', icon: 'business_center' },
+    { key: 'concurrent_logins_agency', label: 'Agency', icon: 'groups' },
+] as const;
 const DEFAULT_LEAFLET_CREATION_LIMITS: Pick<SiteSettings,
   'max_leaflets_free' |
   'max_leaflets_starter' |
@@ -106,6 +118,19 @@ const DEFAULT_LEAFLET_CREATION_LIMITS: Pick<SiteSettings,
     max_leaflets_pro: '25',
     max_leaflets_business: '100',
     max_leaflets_agency: '1000',
+};
+const DEFAULT_CONCURRENT_LOGIN_LIMITS: Pick<SiteSettings,
+  'concurrent_logins_free' |
+  'concurrent_logins_starter' |
+  'concurrent_logins_pro' |
+  'concurrent_logins_business' |
+  'concurrent_logins_agency'
+> = {
+    concurrent_logins_free: '1',
+    concurrent_logins_starter: '2',
+    concurrent_logins_pro: '3',
+    concurrent_logins_business: '5',
+    concurrent_logins_agency: '10',
 };
 const DEFAULT_AI_COVER_GENERATION_LIMITS: Pick<SiteSettings,
   'ai_cover_generations_free' |
@@ -1444,7 +1469,7 @@ function AdminSettings() {
     const [err, setErr] = useState('');
     useEffect(() => {
         adminGetSettings()
-            .then(settings => setS({ ...DEFAULT_LEAFLET_CREATION_LIMITS, ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...settings }))
+            .then(settings => setS({ ...DEFAULT_LEAFLET_CREATION_LIMITS, ...DEFAULT_CONCURRENT_LOGIN_LIMITS, ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...settings }))
             .catch(e => setErr(e.message));
     }, []);
     async function save() {
@@ -1452,7 +1477,7 @@ function AdminSettings() {
             return;
         try {
             const settings = await adminSaveSettings(s);
-            setS({ ...DEFAULT_LEAFLET_CREATION_LIMITS, ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...settings });
+            setS({ ...DEFAULT_LEAFLET_CREATION_LIMITS, ...DEFAULT_CONCURRENT_LOGIN_LIMITS, ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...settings });
             setSaved(true);
             setTimeout(() => setSaved(false), 2500);
         }
@@ -1521,6 +1546,27 @@ function AdminSettings() {
                       aria-label={`${field.label} exported leaflets limit`}
                     />
                     <small>exported leaflets</small>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="cms-settings-group cms-device-limit-group">
+              <div className="cms-settings-group-title">Concurrent Devices</div>
+              <p className="cms-device-limit-note">Set how many active logged-in devices each plan can use at the same time.</p>
+              <div className="cms-device-limit-grid">
+                {CONCURRENT_LOGIN_LIMIT_FIELDS.map(field => (
+                  <label className="cms-device-limit-card" key={field.key}>
+                    <span className="material-symbol" aria-hidden="true">{field.icon}</span>
+                    <strong>{field.label}</strong>
+                    <input
+                      type="number"
+                      min="1"
+                      max="1000"
+                      value={s[field.key] ?? ''}
+                      onChange={e => setS({ ...s, [field.key]: e.target.value })}
+                      aria-label={`${field.label} concurrent device limit`}
+                    />
+                    <small>devices total</small>
                   </label>
                 ))}
               </div>

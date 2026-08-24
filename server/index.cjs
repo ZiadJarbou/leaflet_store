@@ -800,6 +800,11 @@ const settingDefaults = {
   max_leaflets_pro: '25',
   max_leaflets_business: '100',
   max_leaflets_agency: '1000',
+  concurrent_logins_free: '1',
+  concurrent_logins_starter: '2',
+  concurrent_logins_pro: '3',
+  concurrent_logins_business: '5',
+  concurrent_logins_agency: '10',
   free_pdf_export_limit: '1',
   ai_cover_generations_free: '1',
   ai_cover_generations_starter: '2',
@@ -1215,6 +1220,15 @@ const CONCURRENT_LOGIN_LIMITS = {
   business: 5,
   agency: 10,
 };
+const CONCURRENT_LOGIN_SETTING_KEYS = {
+  free: 'concurrent_logins_free',
+  starter: 'concurrent_logins_starter',
+  pro: 'concurrent_logins_pro',
+  professional: 'concurrent_logins_pro',
+  business: 'concurrent_logins_business',
+  agency: 'concurrent_logins_agency',
+};
+const CONCURRENT_LOGIN_SETTING_KEY_SET = new Set(Object.values(CONCURRENT_LOGIN_SETTING_KEYS));
 function sessionExpiresAt(from = Date.now()) {
   return new Date(from + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
 }
@@ -1227,8 +1241,13 @@ function signJwt(user, sessionId) {
 }
 function concurrentLoginLimitForUser(user) {
   if (isUnlimitedUser(user) || String(user?.role || '').toLowerCase() === 'admin') return Infinity;
-  const plan = String(user?.subscription_plan || 'free').trim().toLowerCase();
-  return CONCURRENT_LOGIN_LIMITS[plan] ?? CONCURRENT_LOGIN_LIMITS.free;
+  const plan = normalizeSubscriptionPlan(user?.subscription_plan);
+  const fallback = CONCURRENT_LOGIN_LIMITS[plan] ?? CONCURRENT_LOGIN_LIMITS.free;
+  const settingKey = CONCURRENT_LOGIN_SETTING_KEYS[plan];
+  if (!settingKey) return fallback;
+  const row = db.prepare('SELECT value FROM site_settings WHERE key = ?').get(settingKey);
+  const configured = Number.parseInt(String(row?.value || '').trim(), 10);
+  return Number.isInteger(configured) && configured >= 1 ? configured : fallback;
 }
 function activeSessionCount(userId) {
   return db.prepare(`
@@ -5052,6 +5071,10 @@ app.put('/api/admin/settings', adminMiddleware, (req, res) => {
   const upsert = db.prepare('INSERT OR REPLACE INTO site_settings (key,value) VALUES (?,?)');
   const body = req.body || {};
   const normalizeSettingValue = (key, value) => {
+    if (CONCURRENT_LOGIN_SETTING_KEY_SET.has(key)) {
+      const parsed = Number.parseInt(String(value ?? '').trim(), 10);
+      return String(Number.isInteger(parsed) ? Math.max(1, Math.min(1000, parsed)) : 1);
+    }
     if (AI_COVER_GENERATION_SETTING_KEY_SET.has(key) || LEAFLET_CREATION_SETTING_KEY_SET.has(key)) {
       const parsed = Number.parseInt(String(value ?? '').trim(), 10);
       return String(Number.isInteger(parsed) ? Math.max(0, Math.min(10000, parsed)) : 0);
