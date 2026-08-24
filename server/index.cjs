@@ -196,15 +196,22 @@ function leafletPlanLabel(plan) {
   return safePlan.charAt(0).toUpperCase() + safePlan.slice(1);
 }
 
-function assertCanCreateLeaflet(userId) {
+function exportedLeafletUsageForUser(userId) {
+  return Number(db.prepare('SELECT exported_leaflets_used FROM users WHERE id = ?').get(userId)?.exported_leaflets_used || 0);
+}
+
+function assertCanCountExportedLeaflet(userId) {
   const user = db.prepare('SELECT email, role, subscription_plan FROM users WHERE id = ?').get(userId);
   if (!user) throw httpError(401, 'User was not found.');
   const limit = leafletCreationLimitForUser(user);
   if (!Number.isFinite(limit)) return { user, limit, used: 0 };
-  const used = Number(db.prepare('SELECT COUNT(*) AS count FROM leaflets WHERE user_id = ?').get(userId)?.count || 0);
+  const used = exportedLeafletUsageForUser(userId);
   if (used >= limit) {
     const label = leafletPlanLabel(user.subscription_plan);
-    throw httpError(403, `Leaflet limit reached. Your ${label} plan allows ${limit} ${limit === 1 ? 'leaflet' : 'leaflets'}. Delete an old leaflet or upgrade your plan.`);
+    const err = httpError(403, `Exported leaflet limit reached. Your ${label} plan allows ${limit} exported ${limit === 1 ? 'leaflet' : 'leaflets'}. Upgrade your plan to export more leaflets.`);
+    err.limitReached = true;
+    err.usage = { used, limit, plan: normalizeSubscriptionPlan(user.subscription_plan) };
+    throw err;
   }
   return { user, limit, used };
 }
@@ -579,6 +586,21 @@ if (!leafletCols.includes('layout_json')) {
 if (!leafletCols.includes('thumbnail')) {
   db.exec("ALTER TABLE leaflets ADD COLUMN thumbnail TEXT");
 }
+if (!leafletCols.includes('quota_counted')) {
+  db.exec("ALTER TABLE leaflets ADD COLUMN quota_counted INTEGER NOT NULL DEFAULT 0");
+}
+if (!leafletCols.includes('first_exported_at')) {
+  db.exec("ALTER TABLE leaflets ADD COLUMN first_exported_at TEXT");
+}
+db.exec(`
+  UPDATE leaflets
+  SET quota_counted = 1,
+      first_exported_at = COALESCE(first_exported_at, (
+        SELECT MIN(created_at) FROM leaflet_pdf_exports WHERE leaflet_id = leaflets.id
+      ))
+  WHERE quota_counted = 0
+    AND EXISTS (SELECT 1 FROM leaflet_pdf_exports WHERE leaflet_id = leaflets.id)
+`);
 
 /* ── Migrate: enable origin flags on all existing leaflets (one-time) ── */
 if (!hasMigration('origin_flag_default_v1')) {
@@ -622,6 +644,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_stripe_plan_prices_lookup ON stripe_plan_prices(plan, period, active);
   CREATE INDEX IF NOT EXISTS idx_stripe_plan_prices_price_id ON stripe_plan_prices(stripe_price_id);
   CREATE INDEX IF NOT EXISTS idx_ai_cover_generations_usage ON ai_cover_generations(user_id, leaflet_id, status);
+  CREATE INDEX IF NOT EXISTS idx_leaflets_export_quota ON leaflets(user_id, quota_counted);
 `);
 
 const PLATFORM_DEFAULT_TEMPLATE_NAMES = Array.from({ length: 7 }, (_, i) => `Template ${i + 1}`);
@@ -656,7 +679,19 @@ if (!userCols.includes('subscription_period')) db.exec("ALTER TABLE users ADD CO
 if (!userCols.includes('subscription_start'))  db.exec("ALTER TABLE users ADD COLUMN subscription_start TEXT");
 if (!userCols.includes('subscription_end'))    db.exec("ALTER TABLE users ADD COLUMN subscription_end TEXT");
 if (!userCols.includes('subscription_email_key')) db.exec("ALTER TABLE users ADD COLUMN subscription_email_key TEXT");
+if (!userCols.includes('exported_leaflets_used')) db.exec("ALTER TABLE users ADD COLUMN exported_leaflets_used INTEGER NOT NULL DEFAULT 0");
 if (!userCols.includes('role'))                db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
+if (!hasMigration('exported_leaflet_usage_counter_v1')) {
+  db.exec(`
+    UPDATE users
+    SET exported_leaflets_used = (
+      SELECT COUNT(*) FROM leaflets
+      WHERE leaflets.user_id = users.id
+        AND leaflets.quota_counted = 1
+    )
+  `);
+  markMigration('exported_leaflet_usage_counter_v1');
+}
 db.prepare(`
   UPDATE users
   SET subscription_start = COALESCE(
@@ -2312,7 +2347,6 @@ app.post('/api/leaflets/:id/duplicate', authMiddleware, (req, res, next) => {
   try {
     const src = db.prepare('SELECT * FROM leaflets WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
     if (!src) { res.status(404).json({ error: 'Leaflet not found.' }); return; }
-    assertCanCreateLeaflet(req.user.id);
 
     const newTitle = (req.body?.title || '').trim() || `${src.title} (Copy)`;
     const ins = db.prepare(`INSERT INTO leaflets (user_id, title, description, language_mode, layout_json) VALUES (?, ?, ?, ?, ?)`);
@@ -2485,7 +2519,7 @@ app.post('/api/leaflets', authMiddleware, (req, res, next) => {
     if (!title || !String(title).trim()) {
       res.status(422).json({ error: 'Title is required.' }); return;
     }
-    const { user } = assertCanCreateLeaflet(req.user.id);
+    const user = db.prepare('SELECT email, subscription_plan FROM users WHERE id = ?').get(req.user.id);
     const productLimit = productImportLimitForUser(user);
     const incomingProducts = Array.isArray(products) ? products : [];
     const productsToInsert = Number.isFinite(productLimit)
@@ -2558,9 +2592,63 @@ app.put('/api/leaflets/:id/thumbnail', authMiddleware, (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/* ── POST /api/leaflets/:id/exported-pdfs ── */
-app.post('/api/leaflets/:id/exported-pdfs', authMiddleware, (req, res) => {
+const saveExportedPdfRecord = db.transaction(details => {
+  const leaflet = db.prepare('SELECT id, title, quota_counted FROM leaflets WHERE id = ? AND user_id = ?')
+    .get(details.leafletId, details.userId);
+  if (!leaflet) throw httpError(404, 'Leaflet not found.');
+
+  let countedNow = false;
+  let usage = null;
+  if (!Number(leaflet.quota_counted || 0)) {
+    const quota = assertCanCountExportedLeaflet(details.userId);
+    const result = db.prepare(`
+      UPDATE leaflets
+      SET quota_counted = 1,
+          first_exported_at = COALESCE(first_exported_at, datetime('now'))
+      WHERE id = ? AND user_id = ? AND quota_counted = 0
+    `).run(leaflet.id, details.userId);
+    countedNow = result.changes > 0;
+    if (countedNow) {
+      db.prepare('UPDATE users SET exported_leaflets_used = exported_leaflets_used + 1 WHERE id = ?').run(details.userId);
+    }
+    usage = {
+      used: quota.used + (countedNow ? 1 : 0),
+      limit: Number.isFinite(quota.limit) ? quota.limit : null,
+      plan: normalizeSubscriptionPlan(quota.user.subscription_plan),
+      counted: countedNow,
+    };
+  }
+
+  const result = db.prepare(`
+    INSERT INTO leaflet_pdf_exports (user_id, leaflet_id, filename, original_name, size, share_token, allow_edit)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    details.userId,
+    leaflet.id,
+    details.filename,
+    details.originalName,
+    details.size,
+    details.shareToken,
+    details.allowEdit ? 1 : 0
+  );
+
+  if (!usage) {
+    const user = db.prepare('SELECT email, role, subscription_plan FROM users WHERE id = ?').get(details.userId);
+    const limit = leafletCreationLimitForUser(user);
+    usage = {
+      used: Number.isFinite(limit) ? exportedLeafletUsageForUser(details.userId) : 0,
+      limit: Number.isFinite(limit) ? limit : null,
+      plan: isUnlimitedUser(user) ? 'admin' : normalizeSubscriptionPlan(user?.subscription_plan),
+      counted: false,
+    };
+  }
+
+  return { exportId: result.lastInsertRowid, leaflet, usage };
+});
+
+function handleExportedPdfUpload(req, res) {
   pdfExportUpload.single('pdf')(req, res, (err) => {
+    let fullPath = '';
     try {
       if (err) return res.status(400).json({ error: err.message || 'PDF upload failed.' });
       if (!req.file) { res.status(400).json({ error: 'No PDF file provided.' }); return; }
@@ -2573,16 +2661,22 @@ app.post('/api/leaflets/:id/exported-pdfs', authMiddleware, (req, res) => {
       if (!fs.existsSync(userDir)) fs.mkdirSync(userDir, { recursive: true });
       const safeBase = String(leaflet.title || 'leaflet').trim().replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80) || 'leaflet';
       const filename = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}-${safeBase}.pdf`;
-      const fullPath = path.join(userDir, filename);
+      fullPath = path.join(userDir, filename);
       fs.writeFileSync(fullPath, req.file.buffer);
 
-      const result = db.prepare(`
-        INSERT INTO leaflet_pdf_exports (user_id, leaflet_id, filename, original_name, size, share_token, allow_edit)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(req.user.id, leaflet.id, filename, req.file.originalname || `${safeBase}.pdf`, req.file.size || req.file.buffer.length, shareToken, allowEdit ? 1 : 0);
+      const saved = saveExportedPdfRecord({
+        userId: req.user.id,
+        leafletId: leaflet.id,
+        filename,
+        originalName: req.file.originalname || `${safeBase}.pdf`,
+        size: req.file.size || req.file.buffer.length,
+        shareToken,
+        allowEdit,
+      });
+
       res.status(201).json({
         export: {
-          id: result.lastInsertRowid,
+          id: saved.exportId,
           leaflet_id: leaflet.id,
           filename,
           original_name: req.file.originalname || `${safeBase}.pdf`,
@@ -2591,13 +2685,28 @@ app.post('/api/leaflets/:id/exported-pdfs', authMiddleware, (req, res) => {
           url: `/api/leaflets/${leaflet.id}/exported-pdfs/${filename}`,
           share_url: `/api/shared-pdfs/${shareToken}`,
           share_token: shareToken,
+          quota_counted: saved.usage.counted,
         },
+        usage: saved.usage,
       });
     } catch (saveErr) {
+      if (fullPath && fs.existsSync(fullPath)) {
+        try { fs.unlinkSync(fullPath); } catch (_) {}
+      }
       console.error('[save exported pdf]', saveErr);
-      res.status(500).json({ error: saveErr?.message || 'Unable to save exported PDF.' });
+      const status = saveErr?.status || 500;
+      res.status(status).json({
+        error: saveErr?.message || 'Unable to save exported PDF.',
+        limitReached: !!saveErr?.limitReached,
+        usage: saveErr?.usage,
+      });
     }
   });
+}
+
+/* ── POST /api/leaflets/:id/exported-pdfs ── */
+app.post('/api/leaflets/:id/exported-pdfs', authMiddleware, (req, res) => {
+  handleExportedPdfUpload(req, res);
 });
 
 /* ── GET /api/shared-pdfs/:token ── */
@@ -2684,7 +2793,7 @@ app.delete('/api/leaflets/:id', authMiddleware, (req, res, next) => {
 app.get('/api/leaflets/:id', authMiddleware, (req, res, next) => {
   try {
     const leaflet = db.prepare(
-      'SELECT id, title, description, language_mode, created_at FROM leaflets WHERE id = ? AND user_id = ?'
+      'SELECT id, title, description, language_mode, created_at, quota_counted, first_exported_at FROM leaflets WHERE id = ? AND user_id = ?'
     ).get(req.params.id, req.user.id);
 
     if (!leaflet) { res.status(404).json({ error: 'Leaflet not found.' }); return; }
@@ -2704,7 +2813,7 @@ app.get('/api/leaflets/:id', authMiddleware, (req, res, next) => {
 app.get('/api/admin/leaflets/:id', adminMiddleware, (req, res, next) => {
   try {
     const leaflet = db.prepare(
-      'SELECT id, title, description, language_mode, created_at FROM leaflets WHERE id = ?'
+      'SELECT id, title, description, language_mode, created_at, quota_counted, first_exported_at FROM leaflets WHERE id = ?'
     ).get(req.params.id);
 
     if (!leaflet) { res.status(404).json({ error: 'Leaflet not found.' }); return; }
@@ -3275,44 +3384,7 @@ app.get('/api/layout-templates', authMiddleware, (req, res) => {
 
 /* -- POST /api/leaflets/:id/exported-pdfs -- */
 app.post('/api/leaflets/:id/exported-pdfs', authMiddleware, (req, res) => {
-  pdfExportUpload.single('pdf')(req, res, (err) => {
-    try {
-      if (err) return res.status(400).json({ error: err.message || 'PDF upload failed.' });
-      if (!req.file) { res.status(400).json({ error: 'No PDF file provided.' }); return; }
-      const leaflet = db.prepare('SELECT id, title FROM leaflets WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
-      if (!leaflet) { res.status(404).json({ error: 'Leaflet not found.' }); return; }
-      const allowEdit = req.body?.allow_edit === '1' || req.body?.allow_edit === 'true';
-      const shareToken = crypto.randomBytes(24).toString('hex');
-
-      const userDir = path.join(PDF_EXPORTS_DIR, String(req.user.id));
-      if (!fs.existsSync(userDir)) fs.mkdirSync(userDir, { recursive: true });
-      const safeBase = String(leaflet.title || 'leaflet').trim().replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80) || 'leaflet';
-      const filename = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}-${safeBase}.pdf`;
-      const fullPath = path.join(userDir, filename);
-      fs.writeFileSync(fullPath, req.file.buffer);
-
-      const result = db.prepare(`
-        INSERT INTO leaflet_pdf_exports (user_id, leaflet_id, filename, original_name, size, share_token, allow_edit)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(req.user.id, leaflet.id, filename, req.file.originalname || `${safeBase}.pdf`, req.file.size || req.file.buffer.length, shareToken, allowEdit ? 1 : 0);
-      res.status(201).json({
-        export: {
-          id: result.lastInsertRowid,
-          leaflet_id: leaflet.id,
-          filename,
-          original_name: req.file.originalname || `${safeBase}.pdf`,
-          size: req.file.size || req.file.buffer.length,
-          allow_edit: allowEdit,
-          url: `/api/leaflets/${leaflet.id}/exported-pdfs/${filename}`,
-          share_url: `/api/shared-pdfs/${shareToken}`,
-          share_token: shareToken,
-        },
-      });
-    } catch (saveErr) {
-      console.error('[save exported pdf]', saveErr);
-      res.status(500).json({ error: saveErr?.message || 'Unable to save exported PDF.' });
-    }
-  });
+  handleExportedPdfUpload(req, res);
 });
 
 /* -- GET /api/leaflets/:id/exported-pdfs -- */
@@ -3762,10 +3834,13 @@ app.get('/api/user/stats', authMiddleware, (req, res) => {
     SELECT created_at FROM leaflets WHERE user_id = ? ORDER BY created_at ASC LIMIT 1
   `).get(req.user.id);
   const unlimited = isUnlimitedUser(user);
+  const exportedLeafletLimit = leafletCreationLimitForUser(user);
   res.json({
     leaflets_count:   leaflets?.count ?? 0,
     products_count:   products?.count ?? 0,
     recent_leaflets:  recent,
+    exported_leaflets_used:  Number.isFinite(exportedLeafletLimit) ? exportedLeafletUsageForUser(req.user.id) : 0,
+    exported_leaflets_limit: Number.isFinite(exportedLeafletLimit) ? exportedLeafletLimit : null,
     subscription_plan:    unlimited ? 'admin' : (user?.subscription_plan ?? 'free'),
     subscription_status:  user?.subscription_status  ?? 'active',
     subscription_period:  user?.subscription_period  ?? 'monthly',
@@ -3821,12 +3896,16 @@ app.get('/api/user/export-quota', authMiddleware, (req, res) => {
   if (!user) return res.status(404).json({ error: 'User not found' });
   const pdfLimitRow = db.prepare("SELECT value FROM site_settings WHERE key = 'free_pdf_export_limit'").get();
   const freePdfLimit = Math.max(0, Math.min(10000, Number.parseInt(pdfLimitRow?.value || '1', 10) || 0));
+  const exportedLeafletLimit = leafletCreationLimitForUser(user);
+  const exportedLeafletsUsed = Number.isFinite(exportedLeafletLimit) ? exportedLeafletUsageForUser(req.user.id) : 0;
   if (isUnlimitedUser(user)) {
     res.json({
       plan: 'admin',
       free_pdf_used: 0,
       free_pdf_limit: freePdfLimit,
       free_book_used: 0,
+      exported_leaflets_used: 0,
+      exported_leaflets_limit: null,
       unlimited: true,
     });
     return;
@@ -3836,6 +3915,8 @@ app.get('/api/user/export-quota', authMiddleware, (req, res) => {
     free_pdf_used: user.free_pdf_used || 0,
     free_pdf_limit: freePdfLimit,
     free_book_used: user.free_book_used || 0,
+    exported_leaflets_used: exportedLeafletsUsed,
+    exported_leaflets_limit: Number.isFinite(exportedLeafletLimit) ? exportedLeafletLimit : null,
   });
 });
 
@@ -3849,8 +3930,18 @@ app.post('/api/user/consume-export', authMiddleware, (req, res) => {
     res.json({ ok: true, consumed: false, plan: 'admin', unlimited: true });
     return;
   }
+  if (type === 'pdf') {
+    const limit = leafletCreationLimitForUser(user);
+    res.json({
+      ok: true,
+      consumed: false,
+      used: Number.isFinite(limit) ? exportedLeafletUsageForUser(req.user.id) : 0,
+      limit: Number.isFinite(limit) ? limit : null,
+    });
+    return;
+  }
   const plan = user.subscription_plan || 'free';
-  if (plan !== 'free') return res.json({ ok: true, consumed: false }); // paid users: no limit
+  if (plan !== 'free') return res.json({ ok: true, consumed: false }); // paid users: no book limit
   const col = type === 'pdf' ? 'free_pdf_used' : 'free_book_used';
   const current = user[col] || 0;
   const limit = type === 'pdf'

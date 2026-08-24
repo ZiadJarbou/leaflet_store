@@ -1505,8 +1505,8 @@ function AdminSettings() {
               </div>
             </div>
             <div className="cms-settings-group cms-plan-limit-group">
-              <div className="cms-settings-group-title">Leaflets Created</div>
-              <p className="cms-plan-limit-note">Set how many saved leaflets each plan can create.</p>
+              <div className="cms-settings-group-title">Exported Leaflets</div>
+              <p className="cms-plan-limit-note">Set how many leaflets each plan can count after first successful export.</p>
               <div className="cms-plan-limit-grid">
                 {LEAFLET_CREATION_LIMIT_FIELDS.map(field => (
                   <label className="cms-plan-limit-card" key={field.key}>
@@ -1518,9 +1518,9 @@ function AdminSettings() {
                       max="10000"
                       value={s[field.key] ?? ''}
                       onChange={e => setS({ ...s, [field.key]: e.target.value })}
-                      aria-label={`${field.label} created leaflets limit`}
+                      aria-label={`${field.label} exported leaflets limit`}
                     />
-                    <small>leaflets total</small>
+                    <small>exported leaflets</small>
                   </label>
                 ))}
               </div>

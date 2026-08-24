@@ -524,6 +524,22 @@
   align-items: center;
   gap: 4px;
 }
+.lv-export-usage {
+  display: grid;
+  gap: 1px;
+  min-width: 116px;
+  padding: 5px 8px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 8px;
+  background: rgba(15,23,42,.74);
+  color: #94a3b8;
+  font-size: .68rem;
+  line-height: 1.15;
+}
+.lv-export-usage strong {
+  color: #e2e8f0;
+  font-size: .78rem;
+}
 .lv-search {
   flex: 0 0 180px;
   width: 180px;

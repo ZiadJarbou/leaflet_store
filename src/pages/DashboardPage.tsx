@@ -229,6 +229,7 @@ export default function DashboardPage() {
       <div className="db-stats">
         {[
             { label: 'Total Leaflets', value: loading ? '—' : String(stats?.leaflets_count ?? 0), icon: 'description', color: '#49f2b6' },
+            { label: 'Exported leaflets', value: loading ? '—' : `${stats?.exported_leaflets_used ?? 0} / ${stats?.exported_leaflets_limit ?? '∞'} used`, icon: 'file_upload', color: '#38bdf8' },
             { label: 'Total Products', value: loading ? '—' : String(stats?.products_count ?? 0), icon: 'inventory_2', color: '#7c5cff' },
             { label: 'Current Plan', value: loading ? '—' : (stats?.subscription_plan ?? 'free'), icon: 'star', color: PLAN_COLOR[stats?.subscription_plan ?? 'free'] ?? '#64748b', isPlan: true },
             { label: 'Member Since', value: loading ? '—' : (stats?.member_since ? fmt(stats.member_since) : '—'), icon: 'calendar_month', color: '#f59e0b' },

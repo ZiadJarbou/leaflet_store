@@ -2785,6 +2785,9 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         free_pdf_used: number;
         free_pdf_limit: number;
         free_book_used: number;
+        exported_leaflets_used?: number;
+        exported_leaflets_limit?: number | null;
+        unlimited?: boolean;
     } | null>(null);
     /* -- Add-product modal -- */
     const EMPTY_LP = () => ({
@@ -8161,9 +8164,13 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         }
     }
     const isPaidPlan = exportQuota ? exportQuota.plan !== 'free' : false;
-    const freePdfLimit = exportQuota?.free_pdf_limit ?? 1;
-    const canExportPdf = isPaidPlan || (exportQuota ? exportQuota.free_pdf_used < freePdfLimit : true);
-    const freePdfLimitMessage = `Free plan: ${freePdfLimit} PDF ${freePdfLimit === 1 ? 'export' : 'exports'} allowed. Upgrade for unlimited exports.`;
+    const leafletAlreadyCounted = Boolean(data?.leaflet?.quota_counted);
+    const exportedLeafletLimit = exportQuota?.exported_leaflets_limit ?? null;
+    const exportedLeafletsUsed = exportQuota?.exported_leaflets_used ?? 0;
+    const canExportPdf = leafletAlreadyCounted || exportQuota?.unlimited || exportedLeafletLimit === null || exportedLeafletsUsed < exportedLeafletLimit;
+    const exportedLeafletLimitMessage = exportedLeafletLimit === null
+        ? 'Export PDF'
+        : `Exported leaflets: ${exportedLeafletsUsed} / ${exportedLeafletLimit} used. Upgrade your plan to export more leaflets.`;
     const canExportBook = isPaidPlan || (exportQuota ? exportQuota.free_book_used < 1 : true);
     const A4_PAD = 24;
     const hs = headerSettings;
@@ -8842,10 +8849,32 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 : null;
             if (!shareUrl)
                 throw new Error('The PDF was saved, but the server did not return a share link.');
+            if (payload.usage) {
+                setExportQuota(prev => ({
+                    plan: String(payload.usage.plan || prev?.plan || 'free'),
+                    free_pdf_used: prev?.free_pdf_used ?? 0,
+                    free_pdf_limit: prev?.free_pdf_limit ?? 1,
+                    free_book_used: prev?.free_book_used ?? 0,
+                    exported_leaflets_used: Number(payload.usage.used ?? prev?.exported_leaflets_used ?? 0),
+                    exported_leaflets_limit: payload.usage.limit ?? prev?.exported_leaflets_limit ?? null,
+                    unlimited: prev?.unlimited,
+                }));
+            }
+            if (payload.export?.quota_counted) {
+                setData(prev => prev ? {
+                    ...prev,
+                    leaflet: {
+                        ...prev.leaflet,
+                        quota_counted: true,
+                        first_exported_at: prev.leaflet.first_exported_at || new Date().toISOString(),
+                    },
+                } : prev);
+            }
             setSavedPdfUrl(shareUrl);
             setSavedPdfFile(pdfFile);
             setSharePdfNotice(`Share link ready${allowSharedPdfEdit ? ' with edit permission' : ''}.`);
             setSharePdfMenuOpen(true);
+            return pdfFile;
         }
         catch (e) {
             const message = e instanceof Error ? e.message : 'Unable to save exported PDF.';
@@ -9769,29 +9798,50 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
           </div>
           {/* Export actions group */}
           <div className="lv-export-group">
-            <button className="lv-export-editable-pdf-btn" title={!canExportPdf ? freePdfLimitMessage : "Export editable/selectable PDF"} disabled={savingPdf} onClick={async () => {
+            {exportQuota && exportedLeafletLimit !== null && (
+              <div className="lv-export-usage" aria-live="polite">
+                <span>Exported leaflets</span>
+                <strong>{exportedLeafletsUsed} / {exportedLeafletLimit} used</strong>
+              </div>
+            )}
+            <button className="lv-export-editable-pdf-btn" title={!canExportPdf ? exportedLeafletLimitMessage : "Export editable/selectable PDF"} disabled={savingPdf} onClick={async () => {
             if (!canExportPdf) {
                 await promptProForPdfExport();
                 return;
             }
-            const ok = await consumeExport('pdf');
-            if (!ok) {
-                await promptProForPdfExport();
+            let exportError = '';
+            const file = await saveExportedPdf().catch(error => {
+                exportError = error instanceof Error ? error.message : String(error);
+                return null;
+            });
+            if (!file) {
+                if (/limit reached/i.test(exportError)) await promptProForPdfExport();
                 return;
             }
-            await exportEditablePdf();
+            const url = URL.createObjectURL(file);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = file.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
             fetchExportQuota();
         }}>
               Export PDF
             </button>
-            <button className="lv-save-pdf-btn" title={!canExportPdf ? freePdfLimitMessage : "Save and create a shareable PDF link"} disabled={savingPdf} onClick={async () => {
+            <button className="lv-save-pdf-btn" title={!canExportPdf ? exportedLeafletLimitMessage : "Save and create a shareable PDF link"} disabled={savingPdf} onClick={async () => {
             if (!canExportPdf) {
                 await promptProForPdfExport();
                 return;
             }
-            const saved = await saveExportedPdf().then(() => true).catch(() => false);
-            if (saved) {
-                await consumeExport('pdf');
+            let exportError = '';
+            const saved = await saveExportedPdf().then(() => true).catch(error => {
+                exportError = error instanceof Error ? error.message : String(error);
+                return false;
+            });
+            if (!saved && /limit reached/i.test(exportError)) {
+                await promptProForPdfExport();
             }
             fetchExportQuota();
         }}>
@@ -10021,13 +10071,15 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
               x
             </button>
             <div className="lv-upgrade-kicker">
-              {upgradeFeature === 'book' ? 'Book export limit reached' : 'PDF export limit reached'}
+              {upgradeFeature === 'book' ? 'Book export limit reached' : 'Exported leaflet limit reached'}
             </div>
             <h2>{upgradeFeature === 'book' ? 'Activate Convert to Book with Pro' : 'Activate PDF export with Pro'}</h2>
             <p>
               {upgradeFeature === 'book'
                 ? 'Your free plan includes one book export. Subscribe to Pro to continue converting leaflets to printable books and catalogs.'
-                : `Your free plan includes ${freePdfLimit} PDF ${freePdfLimit === 1 ? 'export' : 'exports'}. Subscribe to Pro to continue exporting PDFs and unlock the full export workflow.`}
+                : exportedLeafletLimit === null
+                ? 'Upgrade your plan to continue exporting leaflets and unlock the full export workflow.'
+                : `Exported leaflets ${exportedLeafletsUsed} / ${exportedLeafletLimit} used. Upgrade your plan to export more leaflets.`}
             </p>
             <div className="lv-upgrade-benefits">
               <span>{upgradeFeature === 'book' ? 'Unlimited book exports' : 'Unlimited PDF exports'}</span>

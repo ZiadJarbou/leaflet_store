@@ -825,6 +825,8 @@ export interface UserStats {
   leaflets_count:      number;
   products_count:      number;
   recent_leaflets:     { id: number; name: string; created_at: string; thumbnail_url: string | null }[];
+  exported_leaflets_used?: number;
+  exported_leaflets_limit?: number | null;
   subscription_plan:   'free' | 'starter' | 'pro' | 'business' | 'admin';
   subscription_status: string;
   subscription_period: 'monthly' | 'annual';

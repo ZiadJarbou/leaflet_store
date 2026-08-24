@@ -80,6 +80,8 @@ export interface LeafletMeta {
   description: string;
   language_mode: LanguageMode;
   created_at: string;
+  quota_counted?: number | boolean;
+  first_exported_at?: string | null;
 }
 
 export interface LeafletDetail {
