@@ -4708,7 +4708,7 @@ app.get('/api/admin/stats', adminMiddleware, (req, res) => {
 app.get('/api/admin/users/export', adminMiddleware, (req, res) => {
   const { search = '', sort_by = 'created_at', sort_dir = 'desc', format = 'csv' } = req.query;
   const like = `%${search}%`;
-  const ALLOWED_COLS = ['name','email','role','subscription_plan','subscription_end','created_at','leaflet_count','email_verified'];
+  const ALLOWED_COLS = ['name','email','role','subscription_plan','subscription_period','subscription_end','created_at','leaflet_count','email_verified'];
   const col = ALLOWED_COLS.includes(sort_by) ? sort_by : 'created_at';
   const dir = sort_dir === 'asc' ? 'ASC' : 'DESC';
   const orderExpr = col === 'leaflet_count'
@@ -4716,7 +4716,7 @@ app.get('/api/admin/users/export', adminMiddleware, (req, res) => {
     : `u.${col} ${dir}`;
   const rows = db.prepare(`
     SELECT u.id, u.name, u.email, u.role, u.email_verified,
-           u.subscription_plan, u.subscription_status, u.subscription_end, u.created_at,
+           u.subscription_plan, u.subscription_status, u.subscription_period, u.subscription_end, u.created_at,
            (SELECT COUNT(*) FROM leaflets WHERE user_id=u.id) as leaflet_count
     FROM users u
     WHERE u.name LIKE ? OR u.email LIKE ?
@@ -4729,8 +4729,9 @@ app.get('/api/admin/users/export', adminMiddleware, (req, res) => {
     Email:               u.email,
     Role:                u.role,
     Plan:                u.subscription_plan,
+    'Billing Period':    u.subscription_plan === 'free' ? '' : (u.subscription_period === 'annual' ? 'Yearly' : 'Monthly'),
     'Sub Status':        u.subscription_status,
-    'End Date':          u.subscription_end,
+    'Subscription End':  u.subscription_end,
     'Email Verified':    u.email_verified ? 'Yes' : 'No',
     Leaflets:            u.leaflet_count,
     'Joined':            u.created_at,
@@ -4764,7 +4765,7 @@ app.get('/api/admin/users', adminMiddleware, (req, res) => {
   const { page=1, limit=20, search='', sort_by='created_at', sort_dir='desc' } = req.query;
   const off  = (Number(page)-1) * Number(limit);
   const like = `%${search}%`;
-  const ALLOWED_COLS = ['name','email','role','subscription_plan','created_at','leaflet_count','email_verified'];
+  const ALLOWED_COLS = ['name','email','role','subscription_plan','subscription_period','subscription_end','created_at','leaflet_count','email_verified'];
   const col = ALLOWED_COLS.includes(sort_by) ? sort_by : 'created_at';
   const dir = sort_dir === 'asc' ? 'ASC' : 'DESC';
   const orderExpr = col === 'leaflet_count'

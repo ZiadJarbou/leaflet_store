@@ -208,6 +208,9 @@ function fmtDate(s: string) { return s ? new Date(s).toLocaleDateString('en-GB',
 function fmtSize(b: number) { if (b < 1024)
     return b + 'B'; if (b < 1048576)
     return (b / 1024).toFixed(1) + 'KB'; return (b / 1048576).toFixed(1) + 'MB'; }
+function billingPeriodLabel(period: string | null | undefined) {
+    return String(period || 'monthly').toLowerCase() === 'annual' ? 'Yearly' : 'Monthly';
+}
 function planBadge(plan: string) {
     const map: Record<string, string> = { free: 'badge-free', starter: 'badge-pro', pro: 'badge-pro', business: 'badge-business', enterprise: 'badge-business' };
     const labels: Record<string, string> = { pro: 'professional' };
@@ -499,18 +502,20 @@ function AdminUsers() {
             <Th col="name" label="Name / Email"/>
             <Th col="role" label="Role"/>
             <Th col="subscription_plan" label="Plan"/>
-            <Th col="subscription_end" label="End Date"/>
+            <Th col="subscription_period" label="Billing"/>
+            <Th col="subscription_end" label="Subscription End"/>
             <Th col="email_verified" label="Verified"/>
             <Th col="leaflet_count" label="Leaflets"/>
             <Th col="created_at" label="Joined"/>
             <th>Actions</th>
           </tr></thead>
           <tbody>
-            {loading && <tr><td colSpan={8} className="cms-loading-row">Loading...</td></tr>}
+            {loading && <tr><td colSpan={9} className="cms-loading-row">Loading...</td></tr>}
             {!loading && users.map(u => (<tr key={u.id}>
                 <td><div className="cms-user-name">{u.name}</div><div className="cms-muted">{u.email}</div></td>
                 <td>{roleBadge(u.role)}</td>
                 <td>{planBadge(u.subscription_plan)}</td>
+                <td className="cms-muted">{u.subscription_plan === 'free' ? '-' : billingPeriodLabel(u.subscription_period)}</td>
                 <td className="cms-muted">{u.subscription_plan === 'free' ? '-' : fmtDate(u.subscription_end || '')}</td>
                 <td>{u.email_verified ? <span className="material-symbol cms-ok" aria-label="Verified">check_circle</span> : <span className="material-symbol cms-warn" aria-label="Not verified">cancel</span>}</td>
                 <td>{u.leaflet_count}</td>
@@ -557,8 +562,8 @@ function AdminUsers() {
             <div className="cms-form-row">
               <label>Billing Period</label>
               <select value={createForm.subscription_period} onChange={e => setCreateForm({ ...createForm, subscription_period: e.target.value as 'monthly' | 'annual' })}>
-                <option value="monthly">monthly</option>
-                <option value="annual">annual</option>
+                <option value="monthly">Monthly</option>
+                <option value="annual">Yearly</option>
               </select>
             </div>
             <div className="cms-form-row">
@@ -602,12 +607,12 @@ function AdminUsers() {
             {editing.subscription_plan !== 'free' && (<div className="cms-form-row">
               <label>Billing Period</label>
               <select value={editing.subscription_period || 'monthly'} onChange={e => setEditing({ ...editing, subscription_period: e.target.value })}>
-                <option value="monthly">monthly</option>
-                <option value="annual">annual</option>
+                <option value="monthly">Monthly</option>
+                <option value="annual">Yearly</option>
               </select>
             </div>)}
             {editing.subscription_plan !== 'free' && (<div className="cms-form-row">
-              <label>End Date</label>
+              <label>Subscription End Date</label>
               <input type="text" value={fmtDate(editing.subscription_end || '')} readOnly/>
             </div>)}
             <div className="cms-form-row">
