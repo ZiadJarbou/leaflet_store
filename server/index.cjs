@@ -4801,6 +4801,40 @@ async function httpsJsonPostWithAiRetry(url, payload, options = {}) {
     }
   }
 }
+async function openAiMultipartPostWithAiRetry(url, createBody, options = {}) {
+  const delays = options.delays || [2500, 6000, 12000];
+  for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: options.headers || {},
+        body: createBody(),
+      });
+      const text = await response.text();
+      let parsed = null;
+      try { parsed = text ? JSON.parse(text) : null; }
+      catch (err) { throw err; }
+      if (!response.ok) {
+        const err = new Error(parsed?.error?.message || `OpenAI API returned ${response.status}`);
+        err.status = response.status;
+        err.details = parsed;
+        throw err;
+      }
+      return parsed;
+    } catch (err) {
+      if (!isTemporaryAiDemandError(err) || attempt === delays.length) {
+        if (isTemporaryAiDemandError(err)) {
+          throw httpError(503, 'The AI image model is busy right now. I tried again automatically, but demand is still high. Please try again in a minute.');
+        }
+        throw err;
+      }
+      if (typeof options.onRetry === 'function') {
+        options.onRetry(attempt + 1, delays.length);
+      }
+      await wait(delays[attempt]);
+    }
+  }
+}
 async function generateA4ImageFromPayload(payload, options = {}) {
   const { prompt, orientation, resolution, width, height, referenceImage, referenceImages } = payload || {};
   const safePrompt = String(prompt || '').trim();
@@ -4818,6 +4852,7 @@ async function generateA4ImageFromPayload(payload, options = {}) {
   const rawReferenceImages = Array.isArray(referenceImages)
     ? referenceImages
     : (referenceImage?.data ? [referenceImage] : []);
+  const preparedReferenceImages = [];
   for (const refImage of rawReferenceImages.slice(0, 6)) {
     if (!refImage?.data) continue;
     const referenceMimeType = String(refImage.mimeType || 'image/png');
@@ -4825,6 +4860,10 @@ async function generateA4ImageFromPayload(payload, options = {}) {
     const referenceBytes = Buffer.byteLength(referenceData, 'base64');
     if (!/^image\/(jpeg|jpg|png|webp|gif|avif)$/i.test(referenceMimeType)) throw httpError(400, 'Reference image must be jpg, png, webp, gif, or avif.');
     if (referenceBytes > 6 * 1024 * 1024) throw httpError(413, 'Reference image is too large.');
+    preparedReferenceImages.push({
+      mimeType: referenceMimeType,
+      buffer: Buffer.from(referenceData, 'base64'),
+    });
   }
   const startTime = Date.now();
   const noTextInstruction = [
@@ -4834,22 +4873,48 @@ async function generateA4ImageFromPayload(payload, options = {}) {
     'Do not include any written words, letters, numbers, prices, logos with text, labels, captions, brand names, watermarks, or readable typography in the image.',
   ].join(' ');
   const finalPrompt = `${safePrompt}\n\n${noTextInstruction}`;
-  const data = await httpsJsonPostWithAiRetry(
-    'https://api.openai.com/v1/images/generations',
-    {
-      model: OPENAI_IMAGE_MODEL,
-      prompt: finalPrompt,
-      n: 1,
-      size: imageSize,
-      quality: safeResolution === '4k' ? 'high' : 'medium',
-      background: 'opaque',
-      output_format: 'png',
-    },
-    {
-      ...options,
-      headers: { Authorization: `Bearer ${openAiApiKey}` },
-    },
-  );
+  const baseOpenAiImagePayload = {
+    model: OPENAI_IMAGE_MODEL,
+    prompt: finalPrompt,
+    n: 1,
+    size: imageSize,
+    quality: safeResolution === '4k' ? 'high' : 'medium',
+    background: 'opaque',
+    output_format: 'png',
+  };
+  const data = preparedReferenceImages.length > 0
+    ? await openAiMultipartPostWithAiRetry(
+      'https://api.openai.com/v1/images/edits',
+      () => {
+        const form = new FormData();
+        Object.entries(baseOpenAiImagePayload).forEach(([key, value]) => form.append(key, String(value)));
+        const imageFieldName = preparedReferenceImages.length > 1 ? 'image[]' : 'image';
+        preparedReferenceImages.forEach((refImage, index) => {
+          const extension = {
+            'image/jpeg': '.jpg',
+            'image/jpg': '.jpg',
+            'image/png': '.png',
+            'image/webp': '.webp',
+            'image/gif': '.gif',
+            'image/avif': '.avif',
+          }[String(refImage.mimeType).toLowerCase()] || '.png';
+          form.append(imageFieldName, new Blob([refImage.buffer], { type: refImage.mimeType }), `reference-${index + 1}${extension}`);
+        });
+        return form;
+      },
+      {
+        ...options,
+        headers: { Authorization: `Bearer ${openAiApiKey}` },
+      },
+    )
+    : await httpsJsonPostWithAiRetry(
+      'https://api.openai.com/v1/images/generations',
+      baseOpenAiImagePayload,
+      {
+        ...options,
+        headers: { Authorization: `Bearer ${openAiApiKey}` },
+      },
+    );
   const imageData = data?.data?.[0];
   if (!imageData?.b64_json) {
     throw httpError(502, 'No image data in response');

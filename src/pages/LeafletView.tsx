@@ -4190,6 +4190,22 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         }
         throw new Error('Image generation is taking longer than expected. Please check Recent Chats or try again.');
     }
+    async function coverImageUrlToNanoReference(imageUrl: string) {
+        const response = await fetch(imageUrl, { cache: 'no-store' });
+        if (!response.ok)
+            throw new Error('Could not load the previous generated image for editing.');
+        const blob = await response.blob();
+        if (!blob.type.startsWith('image/'))
+            throw new Error('The previous generated background is not an image.');
+        if (blob.size > 6 * 1024 * 1024)
+            throw new Error('The previous generated background is too large to edit. Generate a new image instead.');
+        const dataUrl = await blobToDataUrl(blob);
+        const [, data = ''] = dataUrl.split(',');
+        return {
+            mimeType: blob.type || 'image/png',
+            data,
+        };
+    }
     async function generateNanoCover() {
         const prompt = nanoPrompt.trim();
         if (!prompt) {
@@ -4202,17 +4218,22 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         }
         const generationTarget = coverBuilderTarget;
         const generationBuilder = cloneCoverBuilderState(coverBuilder);
+        const editingPreviousGeneratedImage = generationBuilder.bgType === 'image' && Boolean(generationBuilder.bgImage) && generationBuilder.aiGeneratedBg;
         const userMessageId = `user-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const aiMessageId = `ai-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         setNanoConversation(previous => [
             ...previous,
             { id: userMessageId, role: 'user', text: prompt },
-            { id: aiMessageId, role: 'ai', text: 'Generating your supermarket background...', status: 'loading' },
+            { id: aiMessageId, role: 'ai', text: editingPreviousGeneratedImage ? 'Editing your previous generated background...' : 'Generating your supermarket background...', status: 'loading' },
         ]);
         setNanoPrompt('');
         setNanoGenerating(true);
         setNanoError(null);
         try {
+            const referenceImages = nanoReferenceImages.map(image => ({ mimeType: image.mimeType, data: image.data }));
+            if (editingPreviousGeneratedImage && generationBuilder.bgImage) {
+                referenceImages.unshift(await coverImageUrlToNanoReference(generationBuilder.bgImage));
+            }
             const job = await startA4CoverImageJob({
                 leafletId: id,
                 prompt: enhanceA4CoverPrompt(prompt, pageSettings.orientation, generationTarget),
@@ -4220,10 +4241,10 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 resolution: '2k',
                 width: nanoDimensions.width,
                 height: nanoDimensions.height,
-                referenceImages: nanoReferenceImages.map(image => ({ mimeType: image.mimeType, data: image.data })),
+                referenceImages: referenceImages.slice(0, 6),
             });
             setNanoConversation(previous => previous.map(message => message.id === aiMessageId
-                ? { ...message, text: 'Working on it. This can take a minute, and I will apply it when it is ready.', status: 'loading' }
+                ? { ...message, text: editingPreviousGeneratedImage ? 'Working on the requested edits. I will apply the updated image when it is ready.' : 'Working on it. This can take a minute, and I will apply it when it is ready.', status: 'loading' }
                 : message));
             const result = job.status === 'complete' && job.result
                 ? job.result
@@ -4231,7 +4252,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             saveGeneratedCoverBackground(result.imageUrl, prompt);
             await applyGeneratedCoverImage(result.imageUrl, generationTarget, generationBuilder);
             setNanoConversation(previous => previous.map(message => message.id === aiMessageId
-                ? { ...message, text: `Done. I created the background, applied it to the ${generationTarget === 'back' ? 'back cover' : 'cover'}, and saved it in your Library.`, status: undefined }
+                ? { ...message, text: `Done. I ${editingPreviousGeneratedImage ? 'updated' : 'created'} the background, applied it to the ${generationTarget === 'back' ? 'back cover' : 'cover'}, and saved it in your Library.`, status: undefined }
                 : message));
         }
         catch (err) {
