@@ -1112,6 +1112,7 @@ function ImageUploader({ currentUrl, onUploaded }: ImageUploaderProps) {
         }
     }
     async function pasteFromClipboard() {
+        dropRef.current?.focus();
         setUploadErr(null);
         try {
             const clipboard = navigator.clipboard;
@@ -1139,9 +1140,14 @@ function ImageUploader({ currentUrl, onUploaded }: ImageUploaderProps) {
             throw new Error('Clipboard does not contain an image or direct image URL.');
         }
         catch (err) {
-            setUploadErr(err instanceof Error ? err.message : 'Could not paste image from clipboard.');
+            const message = err instanceof Error ? err.message : '';
+            const isPermissionError = /permission|denied|not allowed|not permitted|clipboard access/i.test(message);
+            setUploadErr(isPermissionError
+                ? 'Browser blocked direct paste. Press Ctrl+V while the image box is focused to paste the image.'
+                : message || 'Could not paste image from clipboard.');
         }
     }
+    const imageRightsHelp = 'Use only images you own, licensed images, or free-to-use images.';
     return (<div className="lv-img-upload-wrap" onPaste={onPaste}>
       {/* Drop zone */}
       <div ref={dropRef} className={`lv-img-dropzone${dragging ? ' dragging' : ''}${uploading ? ' uploading' : ''}`} onClick={() => { dropRef.current?.focus(); inputRef.current?.click(); }} onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop} role="button" tabIndex={0} aria-label="Upload product image" onKeyDown={e => {
@@ -1163,8 +1169,9 @@ function ImageUploader({ currentUrl, onUploaded }: ImageUploaderProps) {
               </>)}
           </div>)}
       </div>
-      <button type="button" className="lv-img-paste-btn" onClick={pasteFromClipboard} disabled={uploading}>
-        Paste image
+      <button type="button" className="lv-img-paste-btn" onClick={pasteFromClipboard} disabled={uploading} title={imageRightsHelp} aria-label={`Paste image from clipboard. ${imageRightsHelp}`}>
+        <span>Paste image</span>
+        <span className="material-symbol lv-img-paste-info" aria-hidden="true" title={imageRightsHelp}>info</span>
       </button>
       <input ref={inputRef} type="file" accept="image/*" onChange={onInputChange} className={cssClass({ display: 'none' })}/>
       {uploadErr && <p className="lv-upload-err">{uploadErr}</p>}
