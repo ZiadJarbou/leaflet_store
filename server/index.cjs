@@ -180,16 +180,18 @@ const AI_COVER_GENERATION_SETTING_KEYS = {
 const AI_COVER_GENERATION_SETTING_KEY_SET = new Set(Object.values(AI_COVER_GENERATION_SETTING_KEYS));
 
 function productImportLimitForUser(user) {
+  if (isUnlimitedUser(user) || String(user?.role || '').toLowerCase() === 'admin') return Infinity;
   const plan = String(user?.subscription_plan || 'free').trim().toLowerCase();
   return PRODUCT_IMPORT_LIMIT_BY_PLAN[plan] ?? Infinity;
 }
 
 function productImportLimitPayload(user) {
   const limit = productImportLimitForUser(user);
+  const unlimited = !Number.isFinite(limit);
   return {
-    plan: String(user?.subscription_plan || 'free').trim().toLowerCase() || 'free',
-    limit: Number.isFinite(limit) ? limit : null,
-    unlimited: !Number.isFinite(limit),
+    plan: unlimited && isUnlimitedUser(user) ? 'admin' : String(user?.subscription_plan || 'free').trim().toLowerCase() || 'free',
+    limit: unlimited ? null : limit,
+    unlimited,
   };
 }
 
@@ -792,6 +794,14 @@ db.prepare(`
   WHERE subscription_plan <> 'free'
 `).run();
 db.prepare("UPDATE users SET role = CASE WHEN lower(email) = lower(?) THEN 'admin' ELSE 'user' END").run(PRIMARY_ADMIN_EMAIL);
+db.prepare(`
+  UPDATE users
+  SET subscription_plan = 'admin',
+      subscription_status = 'active',
+      subscription_period = 'monthly',
+      subscription_end = NULL
+  WHERE lower(email) = lower(?)
+`).run(PRIMARY_ADMIN_EMAIL);
 
 // one-time free exports
 try { db.prepare("ALTER TABLE users ADD COLUMN free_pdf_used INTEGER DEFAULT 0").run(); } catch(e) {}
@@ -4420,7 +4430,7 @@ app.get('/api/stripe/subscription', authMiddleware, (req, res) => {
 });
 
 app.get('/api/user/product-import-limit', authMiddleware, (req, res) => {
-  const row = db.prepare('SELECT subscription_plan FROM users WHERE id = ?').get(req.user.id);
+  const row = db.prepare('SELECT email, role, subscription_plan FROM users WHERE id = ?').get(req.user.id);
   res.json(productImportLimitPayload(row));
 });
 
@@ -4747,10 +4757,14 @@ const reserveAiCoverGeneration = db.transaction((userId, leafletId, jobId) => {
   if (!Number.isInteger(safeLeafletId) || safeLeafletId <= 0) {
     throw httpError(400, 'leafletId is required for AI cover image generation.');
   }
-  const user = db.prepare('SELECT id, email, subscription_plan FROM users WHERE id = ?').get(userId);
+  const user = db.prepare('SELECT id, email, role, subscription_plan FROM users WHERE id = ?').get(userId);
   if (!user) throw httpError(401, 'User was not found.');
   const leaflet = db.prepare('SELECT id FROM leaflets WHERE id = ? AND user_id = ?').get(safeLeafletId, userId);
   if (!leaflet) throw httpError(404, 'Leaflet was not found.');
+
+  if (isUnlimitedUser(user) || String(user.role || '').toLowerCase() === 'admin') {
+    return { leafletId: safeLeafletId, used: 0, limit: null, unlimited: true };
+  }
 
   const limit = aiCoverGenerationLimitForPlan(user.subscription_plan);
   const used = aiCoverUsageCount(userId, safeLeafletId);
