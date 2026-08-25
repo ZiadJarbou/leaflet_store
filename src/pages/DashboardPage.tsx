@@ -75,7 +75,7 @@ function LeafletDropdown({ leaflets, selected, onChange }: LeafletDropdownProps)
     </div>);
 }
 const PLAN_COLOR: Record<string, string> = {
-    free: '#64748b', starter: '#38bdf8', pro: '#49f2b6', business: '#7c5cff', admin: '#f59e0b',
+    free: '#64748b', starter: '#38bdf8', pro: '#49f2b6', business: '#7c5cff', agency: '#f59e0b', admin: '#f59e0b',
 };
 function planBadge(plan: string) {
     return (<span className={cx("db-plan-badge", cssClass({ background: `${PLAN_COLOR[plan] ?? '#64748b'}22`, color: PLAN_COLOR[plan] ?? '#64748b', borderColor: `${PLAN_COLOR[plan] ?? '#64748b'}44` }))}>

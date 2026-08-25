@@ -1495,7 +1495,7 @@ function validatePasswordRules(password) {
   }
   return errs;
 }
-const ADMIN_SUBSCRIPTION_PLANS = new Set(['free', 'starter', 'pro', 'business']);
+const ADMIN_SUBSCRIPTION_PLANS = new Set(['free', 'starter', 'pro', 'business', 'agency']);
 const ADMIN_SUBSCRIPTION_STATUSES = new Set(['active', 'cancelled', 'past_due', 'expired', 'paused']);
 const ADMIN_SUBSCRIPTION_PERIODS = new Set(['monthly', 'annual']);
 function validateAdminSubscription({ plan = 'free', status = 'active', period = 'monthly' } = {}) {
@@ -1621,9 +1621,13 @@ function subscriptionEmailKey(details) {
     details.endDate || '',
   ].join('|');
 }
-const PAID_SUBSCRIPTION_PLANS = new Set(['starter', 'pro', 'business']);
 const SUBSCRIPTION_EXPIRY_NOTICE_MAX = 5;
 const SUBSCRIPTION_EXPIRY_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+
+function isPaidSubscriptionPlan(plan) {
+  const safePlan = normalizeSubscriptionPlan(plan);
+  return safePlan !== 'free' && safePlan !== 'admin' && safePlan !== 'contact';
+}
 
 function resetSubscriptionExpiryNotices(userId) {
   db.prepare(`
@@ -1639,7 +1643,7 @@ function resetSubscriptionExpiryNotices(userId) {
 
 function downgradeExpiredUserToFree(user) {
   const expiredPlan = normalizeSubscriptionPlan(user.subscription_plan);
-  if (!PAID_SUBSCRIPTION_PLANS.has(expiredPlan)) return false;
+  if (!isPaidSubscriptionPlan(expiredPlan)) return false;
   db.prepare(`
     UPDATE users
     SET subscription_expired_plan = ?,
@@ -1665,7 +1669,7 @@ function downgradeExpiredUserToFree(user) {
 
 async function sendSubscriptionDetailsEmail(userId, details) {
   const plan = String(details?.plan || '').toLowerCase();
-  if (!PAID_SUBSCRIPTION_PLANS.has(plan)) return false;
+  if (!isPaidSubscriptionPlan(plan)) return false;
 
   const user = db.prepare('SELECT id,name,email,subscription_email_key FROM users WHERE id = ?').get(userId);
   if (!user?.email) return false;
@@ -1875,7 +1879,7 @@ function resolveStripeSubscriptionPlan(sub) {
 
 async function syncActiveStripeSubscriptionForUser(user, sub, source = 'subscription-sync') {
   const resolved = resolveStripeSubscriptionPlan(sub);
-  if (!resolved || !PAID_SUBSCRIPTION_PLANS.has(normalizeSubscriptionPlan(resolved.plan))) return false;
+  if (!resolved || !isPaidSubscriptionPlan(resolved.plan)) return false;
   const status = sub.status === 'active' || sub.status === 'trialing' ? 'active' : sub.status;
   const startDate = stripeTimestampToIso(sub.current_period_start || sub.start_date || sub.created);
   const endDate = stripeTimestampToIso(sub.current_period_end);
@@ -5148,7 +5152,7 @@ app.post('/api/admin/users', adminMiddleware, async (req, res, next) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const isPaid = PAID_SUBSCRIPTION_PLANS.has(sub.plan);
+    const isPaid = isPaidSubscriptionPlan(sub.plan);
     const subscriptionStart = isPaid ? new Date() : null;
     const subscriptionEnd = isPaid ? adminSubscriptionEndDate(sub.period, subscriptionStart) : null;
     const result = db.prepare(`

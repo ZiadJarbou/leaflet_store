@@ -147,7 +147,7 @@ export default function SettingsPage() {
     if (!user)
         return null;
     const initial = user.name.charAt(0).toUpperCase();
-    const PLAN_COLOR: Record<string, string> = { free: '#64748b', starter: '#38bdf8', pro: '#49f2b6', business: '#7c5cff', admin: '#f59e0b' };
+    const PLAN_COLOR: Record<string, string> = { free: '#64748b', starter: '#38bdf8', pro: '#49f2b6', business: '#7c5cff', agency: '#f59e0b', admin: '#f59e0b' };
     const planColor = PLAN_COLOR[sub?.subscription_plan ?? 'free'];
     const hasPaidSubscription = !!sub && sub.subscription_plan !== 'free' && sub.subscription_plan !== 'admin';
     return (<>

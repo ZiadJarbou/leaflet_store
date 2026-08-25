@@ -32,7 +32,7 @@ interface AdminCreateUserForm {
     name: string;
     email: string;
     password: string;
-    subscription_plan: 'starter' | 'pro' | 'business';
+    subscription_plan: 'starter' | 'pro' | 'business' | 'agency';
     subscription_period: 'monthly' | 'annual';
     email_verified: boolean;
 }
@@ -553,10 +553,11 @@ function AdminUsers() {
             </div>
             <div className="cms-form-row">
               <label>Plan</label>
-              <select value={createForm.subscription_plan} onChange={e => setCreateForm({ ...createForm, subscription_plan: e.target.value as 'starter' | 'pro' | 'business' })}>
+              <select value={createForm.subscription_plan} onChange={e => setCreateForm({ ...createForm, subscription_plan: e.target.value as 'starter' | 'pro' | 'business' | 'agency' })}>
                 <option value="starter">starter</option>
                 <option value="pro">professional</option>
                 <option value="business">business</option>
+                <option value="agency">agency</option>
               </select>
             </div>
             <div className="cms-form-row">
@@ -602,6 +603,7 @@ function AdminUsers() {
                 <option value="starter">starter</option>
                 <option value="pro">professional</option>
                 <option value="business">business</option>
+                <option value="agency">agency</option>
               </select>
             </div>
             {editing.subscription_plan !== 'free' && (<div className="cms-form-row">
