@@ -505,24 +505,24 @@ function ProductTable({ products, languageMode, showOnlyInvalid, }: {
               <td>
                 {p.current_price !== null
                 ? p.current_price.toFixed(2)
-                : <span className={cssClass({ color: '#ff8b8b' })}>{p.current_price_raw || 'â€”'}</span>}
+                : <span className={cssClass({ color: '#ff8b8b' })}>{p.current_price_raw || '-'}</span>}
               </td>
               <td>
                 {p.old_price !== null
                 ? p.old_price.toFixed(2)
-                : (p.old_price_raw ? <span className={cssClass({ color: '#ff8b8b' })}>{p.old_price_raw}</span> : 'â€”')}
+                : (p.old_price_raw ? <span className={cssClass({ color: '#ff8b8b' })}>{p.old_price_raw}</span> : '-')}
               </td>
-              <td>{trunc(p.origin_lan1) || 'â€”'}</td>
-              {isTwoLang && <td>{trunc(p.origin_lan2) || 'â€”'}</td>}
+              <td>{trunc(p.origin_lan1) || '-'}</td>
+              {isTwoLang && <td>{trunc(p.origin_lan2) || '-'}</td>}
               <td title={p.product_img_url}>
                 {p.product_img_url
                 ? <a href={p.product_img_url} target="_blank" rel="noreferrer" className={cssClass({ color: 'var(--brand)' })}>link</a>
-                : 'â€”'}
+                : '-'}
               </td>
               <td title={p.product_url}>
                 {p.product_url
                 ? <a href={p.product_url} target="_blank" rel="noreferrer" className={cx("material-symbol", cssClass({ color: 'var(--brand)' }))} aria-label="Open product link">link</a>
-                : 'â€”'}
+                : '-'}
               </td>
               <td className="td-status">
                 {p.isValid ? (<span className="cl-badge valid"><span className="material-symbol" aria-hidden="true">check</span> Valid</span>) : (<>
@@ -794,7 +794,7 @@ export default function CreateLeaflet() {
                     await saveLeafletLayout(String(res.id), layout);
                 }
                 catch {
-                    // non-fatal â€” leaflet was still created
+                    // non-fatal - leaflet was still created
                 }
             }
             if (redirectToLeaflet) {
@@ -880,7 +880,7 @@ export default function CreateLeaflet() {
         {/* â”€â”€ Right content â”€â”€ */}
 
         {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-            STEP 1 â€” Upload
+            STEP 1 - Upload
         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
         {step === 1 && (<div className="cl-card">
             <h2 className="cl-card-title"><span>upload</span> Upload your product file</h2>
@@ -922,7 +922,7 @@ export default function CreateLeaflet() {
             <div className="cl-header-note">
               <input type="checkbox" id="hdr-note" checked disabled readOnly/>
               <label htmlFor="hdr-note">
-                First row is header â€” this is always required and cannot be changed.
+                First row is header - this is always required and cannot be changed.
               </label>
             </div>
 
@@ -1000,7 +1000,7 @@ export default function CreateLeaflet() {
           </div>)}
 
         {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-            STEP 2 â€” Preview & Fix
+            STEP 2 - Preview & Fix
         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
         {step === 2 && importResult && (<>
             {/* Summary card */}
@@ -1025,7 +1025,7 @@ export default function CreateLeaflet() {
                 <span className="cl-import-all-label">
                   Import all rows&nbsp;
                   <span className="cl-import-all-count">
-                    ({totalCount} total â€” {validCount} valid
+                    ({totalCount} total - {validCount} valid
                     {invalidCount > 0 ? `, ${invalidCount} invalid` : ''})
                   </span>
                 </span>
@@ -1081,7 +1081,7 @@ export default function CreateLeaflet() {
               </div>
 
               {!canProceed && (<p className={cssClass({ textAlign: 'right', fontSize: 12, color: '#ff8b8b', marginTop: 8 })}>
-                  No valid rows â€” fix your file and re-upload.
+                  No valid rows - fix your file and re-upload.
                 </p>)}
             </div>
           </>)}
@@ -1163,7 +1163,7 @@ export default function CreateLeaflet() {
           </div>)}
 
         {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-            STEP 3 â€” Create form
+            STEP 3 - Create form
         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
         {step === 3 && importResult && (<div className="cl-card">
 
