@@ -621,6 +621,8 @@ function AdminUsers() {
                 <option value="active">active</option>
                 <option value="cancelled">cancelled</option>
                 <option value="past_due">past_due</option>
+                <option value="paused">paused</option>
+                <option value="expired">expired</option>
               </select>
             </div>
             <div className="cms-form-row">

@@ -110,6 +110,8 @@
 .db-sub-status--active    { background: rgba(73,242,182,.15); color: var(--brand); }
 .db-sub-status--cancelled { background: rgba(239,68,68,.12); color: #fca5a5; }
 .db-sub-status--past_due  { background: rgba(234,179,8,.12); color: #fde68a; }
+.db-sub-status--paused,
+.db-sub-status--expired  { background: rgba(239,68,68,.12); color: #fca5a5; }
 .db-sub-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 .db-sub-btn { width: 100%; justify-content: center; font-size: .85rem; padding: 9px 16px; }
 .db-sub-link { font-size: .8rem; color: var(--muted2); text-decoration: none; text-align: center; }

@@ -142,6 +142,9 @@
 .st-sub-status { font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 2px 8px; border-radius: 100px; }
 .st-sub-status--active    { background: rgba(73,242,182,.15); color: var(--brand); }
 .st-sub-status--cancelled { background: rgba(239,68,68,.12); color: #fca5a5; }
+.st-sub-status--paused,
+.st-sub-status--expired,
+.st-sub-status--past_due  { background: rgba(239,68,68,.12); color: #fca5a5; }
 
 .st-sub-dates {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;

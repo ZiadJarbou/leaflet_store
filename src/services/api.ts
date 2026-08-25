@@ -678,7 +678,7 @@ export async function uploadImage(file: File): Promise<string> {
 
 export interface SubscriptionInfo {
   subscription_plan:    'free' | 'starter' | 'pro' | 'business' | 'admin';
-  subscription_status:  'active' | 'cancelled' | 'past_due';
+  subscription_status:  'active' | 'cancelled' | 'past_due' | 'paused' | 'expired';
   subscription_period:  'monthly' | 'annual';
   subscription_start:   string | null;
   subscription_end:     string | null;

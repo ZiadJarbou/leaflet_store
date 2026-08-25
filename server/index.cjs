@@ -74,7 +74,7 @@ const SMTP_PORT                    = Number(envValue('SMTP_PORT') || 587);
 const SMTP_SECURE                  = envValue('SMTP_SECURE').toLowerCase() === 'true';
 const SMTP_USER                    = envValue('SMTP_USER');
 const SMTP_PASS                    = smtpPasswordValue();
-const MAIL_FROM                    = envValue('MAIL_FROM') || SMTP_USER || 'LeafletAI <no-reply@leafletai.ai>';
+const MAIL_FROM                    = envValue('MAIL_FROM') || 'LeafletAI <no-reply@leafletai.ai>';
 const CONTACT_TO_EMAIL             = envValue('CONTACT_TO_EMAIL') || 'info@leafletai.ai';
 
 let stripe = null;
@@ -761,6 +761,11 @@ if (!userCols.includes('subscription_period')) db.exec("ALTER TABLE users ADD CO
 if (!userCols.includes('subscription_start'))  db.exec("ALTER TABLE users ADD COLUMN subscription_start TEXT");
 if (!userCols.includes('subscription_end'))    db.exec("ALTER TABLE users ADD COLUMN subscription_end TEXT");
 if (!userCols.includes('subscription_email_key')) db.exec("ALTER TABLE users ADD COLUMN subscription_email_key TEXT");
+if (!userCols.includes('subscription_expired_plan')) db.exec("ALTER TABLE users ADD COLUMN subscription_expired_plan TEXT");
+if (!userCols.includes('subscription_expired_period')) db.exec("ALTER TABLE users ADD COLUMN subscription_expired_period TEXT");
+if (!userCols.includes('subscription_expired_end')) db.exec("ALTER TABLE users ADD COLUMN subscription_expired_end TEXT");
+if (!userCols.includes('subscription_expiry_notice_count')) db.exec("ALTER TABLE users ADD COLUMN subscription_expiry_notice_count INTEGER NOT NULL DEFAULT 0");
+if (!userCols.includes('subscription_expiry_notice_last_sent')) db.exec("ALTER TABLE users ADD COLUMN subscription_expiry_notice_last_sent TEXT");
 if (!userCols.includes('exported_leaflets_used')) db.exec("ALTER TABLE users ADD COLUMN exported_leaflets_used INTEGER NOT NULL DEFAULT 0");
 if (!userCols.includes('role'))                db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
 if (!hasMigration('exported_leaflet_usage_counter_v1')) {
@@ -1193,6 +1198,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
               subscription_start  = COALESCE(subscription_start, datetime('now'))
           WHERE id = ?
         `).run(customerId || null, plan, period || 'monthly', parseInt(userId, 10));
+        resetSubscriptionExpiryNotices(parseInt(userId, 10));
         console.log(`[webhook] checkout.session.completed — user ${userId} → ${plan}/${period}`);
       }
       break;
@@ -1225,6 +1231,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         `).run(resolved.plan, status, resolved.period, startDate, endDate, customerId);
         const paidUser = db.prepare('SELECT id, subscription_start FROM users WHERE stripe_customer_id = ?').get(customerId);
         if (paidUser) {
+          if (status === 'active') resetSubscriptionExpiryNotices(paidUser.id);
           sendSubscriptionDetailsEmail(paidUser.id, {
             plan: resolved.plan,
             period: resolved.period,
@@ -1251,13 +1258,48 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
       const sub        = event.data.object;
       const customerId = sub.customer;
       const status     = event.type === 'customer.subscription.paused' ? 'paused' : 'cancelled';
+      const existingUser = db.prepare(`
+        SELECT id,name,email,stripe_customer_id,subscription_plan,subscription_status,subscription_period,
+               subscription_start,subscription_end
+        FROM users WHERE stripe_customer_id = ?
+      `).get(customerId);
+      const resolved = resolveStripeSubscriptionPlan(sub);
+      const endIso = toIso(sub.current_period_end) || existingUser?.subscription_end || new Date().toISOString();
+      const endedAtOrBeforeNow = new Date(endIso).getTime() <= Date.now();
+      const cancellationReason = String(sub.cancellation_details?.reason || '').toLowerCase();
+      const shouldPromptPaymentUpdate = event.type === 'customer.subscription.deleted'
+        && endedAtOrBeforeNow
+        && cancellationReason !== 'cancellation_requested';
       db.prepare(`
         UPDATE users
-        SET subscription_plan   = 'free',
+        SET subscription_expired_plan = CASE WHEN ? THEN ? ELSE subscription_expired_plan END,
+            subscription_expired_period = CASE WHEN ? THEN ? ELSE subscription_expired_period END,
+            subscription_expired_end = CASE WHEN ? THEN ? ELSE subscription_expired_end END,
+            subscription_plan   = 'free',
             subscription_status = ?,
             subscription_end    = ?
         WHERE stripe_customer_id = ?
-      `).run(status, toIso(sub.current_period_end), customerId);
+      `).run(
+        shouldPromptPaymentUpdate ? 1 : 0,
+        normalizeSubscriptionPlan(resolved?.plan || existingUser?.subscription_plan || 'free'),
+        shouldPromptPaymentUpdate ? 1 : 0,
+        resolved?.period || existingUser?.subscription_period || 'monthly',
+        shouldPromptPaymentUpdate ? 1 : 0,
+        endIso,
+        status,
+        endIso,
+        customerId,
+      );
+      if (shouldPromptPaymentUpdate && existingUser) {
+        const reminderUser = db.prepare(`
+          SELECT id,name,email,stripe_customer_id,subscription_plan,subscription_status,subscription_period,
+                 subscription_start,subscription_end,subscription_expired_plan,subscription_expired_period,
+                 subscription_expired_end,subscription_expiry_notice_count,subscription_expiry_notice_last_sent
+          FROM users WHERE id = ?
+        `).get(existingUser.id);
+        sendSubscriptionPaymentUpdateEmail(reminderUser)
+          .catch(err => console.error('[subscription-expiry-email] failed:', err instanceof Error ? err.message : err));
+      }
       console.log(`[webhook] ${event.type} — customer ${customerId} downgraded to free`);
       break;
     }
@@ -1278,11 +1320,35 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
     case 'invoice.paid': {
       const inv        = event.data.object;
       const customerId = inv.customer;
-      /* Only update status; plan/period already set by subscription.updated */
-      db.prepare(`
-        UPDATE users SET subscription_status = 'active'
-        WHERE stripe_customer_id = ?
-      `).run(customerId);
+      const paidUser = db.prepare(`
+        SELECT id,name,email,stripe_customer_id,subscription_plan,subscription_status,subscription_period,
+               subscription_start,subscription_end
+        FROM users WHERE stripe_customer_id = ?
+      `).get(customerId);
+      const subscriptionId = typeof inv.subscription === 'string'
+        ? inv.subscription
+        : inv.subscription?.id;
+      if (paidUser && subscriptionId && stripe) {
+        try {
+          const sub = await stripe.subscriptions.retrieve(subscriptionId, {
+            expand: ['items.data.price'],
+          });
+          await syncActiveStripeSubscriptionForUser(paidUser, sub, 'invoice-paid');
+        } catch (err) {
+          console.error('[webhook] invoice.paid subscription sync failed:', err instanceof Error ? err.message : err);
+          db.prepare(`
+            UPDATE users SET subscription_status = 'active'
+            WHERE stripe_customer_id = ?
+          `).run(customerId);
+          resetSubscriptionExpiryNotices(paidUser.id);
+        }
+      } else {
+        db.prepare(`
+          UPDATE users SET subscription_status = 'active'
+          WHERE stripe_customer_id = ?
+        `).run(customerId);
+        if (paidUser) resetSubscriptionExpiryNotices(paidUser.id);
+      }
       console.log(`[webhook] invoice.paid — customer ${customerId} subscription renewed`);
       break;
     }
@@ -1430,7 +1496,7 @@ function validatePasswordRules(password) {
   return errs;
 }
 const ADMIN_SUBSCRIPTION_PLANS = new Set(['free', 'starter', 'pro', 'business']);
-const ADMIN_SUBSCRIPTION_STATUSES = new Set(['active', 'cancelled', 'past_due']);
+const ADMIN_SUBSCRIPTION_STATUSES = new Set(['active', 'cancelled', 'past_due', 'expired', 'paused']);
 const ADMIN_SUBSCRIPTION_PERIODS = new Set(['monthly', 'annual']);
 function validateAdminSubscription({ plan = 'free', status = 'active', period = 'monthly' } = {}) {
   const nextPlan = String(plan || 'free').trim().toLowerCase();
@@ -1555,9 +1621,51 @@ function subscriptionEmailKey(details) {
     details.endDate || '',
   ].join('|');
 }
+const PAID_SUBSCRIPTION_PLANS = new Set(['starter', 'pro', 'business']);
+const SUBSCRIPTION_EXPIRY_NOTICE_MAX = 5;
+const SUBSCRIPTION_EXPIRY_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+
+function resetSubscriptionExpiryNotices(userId) {
+  db.prepare(`
+    UPDATE users
+    SET subscription_expired_plan = NULL,
+        subscription_expired_period = NULL,
+        subscription_expired_end = NULL,
+        subscription_expiry_notice_count = 0,
+        subscription_expiry_notice_last_sent = NULL
+    WHERE id = ?
+  `).run(userId);
+}
+
+function downgradeExpiredUserToFree(user) {
+  const expiredPlan = normalizeSubscriptionPlan(user.subscription_plan);
+  if (!PAID_SUBSCRIPTION_PLANS.has(expiredPlan)) return false;
+  db.prepare(`
+    UPDATE users
+    SET subscription_expired_plan = ?,
+        subscription_expired_period = ?,
+        subscription_expired_end = ?,
+        subscription_plan = 'free',
+        subscription_status = 'expired',
+        subscription_period = 'monthly'
+    WHERE id = ?
+  `).run(
+    expiredPlan,
+    user.subscription_period || 'monthly',
+    user.subscription_end || new Date().toISOString(),
+    user.id,
+  );
+  console.warn('[subscription-expiry] downgraded user to free', {
+    userId: user.id,
+    plan: expiredPlan,
+    end: user.subscription_end,
+  });
+  return true;
+}
+
 async function sendSubscriptionDetailsEmail(userId, details) {
   const plan = String(details?.plan || '').toLowerCase();
-  if (!['pro', 'business'].includes(plan)) return false;
+  if (!PAID_SUBSCRIPTION_PLANS.has(plan)) return false;
 
   const user = db.prepare('SELECT id,name,email,subscription_email_key FROM users WHERE id = ?').get(userId);
   if (!user?.email) return false;
@@ -1651,6 +1759,218 @@ async function sendSubscriptionDetailsEmail(userId, details) {
     response: info.response,
   });
   return true;
+}
+
+async function sendSubscriptionPaymentUpdateEmail(user) {
+  const noticeCount = Number(user.subscription_expiry_notice_count || 0);
+  if (noticeCount >= SUBSCRIPTION_EXPIRY_NOTICE_MAX) return false;
+
+  const todayKey = new Date().toISOString().slice(0, 10);
+  if (String(user.subscription_expiry_notice_last_sent || '') === todayKey) return false;
+
+  const mailer = createMailer();
+  if (!mailer) {
+    console.warn('[subscription-expiry-email] SMTP not configured', { userId: user.id, email: user.email });
+    return false;
+  }
+
+  const plan = normalizeSubscriptionPlan(user.subscription_expired_plan || user.subscription_plan);
+  const planLabel = `${titleCase(plan)} Plan`;
+  const periodLabel = String(user.subscription_expired_period || user.subscription_period || 'monthly') === 'annual' ? 'Yearly' : 'Monthly';
+  const endLabel = formatEmailDate(user.subscription_expired_end || user.subscription_end);
+  const pricingUrl = `${APP_URL}/pricing`;
+  const settingsUrl = `${APP_URL}/settings`;
+  const remaining = Math.max(0, SUBSCRIPTION_EXPIRY_NOTICE_MAX - noticeCount - 1);
+
+  const info = await mailer.sendMail({
+    from: MAIL_FROM,
+    to: user.email,
+    subject: 'Action required: update your LeafletAI payment',
+    text: [
+      `Hi ${user.name || 'there'},`,
+      '',
+      `Your LeafletAI ${planLabel} subscription expired on ${endLabel}.`,
+      'Your account has been moved to the Free plan because Stripe did not confirm a successful renewal payment.',
+      '',
+      `Expired plan: ${planLabel}`,
+      `Billing period: ${periodLabel}`,
+      `Expiry date: ${endLabel}`,
+      '',
+      `Update your payment or renew your plan: ${pricingUrl}`,
+      `Manage your account: ${settingsUrl}`,
+      '',
+      remaining > 0
+        ? `We will send this reminder once per day for ${remaining} more ${remaining === 1 ? 'day' : 'days'} unless your plan is renewed.`
+        : 'This is the final payment reminder for this expired subscription.',
+      '',
+      'LeafletAI Team',
+      'Create smarter leaflets with AI.',
+    ].join('\n'),
+    html: `
+      <div style="font-family:Inter,Arial,sans-serif;line-height:1.55;color:#111827;max-width:600px;margin:0 auto;padding:24px;">
+        <a href="${escapeHtml(APP_URL)}" style="display:inline-block;margin:0 0 18px;text-decoration:none;">
+          <img src="${escapeHtml(`${APP_URL}/leafletai_email_logo_black.png?v=20260729`)}" alt="LeafletAI" style="display:block;width:180px;max-width:100%;height:auto;border:0;"/>
+        </a>
+        <h1 style="font-size:22px;margin:0 0 12px;">Update your payment to renew LeafletAI</h1>
+        <p>Hi ${escapeHtml(user.name || 'there')},</p>
+        <p>Your LeafletAI <strong>${escapeHtml(planLabel)}</strong> subscription expired on <strong>${escapeHtml(endLabel)}</strong>. Your account has been moved to the Free plan because Stripe did not confirm a successful renewal payment.</p>
+        <table role="presentation" style="width:100%;border-collapse:collapse;margin:20px 0;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+          <tbody>
+            ${[
+              ['Expired plan', planLabel],
+              ['Billing period', periodLabel],
+              ['Expiry date', endLabel],
+              ['Account email', user.email],
+            ].map(([label, value]) => `
+              <tr>
+                <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;background:#f9fafb;color:#4b5563;font-size:14px;width:42%;">${escapeHtml(label)}</td>
+                <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#111827;font-weight:700;font-size:14px;">${escapeHtml(value)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <p style="margin:24px 0;">
+          <a href="${escapeHtml(pricingUrl)}" style="background:#10b981;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700;display:inline-block;">Renew plan</a>
+        </p>
+        <p style="color:#6b7280;font-size:14px;">${remaining > 0
+          ? `We will send this reminder once per day for ${remaining} more ${remaining === 1 ? 'day' : 'days'} unless your plan is renewed.`
+          : 'This is the final payment reminder for this expired subscription.'}</p>
+        <div style="margin-top:28px;padding-top:18px;border-top:1px solid #e5e7eb;color:#374151;font-size:14px;">
+          <p style="margin:0 0 4px;"><strong>LeafletAI Team</strong></p>
+          <p style="margin:0 0 12px;"><em>Create smarter leaflets with AI.</em></p>
+          <p style="margin:0;">&#128231; <a href="mailto:info@leafletai.ai" style="color:#0f766e;text-decoration:none;">info@leafletai.ai</a></p>
+          <p style="margin:0 0 12px;">&#127760; <a href="https://www.leafletai.ai" style="color:#0f766e;text-decoration:none;">www.leafletai.ai</a></p>
+        </div>
+      </div>
+    `,
+  });
+
+  db.prepare(`
+    UPDATE users
+    SET subscription_expiry_notice_count = subscription_expiry_notice_count + 1,
+        subscription_expiry_notice_last_sent = ?
+    WHERE id = ?
+  `).run(todayKey, user.id);
+  console.log('[subscription-expiry-email] sent', {
+    to: user.email,
+    messageId: info.messageId,
+    accepted: info.accepted,
+    rejected: info.rejected,
+  });
+  return true;
+}
+
+function stripeTimestampToIso(ts) {
+  return ts ? new Date(ts * 1000).toISOString() : null;
+}
+
+function resolveStripeSubscriptionPlan(sub) {
+  const priceId = sub?.items?.data?.[0]?.price?.id || '';
+  return resolveStripePlanFromPriceId(priceId) || (
+    sub?.metadata?.plan
+      ? { plan: sub.metadata.plan, period: sub.metadata.period || 'monthly' }
+      : null
+  );
+}
+
+async function syncActiveStripeSubscriptionForUser(user, sub, source = 'subscription-sync') {
+  const resolved = resolveStripeSubscriptionPlan(sub);
+  if (!resolved || !PAID_SUBSCRIPTION_PLANS.has(normalizeSubscriptionPlan(resolved.plan))) return false;
+  const status = sub.status === 'active' || sub.status === 'trialing' ? 'active' : sub.status;
+  const startDate = stripeTimestampToIso(sub.current_period_start || sub.start_date || sub.created);
+  const endDate = stripeTimestampToIso(sub.current_period_end);
+
+  db.prepare(`
+    UPDATE users
+    SET subscription_plan = ?,
+        subscription_status = ?,
+        subscription_period = ?,
+        subscription_start = COALESCE(subscription_start, ?),
+        subscription_end = ?
+    WHERE id = ?
+  `).run(resolved.plan, status, resolved.period, startDate, endDate, user.id);
+  resetSubscriptionExpiryNotices(user.id);
+
+  sendSubscriptionDetailsEmail(user.id, {
+    plan: resolved.plan,
+    period: resolved.period,
+    status,
+    startDate: user.subscription_start || startDate,
+    endDate,
+  }).catch(err => console.error('[subscription-email] failed:', err instanceof Error ? err.message : err));
+
+  console.log(`[${source}] synced active Stripe subscription`, {
+    userId: user.id,
+    plan: resolved.plan,
+    period: resolved.period,
+    endDate,
+  });
+  return true;
+}
+
+async function findCurrentStripeSubscriptionForUser(user) {
+  if (!stripe || !user?.stripe_customer_id) return null;
+  const subscriptions = await stripe.subscriptions.list({
+    customer: user.stripe_customer_id,
+    status: 'all',
+    limit: 20,
+    expand: ['data.items.data.price'],
+  });
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  return subscriptions.data.find(sub => (
+    ['active', 'trialing'].includes(sub.status) &&
+    Number(sub.current_period_end || 0) > nowSeconds &&
+    resolveStripeSubscriptionPlan(sub)
+  )) || null;
+}
+
+async function enforceExpiredSubscriptions() {
+  const rows = db.prepare(`
+    SELECT id,name,email,stripe_customer_id,subscription_plan,subscription_status,subscription_period,
+           subscription_start,subscription_end,subscription_expired_plan,subscription_expired_period,
+           subscription_expired_end,subscription_expiry_notice_count,subscription_expiry_notice_last_sent
+    FROM users
+    WHERE (
+      subscription_plan <> 'free'
+      AND subscription_plan <> 'admin'
+      AND subscription_end IS NOT NULL
+      AND datetime(subscription_end) <= datetime('now')
+    )
+    OR (
+      subscription_plan = 'free'
+      AND subscription_expired_plan IS NOT NULL
+      AND subscription_expiry_notice_count < ?
+    )
+  `).all(SUBSCRIPTION_EXPIRY_NOTICE_MAX);
+
+  for (const user of rows) {
+    try {
+      const activeSub = await findCurrentStripeSubscriptionForUser(user);
+      if (activeSub) {
+        await syncActiveStripeSubscriptionForUser(user, activeSub, 'subscription-expiry');
+        continue;
+      }
+
+      if (user.subscription_plan !== 'free') {
+        downgradeExpiredUserToFree(user);
+      }
+
+      const reminderUser = db.prepare(`
+        SELECT id,name,email,stripe_customer_id,subscription_plan,subscription_status,subscription_period,
+               subscription_start,subscription_end,subscription_expired_plan,subscription_expired_period,
+               subscription_expired_end,subscription_expiry_notice_count,subscription_expiry_notice_last_sent
+        FROM users WHERE id = ?
+      `).get(user.id);
+      if (reminderUser?.subscription_expired_plan) {
+        await sendSubscriptionPaymentUpdateEmail(reminderUser);
+      }
+    } catch (err) {
+      console.error('[subscription-expiry] failed for user', {
+        userId: user.id,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 }
 async function sendContactMessage({ name, email, topic, message }) {
   const mailer = createMailer();
@@ -1887,6 +2207,18 @@ db.prepare("INSERT OR IGNORE INTO site_settings (key,value) VALUES ('backup_auto
 db.prepare("INSERT OR IGNORE INTO site_settings (key,value) VALUES ('backup_auto_hours','24')").run();
 db.prepare("INSERT OR IGNORE INTO site_settings (key,value) VALUES ('backup_max_keep','20')").run();
 startAutoBackup();
+
+let subscriptionExpiryTimer = null;
+function startSubscriptionExpiryScheduler() {
+  if (subscriptionExpiryTimer) clearInterval(subscriptionExpiryTimer);
+  setTimeout(() => {
+    enforceExpiredSubscriptions().catch(err => console.error('[subscription-expiry] startup check failed:', err));
+  }, 10 * 1000);
+  subscriptionExpiryTimer = setInterval(() => {
+    enforceExpiredSubscriptions().catch(err => console.error('[subscription-expiry] scheduled check failed:', err));
+  }, SUBSCRIPTION_EXPIRY_CHECK_INTERVAL_MS);
+  console.log('[subscription-expiry] scheduler started');
+}
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
@@ -4147,6 +4479,7 @@ app.post('/api/stripe/confirm-session', authMiddleware, async (req, res) => {
       endDate,
       req.user.id,
     );
+    resetSubscriptionExpiryNotices(req.user.id);
 
     const updatedUser = db.prepare('SELECT subscription_start FROM users WHERE id = ?').get(req.user.id);
     sendSubscriptionDetailsEmail(req.user.id, {
@@ -4815,7 +5148,7 @@ app.post('/api/admin/users', adminMiddleware, async (req, res, next) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const isPaid = sub.plan === 'pro' || sub.plan === 'business';
+    const isPaid = PAID_SUBSCRIPTION_PLANS.has(sub.plan);
     const subscriptionStart = isPaid ? new Date() : null;
     const subscriptionEnd = isPaid ? adminSubscriptionEndDate(sub.period, subscriptionStart) : null;
     const result = db.prepare(`
@@ -4896,6 +5229,9 @@ app.put('/api/admin/users/:id', adminMiddleware, (req, res) => {
   if (!fields.length) { res.status(400).json({ error: 'Nothing to update' }); return; }
   vals.push(id);
   db.prepare(`UPDATE users SET ${fields.join(',')} WHERE id=?`).run(...vals);
+  if (subscription_plan !== undefined || subscription_period !== undefined || subscription_status !== undefined) {
+    resetSubscriptionExpiryNotices(id);
+  }
   const updated = db.prepare('SELECT id,name,email,role,email_verified,subscription_plan,subscription_status,subscription_period,subscription_start,subscription_end,created_at FROM users WHERE id=?').get(id);
   res.json(updated);
 });
@@ -5862,4 +6198,5 @@ if (fs.existsSync(DIST_DIR)) {
 app.listen(PORT, () => {
   console.log(`LeafletAI running on port ${PORT}`);
   logSmtpStartupStatus();
+  startSubscriptionExpiryScheduler();
 });
