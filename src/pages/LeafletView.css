@@ -669,20 +669,6 @@
   line-height: 1;
   opacity: .3;
 }
-.lv-card-image-license {
-  max-width: 100%;
-  font-size: calc(10px * var(--card-scale, 1));
-  font-weight: 700;
-  line-height: 1.25;
-  color: #334155;
-  text-align: center;
-  overflow-wrap: anywhere;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.lv-card-img-placeholder:has(.lv-card-image-license) {
-  background: rgba(255,255,255,.08);
-}
 .lv-discount-badge {
   position: absolute;
   top: 10px;
@@ -768,47 +754,6 @@
   font-weight: 600;
 }
 .lv-card-link:hover { text-decoration: underline; }
-
-.lv-card-image-license {
-  display: block;
-  margin-top: calc(6px * var(--card-scale, 1));
-  font-size: calc(9px * var(--card-scale, 1));
-  line-height: 1.25;
-  color: rgba(100,116,139,.9);
-  text-decoration: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-a.lv-card-image-license:hover {
-  color: var(--brand);
-  text-decoration: underline;
-}
-
-.lv-card-positioned > .lv-card-image-license {
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 6px;
-  z-index: 8;
-  margin-top: 0;
-  padding: 2px 5px;
-  border-radius: 6px;
-  background: rgba(255,255,255,.82);
-  color: #475569;
-}
-
-.lv-card-img-placeholder .lv-card-image-license {
-  margin-top: 0;
-  max-width: 100%;
-  color: #334155;
-  text-align: center;
-  white-space: normal;
-  text-overflow: clip;
-  text-decoration: underline;
-  overflow-wrap: anywhere;
-}
 
 /* ── Empty state ── */
 .lv-empty {

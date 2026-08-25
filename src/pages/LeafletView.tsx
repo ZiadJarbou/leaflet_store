@@ -1379,7 +1379,7 @@ function EditModal({ product, isTwoLang, leafletId, onClose, onSave }: EditModal
     }
     async function findReusableImage() {
         const productName = form.product_name_lan1.trim();
-        setImageSearchStatus('Searching Creative Commons images for this product...');
+        setImageSearchStatus('Searching product images for this product...');
         const { images } = await searchProductImages(productName);
         const words = productName.toLowerCase().split(/\s+/).filter(w => w.length > 2);
         const ranked = [...images].sort((a, b) => {
@@ -1390,18 +1390,21 @@ function EditModal({ product, isTwoLang, leafletId, onClose, onSave }: EditModal
             return bScore - aScore;
         });
         const selected = ranked[0] ?? null;
-        if (!selected)
-            throw new Error('No reusable image was found for this product name. Please upload an image or paste a direct image URL.');
+        if (!selected) {
+            setImageSearchStatus('No product image was found. Saving without an image.');
+            return true;
+        }
         setPendingImage(selected);
         setImageSearchStatus(null);
+        return false;
     }
     async function findImageLicense() {
         const productName = form.product_name_lan1.trim();
         if (!productName) {
-            setError('Product name is required before searching for an image license.');
+            setError('Product name is required before searching for an image.');
             return;
         }
-        const searchQuery = `${productName} product image Creative Commons license`;
+        const searchQuery = `${productName} product image`;
         const imageSearchUrls = {
             google: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(searchQuery)}`,
             bing: `https://www.bing.com/images/search?q=${encodeURIComponent(searchQuery)}`,
@@ -1410,9 +1413,9 @@ function EditModal({ product, isTwoLang, leafletId, onClose, onSave }: EditModal
                 ? customImageSearchUrl.trim().replace('{query}', encodeURIComponent(searchQuery))
                 : `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(searchQuery)}`,
         };
-        const popup = window.open(imageSearchUrls[imageSearchEngine], 'leafletai_image_license_search', 'popup=yes,width=1180,height=760,menubar=no,toolbar=yes,location=yes,status=no,scrollbars=yes,resizable=yes');
+        const popup = window.open(imageSearchUrls[imageSearchEngine], 'leafletai_product_image_search', 'popup=yes,width=1180,height=760,menubar=no,toolbar=yes,location=yes,status=no,scrollbars=yes,resizable=yes');
         if (!popup) {
-            setError('Popup was blocked. Please allow popups, then click Find license again.');
+            setError('Popup was blocked. Please allow popups, then click Search for product image again.');
             return;
         }
         popup.focus();
@@ -1423,15 +1426,16 @@ function EditModal({ product, isTwoLang, leafletId, onClose, onSave }: EditModal
             const match = images.find(img => img.url === form.product_img_url.trim())
                 || images.find(img => img.licenseUrl)
                 || images[0];
-            if (!match)
-                throw new Error('No reusable image license was found for this product.');
-            set('product_image_license', match.licenseUrl || match.license || 'Creative Commons / reusable media');
+            if (!match) {
+                setImageSearchStatus('No product image was found. You can upload an image or paste an image URL.');
+                return;
+            }
             if (!form.product_img_url.trim()) {
                 setPendingImage(match);
             }
         }
-        catch (err) {
-            setError(err instanceof Error ? err.message : 'Could not find an image license.');
+        catch {
+            setImageSearchStatus('Could not complete image search. You can upload an image or paste an image URL.');
         }
         finally {
             setLicenseSearching(false);
@@ -1457,7 +1461,10 @@ function EditModal({ product, isTwoLang, leafletId, onClose, onSave }: EditModal
                     await saveProduct(pendingImage.url, pendingImage);
                 }
                 else {
-                    await findReusableImage();
+                    const shouldSaveWithoutImage = await findReusableImage();
+                    if (shouldSaveWithoutImage) {
+                        await saveProduct();
+                    }
                 }
             }
             else {
@@ -1557,9 +1564,8 @@ function EditModal({ product, isTwoLang, leafletId, onClose, onSave }: EditModal
               {pendingImage && (<div className="lv-image-suggestion">
                   <img src={pendingImage.thumb || pendingImage.url} alt={form.product_name_lan1.trim()} className="lv-image-suggestion-preview"/>
                   <div className="lv-image-suggestion-copy">
-                    <strong>Suggested reusable image</strong>
+                    <strong>Suggested product image</strong>
                     <span>{pendingImage.title}</span>
-                    <small>{pendingImage.source} - {pendingImage.licenseUrl || pendingImage.license || 'Creative Commons / reusable media'}</small>
                     <div className="lv-image-suggestion-actions">
                       <button type="button" className="btn primary" onClick={() => {
                 set('product_img_url', pendingImage.url);
@@ -2128,18 +2134,13 @@ function ProductCard({ p, isTwoLang, leafletId, onUpdate, onDelete, cardLayout, 
           <span className="material-symbol" aria-hidden="true">delete</span>
         </button>)}
     </div>);
-    const imageLicense = (p.product_image_license || '').trim();
-    const imageLicenseNode = imageLicense ? (/^https?:\/\//i.test(imageLicense) ? (<a href={imageLicense} target="_blank" rel="noreferrer" className="lv-card-image-license">
-        Image license
-      </a>) : (<span className="lv-card-image-license">{imageLicense}</span>)) : null;
     const displayImageUrl = p.product_img_url ? toCanvasSafeImageUrl(p.product_img_url) : '';
     const imgNode = (displayImageUrl && !imgErr)
         ? captureSafeImages
             ? <img src={displayImageUrl} alt={p.product_name_lan1} className={cx("lv-card-img", cssClass({ objectFit: 'contain' }))} loading={imageLoading} decoding="async" crossOrigin="anonymous" onError={() => setImgErr(true)}/>
             : <img src={displayImageUrl} alt={p.product_name_lan1} className={cx("lv-card-img", cssClass({ objectFit: hasPositions ? 'scale-down' : 'cover' }))} loading={imageLoading} decoding="async" onError={() => setImgErr(true)}/>
-        : (<div className="lv-card-img-placeholder" aria-hidden={!imageLicenseNode}>
+        : (<div className="lv-card-img-placeholder" aria-hidden="true">
         <span className="lv-card-img-placeholder-icon" aria-hidden="true">image</span>
-        {imageLicenseNode}
       </div>);
     if (hasPositions) {
         const es = cl?.element_styles;
@@ -2314,7 +2315,6 @@ function ProductCard({ p, isTwoLang, leafletId, onUpdate, onDelete, cardLayout, 
                 {showText && linkText}
               </a>);
         })()}
-          {imageLicenseNode}
         </div>
         {showShapes && <CardShapes layout={cl}/>}
         {/* Overlays - rendered last to sit above all card content */}
@@ -4085,7 +4085,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                     imageMeta = addPendingImage;
                 }
                 else {
-                    setAddImageSearchStatus('Searching Creative Commons images for this product...');
+                    setAddImageSearchStatus('Searching product images for this product...');
                     const { images } = await searchProductImages(newProd.product_name_lan1.trim());
                     const words = newProd.product_name_lan1.toLowerCase().split(/\s+/).filter(w => w.length > 2);
                     const selected = [...images].sort((a, b) => {
@@ -4094,10 +4094,13 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                         return bScore - aScore;
                     })[0] ?? null;
                     setAddImageSearchStatus(null);
-                    if (!selected)
-                        throw new Error('No reusable image was found for this product name. Please upload an image or paste a direct image URL.');
-                    setAddPendingImage(selected);
-                    return;
+                    if (!selected) {
+                        setAddImageSearchStatus('No product image was found. Product will be saved without an image.');
+                    }
+                    else {
+                        setAddPendingImage(selected);
+                        return;
+                    }
                 }
             }
             const body = {
@@ -10188,9 +10191,8 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                   {addPendingImage && (<div className="lv-image-suggestion">
                       <img src={addPendingImage.thumb || addPendingImage.url} alt={newProd.product_name_lan1.trim()} className="lv-image-suggestion-preview"/>
                       <div className="lv-image-suggestion-copy">
-                        <strong>Suggested reusable image</strong>
+                        <strong>Suggested product image</strong>
                         <span>{addPendingImage.title}</span>
-                        <small>{addPendingImage.source} - {addPendingImage.licenseUrl || addPendingImage.license || 'Creative Commons / reusable media'}</small>
                         <div className="lv-image-suggestion-actions">
                           <button type="button" className="btn primary" onClick={() => {
                     setNewProd(p => ({ ...p, product_img_url: addPendingImage.url }));
