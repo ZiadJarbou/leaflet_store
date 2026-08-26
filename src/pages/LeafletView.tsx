@@ -2083,6 +2083,7 @@ function cardBoxStyle(cl: CardLayout | null | undefined): React.CSSProperties {
         background: cl?.card_background ?? undefined,
         borderRadius,
         boxShadow: cl?.card_shadow === false ? 'none' : undefined,
+        ...(hasBorder ? { ['--lv-card-border-color' as string]: bc } : {}),
         ...(hasBorder ? {
             borderTopWidth: `${bt}px`,
             borderRightWidth: `${br}px`,
