@@ -1111,6 +1111,15 @@ function ImageUploader({ currentUrl, onUploaded }: ImageUploaderProps) {
             onUploaded(text);
         }
     }
+    function focusPasteTarget() {
+        dropRef.current?.focus();
+        try {
+            return typeof document !== 'undefined' && document.execCommand?.('paste') === true;
+        }
+        catch {
+            return false;
+        }
+    }
     async function pasteFromClipboard() {
         dropRef.current?.focus();
         setUploadErr(null);
@@ -1118,6 +1127,14 @@ function ImageUploader({ currentUrl, onUploaded }: ImageUploaderProps) {
             const clipboard = navigator.clipboard;
             if (!clipboard)
                 throw new Error('Clipboard access is not available in this browser.');
+            const isFirefox = /firefox/i.test(navigator.userAgent || '');
+            if (isFirefox && !('read' in clipboard)) {
+                const pasted = focusPasteTarget();
+                if (!pasted) {
+                    setUploadErr('Firefox is ready to paste. Press Ctrl+V once while the image box is focused.');
+                }
+                return;
+            }
             if ('read' in clipboard) {
                 const items = await clipboard.read();
                 for (const item of items) {
@@ -1141,6 +1158,13 @@ function ImageUploader({ currentUrl, onUploaded }: ImageUploaderProps) {
         }
         catch (err) {
             const message = err instanceof Error ? err.message : '';
+            if (/firefox/i.test(navigator.userAgent || '') && /permission|denied|not allowed|not permitted|clipboard access/i.test(message)) {
+                const pasted = focusPasteTarget();
+                if (!pasted) {
+                    setUploadErr('Firefox is ready to paste. Press Ctrl+V once while the image box is focused.');
+                }
+                return;
+            }
             const isPermissionError = /permission|denied|not allowed|not permitted|clipboard access/i.test(message);
             setUploadErr(isPermissionError
                 ? 'Browser blocked direct paste. Press Ctrl+V while the image box is focused to paste the image.'
