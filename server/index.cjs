@@ -75,6 +75,7 @@ const SMTP_SECURE                  = envValue('SMTP_SECURE').toLowerCase() === '
 const SMTP_USER                    = envValue('SMTP_USER');
 const SMTP_PASS                    = smtpPasswordValue();
 const MAIL_FROM                    = envValue('MAIL_FROM') || 'LeafletAI <no-reply@leafletai.ai>';
+const SUBSCRIPTION_MAIL_FROM       = 'LeafletAI <no-reply@leafletai.ai>';
 const CONTACT_TO_EMAIL             = envValue('CONTACT_TO_EMAIL') || 'info@leafletai.ai';
 
 let stripe = null;
@@ -1195,20 +1196,53 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
     case 'checkout.session.completed': {
       const session    = event.data.object;
       const userId     = session.metadata?.userId;
-      const plan       = session.metadata?.plan;
-      const period     = session.metadata?.period;
+      let plan         = session.metadata?.plan;
+      let period       = session.metadata?.period;
       const customerId = session.customer;
+      let subscription = null;
+      if (typeof session.subscription === 'string') {
+        try {
+          subscription = await stripe.subscriptions.retrieve(session.subscription, {
+            expand: ['items.data.price'],
+          });
+        } catch (err) {
+          console.error('[webhook] checkout.session.completed subscription retrieve failed:', err instanceof Error ? err.message : err);
+        }
+      } else if (session.subscription && typeof session.subscription === 'object') {
+        subscription = session.subscription;
+      }
+      const priceId = subscription?.items?.data?.[0]?.price?.id || '';
+      const resolved = planFromPriceId(priceId) || (plan ? { plan, period: period || 'monthly' } : null);
+      if (resolved) {
+        plan = resolved.plan;
+        period = resolved.period || 'monthly';
+      }
       if (userId && plan) {
+        const userIdNumber = parseInt(userId, 10);
+        const status = subscription?.status === 'active' || subscription?.status === 'trialing'
+          ? 'active'
+          : (subscription?.status || 'active');
+        const startDate = toIso(subscription?.current_period_start || subscription?.start_date || subscription?.created);
+        const endDate = toIso(subscription?.current_period_end);
         db.prepare(`
           UPDATE users
           SET stripe_customer_id = COALESCE(?, stripe_customer_id),
               subscription_plan   = ?,
-              subscription_status = 'active',
+              subscription_status = ?,
               subscription_period = ?,
-              subscription_start  = COALESCE(subscription_start, datetime('now'))
+              subscription_start  = COALESCE(subscription_start, COALESCE(?, datetime('now'))),
+              subscription_end    = COALESCE(?, subscription_end)
           WHERE id = ?
-        `).run(customerId || null, plan, period || 'monthly', parseInt(userId, 10));
-        resetSubscriptionExpiryNotices(parseInt(userId, 10));
+        `).run(customerId || null, plan, status, period || 'monthly', startDate, endDate, userIdNumber);
+        resetSubscriptionExpiryNotices(userIdNumber);
+        const paidUser = db.prepare('SELECT subscription_start, subscription_end FROM users WHERE id = ?').get(userIdNumber);
+        sendSubscriptionDetailsEmail(userIdNumber, {
+          plan,
+          period: period || 'monthly',
+          status,
+          startDate: paidUser?.subscription_start || startDate,
+          endDate: paidUser?.subscription_end || endDate,
+        }).catch(err => console.error('[subscription-email] failed:', err instanceof Error ? err.message : err));
         console.log(`[webhook] checkout.session.completed — user ${userId} → ${plan}/${period}`);
       }
       break;
@@ -1712,7 +1746,7 @@ async function sendSubscriptionDetailsEmail(userId, details) {
   ];
 
   const info = await mailer.sendMail({
-    from: MAIL_FROM,
+    from: SUBSCRIPTION_MAIL_FROM,
     to: user.email,
     subject: `Your LeafletAI ${planLabel} subscription details`,
     text: [
