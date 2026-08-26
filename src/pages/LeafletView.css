@@ -2348,11 +2348,10 @@
 
 /* ── Cards inside A4 keep layout-defined backgrounds ─────────────── */
 .lv-a4-page .lv-card {
-  border-color: rgba(0,0,0,.08);
   color: #1e293b;
 }
 .lv-a4-page .lv-card:hover {
-  border-color: rgba(73,242,182,.5);
+  border-color: var(--lv-card-border-color, rgba(73,242,182,.5));
   box-shadow: 0 4px 16px rgba(0,0,0,.12);
 }
 
