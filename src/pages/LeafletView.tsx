@@ -3003,6 +3003,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const nanoSpeechBasePromptRef = useRef('');
     const nanoSpeechFinalRef = useRef('');
     const nanoSpeechManualStopRef = useRef(false);
+    const coverBuilderTextRefs = useRef<Partial<Record<'headline' | 'subline' | 'contact', HTMLSpanElement | null>>>({});
     const coverBuilderPreviewRef = useRef<HTMLDivElement>(null);
     const coverBuilderStageRef = useRef<HTMLDivElement>(null);
     const coverBuilderLoadedFromLayoutRef = useRef({ front: false, back: false });
@@ -4451,6 +4452,22 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             ...(clearsGeneratedBackground ? { aiGeneratedBg: false } : {}),
         }));
     }
+    function coverBuilderTextFromElement(itemKey: 'headline' | 'subline' | 'contact', element: HTMLElement) {
+        return itemKey === 'headline' ? element.innerText || '' : element.textContent || '';
+    }
+    function commitCoverBuilderText(itemKey: 'headline' | 'subline' | 'contact', element: HTMLElement) {
+        setCoverBuilderValue(itemKey, coverBuilderTextFromElement(itemKey, element) as CoverBuilderState[typeof itemKey]);
+    }
+    function coverBuilderWithCommittedText() {
+        const next = cloneCoverBuilderState(coverBuilder);
+        (['headline', 'subline', 'contact'] as const).forEach(itemKey => {
+            const element = coverBuilderTextRefs.current[itemKey];
+            if (element) {
+                next[itemKey] = coverBuilderTextFromElement(itemKey, element);
+            }
+        });
+        return next;
+    }
     function commitCoverBuilderLogoText(nextText = coverBuilderLogoTextDraftRef.current) {
         if (coverBuilderLogoTextCommitTimerRef.current !== null) {
             window.clearTimeout(coverBuilderLogoTextCommitTimerRef.current);
@@ -5673,7 +5690,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     }
     async function useCoverBuilderCover() {
         setNanoError(null);
-        const savedBuilder = cloneCoverBuilderState(coverBuilder);
+        const savedBuilder = coverBuilderWithCommittedText();
         if (coverBuilderTarget === 'back') {
             setBackCoverBuilder(savedBuilder);
             setBackPage({ image: '', show: true, builder: true });
@@ -7716,11 +7733,12 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
                 <ContactInfoIcon type={item.type}/>
                 <span>{item.value}</span>
               </span>))}
-          </span>) : (<span className="lv-cb-editable-text" contentEditable suppressContentEditableWarning spellCheck={false} onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); selectCoverBuilderItem(itemKey, e.shiftKey); }} onInput={e => setCoverBuilderValue(itemKey, itemKey === 'headline' ? e.currentTarget.innerText || '' : e.currentTarget.textContent || '')} onBlur={() => setCoverBuilderSaveTick(t => t + 1)} onKeyDown={e => {
+          </span>) : (<span ref={element => { coverBuilderTextRefs.current[itemKey] = element; }} className="lv-cb-editable-text" contentEditable suppressContentEditableWarning spellCheck={false} dir="auto" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); selectCoverBuilderItem(itemKey, e.shiftKey); }} onBlur={e => { commitCoverBuilderText(itemKey, e.currentTarget); setCoverBuilderSaveTick(t => t + 1); }} onKeyDown={e => {
                     e.stopPropagation();
                     if (e.key === 'Enter') {
                         if (itemKey !== 'headline') {
                             e.preventDefault();
+                            commitCoverBuilderText(itemKey, e.currentTarget);
                             e.currentTarget.blur();
                         }
                     }

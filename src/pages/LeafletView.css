@@ -5709,6 +5709,7 @@ body.dragging-icon .lv-card-drop-layer {
   white-space: pre-wrap;
   word-break: break-word;
   user-select: text;
+  unicode-bidi: plaintext;
 }
 .lv-cb-editable-text:focus {
   text-shadow: 0 0 0 currentColor;
