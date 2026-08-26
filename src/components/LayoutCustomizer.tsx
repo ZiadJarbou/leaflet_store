@@ -205,6 +205,16 @@ function cardBorderRadius(layout: CardLayout): string | number {
     }
     return layout.card_border_radius ?? 16;
 }
+function visibleCardBorderWidths(layout: CardLayout) {
+    const width = Number(layout.card_border_width ?? 0);
+    return {
+        width,
+        top: Number(layout.card_border_top ?? width),
+        right: Number(layout.card_border_right ?? width),
+        bottom: Number(layout.card_border_bottom ?? width),
+        left: Number(layout.card_border_left ?? width),
+    };
+}
 interface Props {
     initial: CardLayout;
     onSave: (layout: CardLayout) => Promise<void>;
@@ -1996,12 +2006,14 @@ function DraggableCard({ layout, onPosChange, onMultiPosChange, onShapeChange, s
         </div>);
     }
     function renderCardBorderPanel() {
-        const width = layout.card_border_width ?? 0;
+        const borderWidths = visibleCardBorderWidths(layout);
+        const width = borderWidths.width;
+        const hasVisibleBorder = Object.values(borderWidths).some(value => value > 0);
         const sides = [
-            ['T', 'card_border_top', layout.card_border_top ?? width],
-            ['R', 'card_border_right', layout.card_border_right ?? width],
-            ['B', 'card_border_bottom', layout.card_border_bottom ?? width],
-            ['L', 'card_border_left', layout.card_border_left ?? width],
+            ['T', 'card_border_top', borderWidths.top],
+            ['R', 'card_border_right', borderWidths.right],
+            ['B', 'card_border_bottom', borderWidths.bottom],
+            ['L', 'card_border_left', borderWidths.left],
         ] as const;
         return (<div className="lc-toolbar-panel-stack">
           {miniRange('Width', width, 0, 20, 1, 'px', value => onLayoutPatch({ card_border_width: value, card_border_top: value, card_border_right: value, card_border_bottom: value, card_border_left: value }))}
@@ -2010,7 +2022,10 @@ function DraggableCard({ layout, onPosChange, onMultiPosChange, onShapeChange, s
                 { value: 'dashed', icon: 'more_horiz', title: 'Dashed' },
                 { value: 'dotted', icon: 'blur_linear', title: 'Dotted' },
             ], value => onLayoutPatch({ card_border_style: value as CardLayout['card_border_style'] }))}
-          {miniColor('Color', layout.card_border_color ?? '#49f2b6', value => onLayoutPatch({ card_border_color: value }))}
+          {miniColor('Color', layout.card_border_color ?? '#49f2b6', value => onLayoutPatch({
+                card_border_color: value,
+                ...(!hasVisibleBorder ? { card_border_width: 1, card_border_top: 1, card_border_right: 1, card_border_bottom: 1, card_border_left: 1 } : {}),
+            }))}
           <div className="lc-toolbar-side-grid">
             {sides.map(([label, field, value]) => (<label key={field} className="lc-toolbar-side-field">
               <span>{label}</span>
@@ -2416,13 +2431,14 @@ function DraggableCard({ layout, onPosChange, onMultiPosChange, onShapeChange, s
             /* expose canvas width as a CSS var so child elements can size relatively */
             ['--cw' as string]: `${canvasW}px`,
             ...(() => {
-                const bw = layout.card_border_width ?? 0;
-                if (bw > 0) {
+                const borderWidths = visibleCardBorderWidths(layout);
+                const hasBorder = Object.values(borderWidths).some(value => value > 0);
+                if (hasBorder) {
                     return {
-                        borderTopWidth: `${layout.card_border_top ?? bw}px`,
-                        borderRightWidth: `${layout.card_border_right ?? bw}px`,
-                        borderBottomWidth: `${layout.card_border_bottom ?? bw}px`,
-                        borderLeftWidth: `${layout.card_border_left ?? bw}px`,
+                        borderTopWidth: `${borderWidths.top}px`,
+                        borderRightWidth: `${borderWidths.right}px`,
+                        borderBottomWidth: `${borderWidths.bottom}px`,
+                        borderLeftWidth: `${borderWidths.left}px`,
                         borderStyle: layout.card_border_style ?? 'solid',
                         borderColor: layout.card_border_color ?? '#49f2b6',
                     };

@@ -3491,6 +3491,7 @@ app.get('/api/leaflets/:id/layout', authMiddleware, (req, res, next) => {
       'badge_font_size','badge_radius','badge_show_bg','badge_color','badge_text_color','badge_display_mode',
       'url_icon','url_icon_size','url_icon_url','url_text','url_show_text','url_icon_color','url_custom_icon',
       'card_bg_type','card_bg_color2','card_bg_gradient_angle',
+      'card_border_radius','card_border_width','card_border_color','card_border_style',
       'card_border_top','card_border_right','card_border_bottom','card_border_left',
       'shapes'];
     for (const f of TOP_FIELDS) {

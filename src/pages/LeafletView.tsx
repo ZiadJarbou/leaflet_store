@@ -2068,13 +2068,14 @@ interface ProductCardProps {
 }
 /* Compute the card's box-level inline style (background, border, radius, shadow) */
 function cardBoxStyle(cl: CardLayout | null | undefined): React.CSSProperties {
-    const bw = cl?.card_border_width ?? 0;
+    const bw = Number(cl?.card_border_width ?? 0);
     const bc = cl?.card_border_color ?? '#49f2b6';
     const bs = cl?.card_border_style ?? 'solid';
-    const bt = cl?.card_border_top ?? bw;
-    const br = cl?.card_border_right ?? bw;
-    const bb = cl?.card_border_bottom ?? bw;
-    const bl = cl?.card_border_left ?? bw;
+    const bt = Number(cl?.card_border_top ?? bw);
+    const br = Number(cl?.card_border_right ?? bw);
+    const bb = Number(cl?.card_border_bottom ?? bw);
+    const bl = Number(cl?.card_border_left ?? bw);
+    const hasBorder = [bw, bt, br, bb, bl].some(value => value > 0);
     const borderRadius = cl?.card_radius_mode === 'each'
         ? `${cl.card_radius_tl ?? 16}px ${cl.card_radius_tr ?? 16}px ${cl.card_radius_br ?? 16}px ${cl.card_radius_bl ?? 16}px`
         : cl?.card_border_radius != null ? `${cl.card_border_radius}px` : undefined;
@@ -2082,7 +2083,7 @@ function cardBoxStyle(cl: CardLayout | null | undefined): React.CSSProperties {
         background: cl?.card_background ?? undefined,
         borderRadius,
         boxShadow: cl?.card_shadow === false ? 'none' : undefined,
-        ...(bw > 0 ? {
+        ...(hasBorder ? {
             borderTopWidth: `${bt}px`,
             borderRightWidth: `${br}px`,
             borderBottomWidth: `${bb}px`,
