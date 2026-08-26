@@ -1041,6 +1041,7 @@ interface ImageUploaderProps {
     onUploaded: (url: string) => void;
 }
 const IMAGE_URL_RE = /^https?:\/\/.+\.(avif|gif|jpe?g|png|svg|webp)(\?.*)?$/i;
+const IMAGE_DATA_URL_RE = /^data:image\/(avif|gif|jpe?g|png|svg\+xml|webp);base64,/i;
 function ImageUploader({ currentUrl, onUploaded }: ImageUploaderProps) {
     const [dragging, setDragging] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -1104,7 +1105,7 @@ function ImageUploader({ currentUrl, onUploaded }: ImageUploaderProps) {
             return;
         }
         const text = e.clipboardData.getData('text/plain').trim();
-        if (IMAGE_URL_RE.test(text)) {
+        if (IMAGE_URL_RE.test(text) || IMAGE_DATA_URL_RE.test(text)) {
             e.preventDefault();
             setUploadErr(null);
             setPreview(text);
@@ -1119,16 +1120,27 @@ function ImageUploader({ currentUrl, onUploaded }: ImageUploaderProps) {
             ? `${browserName} is ready to paste. Press Ctrl+V once while the image box is focused.`
             : 'Browser blocked direct paste. Press Ctrl+V while the image box is focused to paste the image.';
     }
+    async function applyPastedImageText(text: string) {
+        const value = text.trim();
+        if (IMAGE_URL_RE.test(value) || IMAGE_DATA_URL_RE.test(value)) {
+            setPreview(value);
+            onUploaded(value);
+            return true;
+        }
+        const htmlMatch = value.match(/<img[^>]+src=["']([^"']+)["']/i);
+        const htmlUrl = htmlMatch?.[1]?.replace(/&amp;/g, '&').trim();
+        if (htmlUrl && (IMAGE_URL_RE.test(htmlUrl) || IMAGE_DATA_URL_RE.test(htmlUrl))) {
+            setPreview(htmlUrl);
+            onUploaded(htmlUrl);
+            return true;
+        }
+        return false;
+    }
     async function pasteFromClipboard() {
         focusPasteTarget();
         setUploadErr(null);
         const ua = navigator.userAgent || '';
-        const isFirefox = /firefox/i.test(ua);
         const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(ua);
-        if (isFirefox) {
-            setUploadErr(pasteSupportMessage('Firefox'));
-            return;
-        }
         try {
             const clipboard = navigator.clipboard;
             if (!clipboard)
@@ -1143,15 +1155,18 @@ function ImageUploader({ currentUrl, onUploaded }: ImageUploaderProps) {
                         await handleFile(new File([blob], `pasted-image.${ext}`, { type: imageType }));
                         return;
                     }
+                    for (const textType of ['text/html', 'text/uri-list', 'text/plain']) {
+                        if (item.types.includes(textType)) {
+                            const blob = await item.getType(textType);
+                            if (await applyPastedImageText(await blob.text()))
+                                return;
+                        }
+                    }
                 }
             }
             const text = await clipboard.readText();
-            const url = text.trim();
-            if (IMAGE_URL_RE.test(url)) {
-                setPreview(url);
-                onUploaded(url);
+            if (await applyPastedImageText(text))
                 return;
-            }
             throw new Error('Clipboard does not contain an image or direct image URL.');
         }
         catch (err) {
