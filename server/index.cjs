@@ -1237,6 +1237,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         resetSubscriptionExpiryNotices(userIdNumber);
         const paidUser = db.prepare('SELECT subscription_start, subscription_end FROM users WHERE id = ?').get(userIdNumber);
         sendSubscriptionDetailsEmail(userIdNumber, {
+          subscriptionId: typeof session.subscription === 'string' ? session.subscription : subscription?.id,
           plan,
           period: period || 'monthly',
           status,
@@ -1277,6 +1278,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         if (paidUser) {
           if (status === 'active') resetSubscriptionExpiryNotices(paidUser.id);
           sendSubscriptionDetailsEmail(paidUser.id, {
+            subscriptionId: sub.id,
             plan: resolved.plan,
             period: resolved.period,
             status,
@@ -1658,10 +1660,11 @@ function titleCase(value) {
 }
 function subscriptionEmailKey(details) {
   return [
+    'subscription-details-v2',
+    details.subscriptionId || '',
     details.plan,
     details.period,
     details.status,
-    details.startDate || '',
     details.endDate || '',
   ].join('|');
 }
@@ -1730,6 +1733,17 @@ async function sendSubscriptionDetailsEmail(userId, details) {
     return false;
   }
 
+  const reserved = db.prepare(`
+    UPDATE users
+    SET subscription_email_key = ?
+    WHERE id = ?
+      AND COALESCE(subscription_email_key, '') <> ?
+  `).run(emailKey, userId, emailKey);
+  if (reserved.changes === 0) {
+    console.log('[subscription-email] already reserved', { userId, emailKey });
+    return false;
+  }
+
   const planLabel = `${titleCase(plan)} Plan`;
   const periodLabel = String(details.period || 'monthly') === 'annual' ? 'Annual' : 'Monthly';
   const statusLabel = titleCase(details.status || 'active');
@@ -1745,60 +1759,69 @@ async function sendSubscriptionDetailsEmail(userId, details) {
     ['Account email', user.email],
   ];
 
-  const info = await mailer.sendMail({
-    from: SUBSCRIPTION_MAIL_FROM,
-    to: user.email,
-    subject: `Your LeafletAI ${planLabel} subscription details`,
-    text: [
-      `Hi ${user.name || 'there'},`,
-      '',
-      'Your LeafletAI subscription is active. Here are the details:',
-      '',
-      ...rows.map(([label, value]) => `${label}: ${value}`),
-      '',
-      `Manage your subscription and invoices: ${settingsUrl}`,
-      '',
-      'LeafletAI Team',
-      'Create smarter leaflets with AI.',
-      '',
-      'Email: info@leafletai.ai',
-      'Website: www.leafletai.ai',
-      '',
-      'LeafletAI - Design. Automate. Publish.',
-    ].join('\n'),
-    html: `
-      <div style="font-family:Inter,Arial,sans-serif;line-height:1.55;color:#111827;max-width:600px;margin:0 auto;padding:24px;">
-        <a href="${escapeHtml(APP_URL)}" style="display:inline-block;margin:0 0 18px;text-decoration:none;">
-          <img src="${escapeHtml(`${APP_URL}/leafletai_email_logo_black.png?v=20260729`)}" alt="LeafletAI" style="display:block;width:180px;max-width:100%;height:auto;border:0;"/>
-        </a>
-        <h1 style="font-size:22px;margin:0 0 12px;">Your subscription details</h1>
-        <p>Hi ${escapeHtml(user.name || 'there')},</p>
-        <p>Your LeafletAI subscription is active. Here are the details for your account.</p>
-        <table role="presentation" style="width:100%;border-collapse:collapse;margin:20px 0;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
-          <tbody>
-            ${rows.map(([label, value]) => `
-              <tr>
-                <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;background:#f9fafb;color:#4b5563;font-size:14px;width:42%;">${escapeHtml(label)}</td>
-                <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#111827;font-weight:700;font-size:14px;">${escapeHtml(value)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-        <p style="margin:24px 0;">
-          <a href="${escapeHtml(settingsUrl)}" style="background:#10b981;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700;display:inline-block;">Manage subscription</a>
-        </p>
-        <div style="margin-top:28px;padding-top:18px;border-top:1px solid #e5e7eb;color:#374151;font-size:14px;">
-          <p style="margin:0 0 4px;"><strong>LeafletAI Team</strong></p>
-          <p style="margin:0 0 12px;"><em>Create smarter leaflets with AI.</em></p>
-          <p style="margin:0;">&#128231; <a href="mailto:info@leafletai.ai" style="color:#0f766e;text-decoration:none;">info@leafletai.ai</a></p>
-          <p style="margin:0 0 12px;">&#127760; <a href="https://www.leafletai.ai" style="color:#0f766e;text-decoration:none;">www.leafletai.ai</a></p>
-          <p style="margin:0;"><strong>LeafletAI</strong> &mdash; Design. Automate. Publish.</p>
+  let info;
+  try {
+    info = await mailer.sendMail({
+      from: SUBSCRIPTION_MAIL_FROM,
+      to: user.email,
+      subject: `Your LeafletAI ${planLabel} subscription details`,
+      text: [
+        `Hi ${user.name || 'there'},`,
+        '',
+        'Your LeafletAI subscription is active. Here are the details:',
+        '',
+        ...rows.map(([label, value]) => `${label}: ${value}`),
+        '',
+        `Manage your subscription and invoices: ${settingsUrl}`,
+        '',
+        'LeafletAI Team',
+        'Create smarter leaflets with AI.',
+        '',
+        'Email: info@leafletai.ai',
+        'Website: www.leafletai.ai',
+        '',
+        'LeafletAI - Design. Automate. Publish.',
+      ].join('\n'),
+      html: `
+        <div style="font-family:Inter,Arial,sans-serif;line-height:1.55;color:#111827;max-width:600px;margin:0 auto;padding:24px;">
+          <a href="${escapeHtml(APP_URL)}" style="display:inline-block;margin:0 0 18px;text-decoration:none;">
+            <img src="${escapeHtml(`${APP_URL}/leafletai_email_logo_black.png?v=20260729`)}" alt="LeafletAI" style="display:block;width:180px;max-width:100%;height:auto;border:0;"/>
+          </a>
+          <h1 style="font-size:22px;margin:0 0 12px;">Your subscription details</h1>
+          <p>Hi ${escapeHtml(user.name || 'there')},</p>
+          <p>Your LeafletAI subscription is active. Here are the details for your account.</p>
+          <table role="presentation" style="width:100%;border-collapse:collapse;margin:20px 0;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+            <tbody>
+              ${rows.map(([label, value]) => `
+                <tr>
+                  <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;background:#f9fafb;color:#4b5563;font-size:14px;width:42%;">${escapeHtml(label)}</td>
+                  <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#111827;font-weight:700;font-size:14px;">${escapeHtml(value)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <p style="margin:24px 0;">
+            <a href="${escapeHtml(settingsUrl)}" style="background:#10b981;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700;display:inline-block;">Manage subscription</a>
+          </p>
+          <div style="margin-top:28px;padding-top:18px;border-top:1px solid #e5e7eb;color:#374151;font-size:14px;">
+            <p style="margin:0 0 4px;"><strong>LeafletAI Team</strong></p>
+            <p style="margin:0 0 12px;"><em>Create smarter leaflets with AI.</em></p>
+            <p style="margin:0;">&#128231; <a href="mailto:info@leafletai.ai" style="color:#0f766e;text-decoration:none;">info@leafletai.ai</a></p>
+            <p style="margin:0 0 12px;">&#127760; <a href="https://www.leafletai.ai" style="color:#0f766e;text-decoration:none;">www.leafletai.ai</a></p>
+            <p style="margin:0;"><strong>LeafletAI</strong> &mdash; Design. Automate. Publish.</p>
+          </div>
         </div>
-      </div>
-    `,
-  });
-
-  db.prepare('UPDATE users SET subscription_email_key = ? WHERE id = ?').run(emailKey, userId);
+      `,
+    });
+  } catch (err) {
+    db.prepare(`
+      UPDATE users
+      SET subscription_email_key = ?
+      WHERE id = ?
+        AND subscription_email_key = ?
+    `).run(user.subscription_email_key || null, userId, emailKey);
+    throw err;
+  }
   console.log('[subscription-email] sent', {
     to: user.email,
     messageId: info.messageId,
@@ -1940,6 +1963,7 @@ async function syncActiveStripeSubscriptionForUser(user, sub, source = 'subscrip
   resetSubscriptionExpiryNotices(user.id);
 
   sendSubscriptionDetailsEmail(user.id, {
+    subscriptionId: sub.id,
     plan: resolved.plan,
     period: resolved.period,
     status,
@@ -4532,6 +4556,7 @@ app.post('/api/stripe/confirm-session', authMiddleware, async (req, res) => {
 
     const updatedUser = db.prepare('SELECT subscription_start FROM users WHERE id = ?').get(req.user.id);
     sendSubscriptionDetailsEmail(req.user.id, {
+      subscriptionId: typeof session.subscription === 'string' ? session.subscription : subscription?.id,
       plan: resolved.plan,
       period: resolved.period,
       status: subscriptionStatus,
