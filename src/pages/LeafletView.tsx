@@ -3754,11 +3754,9 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         const nextBackCoverBuilder = loadedFromLayout.back ? backCoverBuilder : buildDefaultBuilder(backTemplate);
         if (!loadedFromLayout.front) {
             setFrontCoverBuilder(nextFrontCoverBuilder);
-            setCoverPage(prev => prev.show || prev.image ? { ...prev, builder: prev.builder ?? true } : { image: '', show: true, builder: true });
         }
         if (!loadedFromLayout.back) {
             setBackCoverBuilder(nextBackCoverBuilder);
-            setBackPage(prev => prev.show || prev.image ? { ...prev, builder: prev.builder ?? true } : { image: '', show: true, builder: true });
         }
         if ((coverBuilderTarget === 'front' && !loadedFromLayout.front) || (coverBuilderTarget === 'back' && !loadedFromLayout.back)) {
             setCoverBuilder(coverBuilderTarget === 'front' ? nextFrontCoverBuilder : nextBackCoverBuilder);
@@ -4378,13 +4376,11 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         setCoverBuilderSelected('background');
         if (target === 'back') {
             setBackCoverBuilder(dynamicCoverBuilder);
-            setBackPage({ image: '', show: true, builder: true });
-            setCurrentPage(pages.length);
+            setBackPage(prev => prev.show ? { image: '', show: true, builder: true } : prev);
             return;
         }
         setFrontCoverBuilder(dynamicCoverBuilder);
-        setCoverPage({ image: '', show: true, builder: true });
-        setCurrentPage(-1);
+        setCoverPage(prev => prev.show ? { image: '', show: true, builder: true } : prev);
     }
     async function handleNanoReferenceUpload(files: FileList | File[] | File | null) {
         const selectedFiles = files instanceof File
@@ -9317,7 +9313,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             <div className="lv-sb-row">
               <span className="lv-sb-label">Show</span>
               <label className="lv-sb-switch">
-                <input type="checkbox" checked={coverPage.show} onChange={e => setCoverPage(p => ({ ...p, show: e.target.checked }))}/>
+                <input type="checkbox" checked={coverPage.show} disabled={!coverPage.image && !coverPage.builder} onChange={e => setCoverPage(p => (e.target.checked && !p.image && !p.builder) ? p : { ...p, show: e.target.checked })}/>
                 <span className="lv-sb-switch-track"/>
               </label>
             </div>
@@ -9353,7 +9349,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             <div className="lv-sb-row">
               <span className="lv-sb-label">Show</span>
               <label className="lv-sb-switch">
-                <input type="checkbox" checked={backPage.show} onChange={e => setBackPage(p => ({ ...p, show: e.target.checked }))}/>
+                <input type="checkbox" checked={backPage.show} disabled={!backPage.image && !backPage.builder} onChange={e => setBackPage(p => (e.target.checked && !p.image && !p.builder) ? p : { ...p, show: e.target.checked })}/>
                 <span className="lv-sb-switch-track"/>
               </label>
             </div>
