@@ -7,12 +7,13 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import HTMLFlipBook from 'react-pageflip';
 import { Link, useParams } from 'react-router-dom';
-import { getLeaflet, getAdminLeaflet, updateProduct, uploadImage, deleteProduct, getLeafletLayout, getAdminLeafletLayout, saveLeafletLayout, resetLeafletLayout, saveLeafletThumbnail, createCheckoutSession, searchProductImages, getIconLibrary, getLayoutTemplates, deleteLayoutTemplate, startA4CoverImageJob, getA4CoverImageJob, getCoverLayoutTemplates, createCoverLayoutTemplate, createAdminCoverLayoutTemplate, updateAdminCoverLayoutTemplate, deleteCoverLayoutTemplate, deleteAdminCoverLayoutTemplate, getPublicSettings, deleteAdminDealTag } from '../services/api';
+import { getLeaflet, getAdminLeaflet, updateProduct, uploadImage, deleteProduct, getLeafletLayout, getAdminLeafletLayout, saveLeafletLayout, resetLeafletLayout, saveLeafletThumbnail, createCheckoutSession, searchProductImages, getIconLibrary, getLayoutTemplates, deleteLayoutTemplate, startA4CoverImageJob, getA4CoverImageJob, getCoverLayoutTemplates, createCoverLayoutTemplate, createAdminCoverLayoutTemplate, updateAdminCoverLayoutTemplate, deleteCoverLayoutTemplate, deleteAdminCoverLayoutTemplate, getPublicSettings, deleteAdminDealTag, exportFlipbookToStore } from '../services/api';
 import { getStoredToken } from '../services/authService';
 import { countryToFlag, countryToIso } from '../utils/countryToFlag';
 import type { CardLayout, CardElementPos, TextElementStyle, ProductImageSuggestion, LayoutTemplate, CoverLayoutTemplate } from '../services/api';
 import { trackProductClick } from '../services/api';
 import { WORLD_CURRENCIES } from '../data/currencies';
+import { COUNTRY_OPTIONS, countryNameForCode } from '../data/countries';
 import { PRESET_ICON_URLS } from '../data/editorIcons';
 import type { LeafletDetail, LeafletProduct } from '../types/leaflet';
 import { hexToRgba, LINK_ICONS, DEFAULT_POSITIONS, loadGoogleFont, FontPickerSection } from '../components/LayoutCustomizer';
@@ -2895,6 +2896,9 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const [flipbookError, setFlipbookError] = useState<string | null>(null);
     const [flipbookPdfBlob, setFlipbookPdfBlob] = useState<Blob | null>(null);
     const [flipbookPages, setFlipbookPages] = useState<FlipbookPageImage[]>([]);
+    const [flipbookCountry, setFlipbookCountry] = useState('');
+    const [flipbookExporting, setFlipbookExporting] = useState(false);
+    const [flipbookExportNotice, setFlipbookExportNotice] = useState<string | null>(null);
     const [editorTourOpen, setEditorTourOpen] = useState(false);
     const [editorTourStep, setEditorTourStep] = useState(0);
     const [editorTourSkipped, setEditorTourSkipped] = useState(false);
@@ -8841,6 +8845,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         setFlipbookLoading(true);
         setFlipbookError(null);
         setFlipbookPdfBlob(null);
+        setFlipbookExportNotice(null);
         setFlipbookPages([]);
         try {
             const blob = await createPdfBlob();
@@ -8859,24 +8864,38 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         setFlipbookOpen(false);
         setFlipbookError(null);
         setFlipbookPdfBlob(null);
+        setFlipbookExportNotice(null);
         setFlipbookPages([]);
     }
-    async function exportFlipbookPdf() {
+    async function exportFlipbookToLeafletStore() {
+        if (!id)
+            return;
+        const countryName = countryNameForCode(flipbookCountry);
+        if (!flipbookCountry || !countryName) {
+            setFlipbookError('Select a country before exporting to Leaflet Store.');
+            return;
+        }
+        setFlipbookExporting(true);
+        setFlipbookError(null);
+        setFlipbookExportNotice(null);
         try {
             const blob = flipbookPdfBlob ?? await createPdfBlob();
             if (!flipbookPdfBlob)
                 setFlipbookPdfBlob(blob);
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${pdfFileBaseName()}-flipbook.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            await exportFlipbookToStore({
+                leafletId: id,
+                pdf: blob,
+                filename: `${pdfFileBaseName()}-flipbook.pdf`,
+                countryCode: flipbookCountry,
+                countryName,
+            });
+            setFlipbookExportNotice(`Exported to Leaflet Store for ${countryName}.`);
         }
         catch (e) {
-            setFlipbookError(e instanceof Error ? e.message : 'Unable to export flipbook.');
+            setFlipbookError(e instanceof Error ? e.message : 'Unable to export the flipbook to Leaflet Store.');
+        }
+        finally {
+            setFlipbookExporting(false);
         }
     }
     function addLinkAnnotations(pdf: jsPDF, exportEl: HTMLElement, pageW: number, pageH: number) {
@@ -10191,13 +10210,28 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
               <h2 id="lv-flipbook-title">{leaflet?.title || 'Leaflet'} Flipbook</h2>
             </div>
             <div className="lv-flipbook-head-actions">
-              <button type="button" className="lv-flipbook-export" onClick={exportFlipbookPdf} disabled={flipbookLoading || !!flipbookError || !flipbookPages.length}>
+              <label className="lv-flipbook-country">
+                <span>Country</span>
+                <select value={flipbookCountry} onChange={e => {
+                    setFlipbookCountry(e.target.value);
+                    setFlipbookError(null);
+                    setFlipbookExportNotice(null);
+                }}>
+                  <option value="">Select country</option>
+                  {COUNTRY_OPTIONS.map(country => <option key={country.code} value={country.code}>{country.name}</option>)}
+                </select>
+              </label>
+              <button type="button" className="lv-flipbook-export" onClick={exportFlipbookToLeafletStore} disabled={flipbookLoading || flipbookExporting || !flipbookPages.length || !flipbookCountry}>
                 <span className="material-symbol" aria-hidden="true">download</span>
-                Export
+                {flipbookExporting ? 'Exporting...' : 'Export'}
               </button>
               <button type="button" className="lv-flipbook-close material-symbol" onClick={closeFlipbook} disabled={flipbookLoading} aria-label="Close flipbook">close</button>
             </div>
           </div>
+          {flipbookExportNotice && <div className="lv-flipbook-notice" aria-live="polite">
+            <span>{flipbookExportNotice}</span>
+            <Link to="/leaflet-store">Open Leaflet Store</Link>
+          </div>}
 
           {flipbookLoading ? (<div className="lv-flipbook-state" aria-live="polite">
               <span className="lv-share-pdf-spinner" aria-hidden="true"/>

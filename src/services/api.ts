@@ -818,6 +818,66 @@ export async function createPortalSession(): Promise<string> {
   return url;
 }
 
+export interface LeafletStoreFlipbook {
+  id: number;
+  leaflet_id: number;
+  title: string;
+  description: string;
+  country_code: string;
+  country_name: string;
+  created_at: string;
+  size: number;
+  thumbnail_url: string | null;
+  url: string;
+  share_url: string;
+}
+
+export interface LeafletStoreCountry {
+  country_code: string;
+  country_name: string;
+  count: number;
+}
+
+export function getLeafletStore(countryCode = ''): Promise<{ flipbooks: LeafletStoreFlipbook[]; countries: LeafletStoreCountry[] }> {
+  const params = new URLSearchParams();
+  if (countryCode) params.set('country', countryCode);
+  const query = params.toString();
+  return request(`/leaflet-store${query ? `?${query}` : ''}`);
+}
+
+export async function exportFlipbookToStore(payload: {
+  leafletId: string | number;
+  pdf: Blob;
+  filename: string;
+  countryCode: string;
+  countryName: string;
+}): Promise<{ export: { id: number; url: string; share_url: string; country_code: string; country_name: string }; usage?: unknown }> {
+  const token = getStoredToken();
+  if (!token) throw new Error('Please log in again before exporting the flipbook.');
+  const form = new FormData();
+  form.append('pdf', payload.pdf, payload.filename);
+  form.append('allow_edit', '0');
+  form.append('export_type', 'flipbook');
+  form.append('country_code', payload.countryCode);
+  form.append('country_name', payload.countryName);
+  const res = await fetch(`${BASE}/leaflets/${payload.leafletId}/exported-pdfs`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  const text = await res.text();
+  let data: any = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = {};
+  }
+  if (!res.ok) {
+    throw new Error(data.error || data.message || text.trim() || `Request failed with status ${res.status}`);
+  }
+  return data;
+}
+
 /* ─────────────────────────────────────────────
    User / Account
 ───────────────────────────────────────────── */

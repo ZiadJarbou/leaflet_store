@@ -11,6 +11,7 @@ import OAuthCallbackPage from './pages/OAuthCallbackPage';
 import CreateLeaflet from './pages/CreateLeaflet';
 import LeafletView from './pages/LeafletView';
 import MyLeaflets from './pages/MyLeaflets';
+import LeafletStorePage from './pages/LeafletStorePage';
 import PricingPage from './pages/PricingPage';
 import PaymentSuccess from './pages/PaymentSuccess';
 import WhyPage from './pages/WhyPage';
@@ -68,6 +69,9 @@ function AppShell() {
               </ProtectedRoute>}/>
           <Route path="/my-leaflets" element={<ProtectedRoute>
                 <MyLeaflets />
+              </ProtectedRoute>}/>
+          <Route path="/leaflet-store" element={<ProtectedRoute>
+                <LeafletStorePage />
               </ProtectedRoute>}/>
           <Route path="/dashboard" element={<ProtectedRoute>
                 <DashboardPage />

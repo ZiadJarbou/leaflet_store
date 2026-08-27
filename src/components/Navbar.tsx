@@ -34,10 +34,16 @@ export default function Navbar() {
             <Link to="/faq"      className={location.pathname === '/faq'      ? 'menu-active' : ''}>FAQ</Link>
             <Link to="/help"     className={location.pathname === '/help'     ? 'menu-active' : ''}>Help</Link>
             {user && (
-              <Link
-                to="/my-leaflets"
-                className={`nav-my-leaflets${location.pathname === '/my-leaflets' ? ' active' : ''}`}
-              >My Leaflets</Link>
+              <>
+                <Link
+                  to="/my-leaflets"
+                  className={`nav-my-leaflets${location.pathname === '/my-leaflets' ? ' active' : ''}`}
+                >My Leaflets</Link>
+                <Link
+                  to="/leaflet-store"
+                  className={location.pathname === '/leaflet-store' ? 'menu-active' : ''}
+                >Leaflet Store</Link>
+              </>
             )}
           </div>
 
@@ -57,6 +63,7 @@ export default function Navbar() {
                 <div className={`user-dropdown${dropdownOpen ? ' show' : ''}`}>
                   <div className="dropdown-header">{user.name}</div>
                   <Link to="/dashboard">monitoring Dashboard</Link>
+                  <Link to="/leaflet-store">auto_stories Leaflet Store</Link>
                   <Link to="/settings">settings Settings</Link>
                   <div className="dropdown-divider"></div>
                   <a href="#" className="danger" onClick={async (e) => { e.preventDefault(); await logout(); setDropdownOpen(false); }}>🚪 Log out</a>

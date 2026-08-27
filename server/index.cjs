@@ -723,6 +723,15 @@ if (!pdfExportCols.includes('share_token')) {
 if (!pdfExportCols.includes('allow_edit')) {
   db.exec("ALTER TABLE leaflet_pdf_exports ADD COLUMN allow_edit INTEGER NOT NULL DEFAULT 0");
 }
+if (!pdfExportCols.includes('export_type')) {
+  db.exec("ALTER TABLE leaflet_pdf_exports ADD COLUMN export_type TEXT NOT NULL DEFAULT 'pdf'");
+}
+if (!pdfExportCols.includes('country_code')) {
+  db.exec("ALTER TABLE leaflet_pdf_exports ADD COLUMN country_code TEXT NOT NULL DEFAULT ''");
+}
+if (!pdfExportCols.includes('country_name')) {
+  db.exec("ALTER TABLE leaflet_pdf_exports ADD COLUMN country_name TEXT NOT NULL DEFAULT ''");
+}
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_user_sessions_active ON user_sessions(user_id, revoked_at, expires_at);
   CREATE INDEX IF NOT EXISTS idx_user_sessions_sid ON user_sessions(session_id);
@@ -730,6 +739,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_stripe_plan_prices_price_id ON stripe_plan_prices(stripe_price_id);
   CREATE INDEX IF NOT EXISTS idx_ai_cover_generations_usage ON ai_cover_generations(user_id, leaflet_id, status);
   CREATE INDEX IF NOT EXISTS idx_leaflets_export_quota ON leaflets(user_id, quota_counted);
+  CREATE INDEX IF NOT EXISTS idx_leaflet_pdf_exports_store ON leaflet_pdf_exports(user_id, export_type, country_code, created_at);
 `);
 
 const PLATFORM_DEFAULT_TEMPLATE_NAMES = Array.from({ length: 7 }, (_, i) => `Template ${i + 1}`);
@@ -3133,8 +3143,8 @@ const saveExportedPdfRecord = db.transaction(details => {
   }
 
   const result = db.prepare(`
-    INSERT INTO leaflet_pdf_exports (user_id, leaflet_id, filename, original_name, size, share_token, allow_edit)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO leaflet_pdf_exports (user_id, leaflet_id, filename, original_name, size, share_token, allow_edit, export_type, country_code, country_name)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     details.userId,
     leaflet.id,
@@ -3142,7 +3152,10 @@ const saveExportedPdfRecord = db.transaction(details => {
     details.originalName,
     details.size,
     details.shareToken,
-    details.allowEdit ? 1 : 0
+    details.allowEdit ? 1 : 0,
+    details.exportType || 'pdf',
+    details.countryCode || '',
+    details.countryName || ''
   );
 
   if (!usage) {
@@ -3159,6 +3172,14 @@ const saveExportedPdfRecord = db.transaction(details => {
   return { exportId: result.lastInsertRowid, leaflet, usage };
 });
 
+function cleanCountryName(value) {
+  return String(value || '')
+    .replace(/[<>]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+}
+
 function handleExportedPdfUpload(req, res) {
   pdfExportUpload.single('pdf')(req, res, (err) => {
     let fullPath = '';
@@ -3168,6 +3189,13 @@ function handleExportedPdfUpload(req, res) {
       const leaflet = db.prepare('SELECT id, title FROM leaflets WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
       if (!leaflet) { res.status(404).json({ error: 'Leaflet not found.' }); return; }
       const allowEdit = req.body?.allow_edit === '1' || req.body?.allow_edit === 'true';
+      const exportType = String(req.body?.export_type || 'pdf').trim().toLowerCase() === 'flipbook' ? 'flipbook' : 'pdf';
+      const countryCode = normalizeCountryCode(req.body?.country_code);
+      const countryName = cleanCountryName(req.body?.country_name);
+      if (exportType === 'flipbook' && (!countryCode || !countryName)) {
+        res.status(400).json({ error: 'Select a country before exporting the flipbook to Leaflet Store.' });
+        return;
+      }
       const shareToken = crypto.randomBytes(24).toString('hex');
 
       const userDir = path.join(PDF_EXPORTS_DIR, String(req.user.id));
@@ -3185,6 +3213,9 @@ function handleExportedPdfUpload(req, res) {
         size: req.file.size || req.file.buffer.length,
         shareToken,
         allowEdit,
+        exportType,
+        countryCode,
+        countryName,
       });
 
       res.status(201).json({
@@ -3195,6 +3226,9 @@ function handleExportedPdfUpload(req, res) {
           original_name: req.file.originalname || `${safeBase}.pdf`,
           size: req.file.size || req.file.buffer.length,
           allow_edit: allowEdit,
+          export_type: exportType,
+          country_code: countryCode,
+          country_name: countryName,
           url: `/api/leaflets/${leaflet.id}/exported-pdfs/${filename}`,
           share_url: `/api/shared-pdfs/${shareToken}`,
           share_token: shareToken,
@@ -3287,8 +3321,54 @@ app.get('/api/leaflets/:id/exported-pdfs/:filename', authMiddleware, (req, res) 
   const fullPath = path.join(PDF_EXPORTS_DIR, String(req.user.id), row.filename);
   if (!fs.existsSync(fullPath)) { res.status(404).json({ error: 'Saved PDF file is missing.' }); return; }
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="${String(row.original_name || row.filename).replace(/"/g, '')}"`);
+  const disposition = req.query.inline === '1' ? 'inline' : 'attachment';
+  res.setHeader('Content-Disposition', `${disposition}; filename="${String(row.original_name || row.filename).replace(/"/g, '')}"`);
   res.sendFile(fullPath);
+});
+
+/* ── GET /api/leaflet-store ── user's exported flipbooks grouped by country ── */
+app.get('/api/leaflet-store', authMiddleware, (req, res) => {
+  const country = normalizeCountryCode(req.query.country);
+  const params = [req.user.id];
+  let whereCountry = '';
+  if (country) {
+    whereCountry = 'AND e.country_code = ?';
+    params.push(country);
+  }
+  const rows = db.prepare(`
+    SELECT e.id, e.leaflet_id, e.filename, e.original_name, e.size, e.share_token,
+           e.country_code, e.country_name, e.created_at,
+           l.title, l.description, l.thumbnail
+    FROM leaflet_pdf_exports e
+    JOIN leaflets l ON l.id = e.leaflet_id
+    WHERE e.user_id = ?
+      AND e.export_type = 'flipbook'
+      ${whereCountry}
+    ORDER BY e.country_name ASC, e.created_at DESC
+    LIMIT 200
+  `).all(...params).map(row => ({
+    id: row.id,
+    leaflet_id: row.leaflet_id,
+    title: row.title || row.original_name || 'Leaflet flipbook',
+    description: row.description || '',
+    country_code: row.country_code,
+    country_name: row.country_name,
+    created_at: row.created_at,
+    size: row.size,
+    thumbnail_url: row.thumbnail || null,
+    url: `/api/leaflets/${row.leaflet_id}/exported-pdfs/${row.filename}?inline=1`,
+    share_url: row.share_token ? `/api/shared-pdfs/${row.share_token}` : '',
+  }));
+  const countries = db.prepare(`
+    SELECT country_code, country_name, COUNT(*) AS count
+    FROM leaflet_pdf_exports
+    WHERE user_id = ?
+      AND export_type = 'flipbook'
+      AND country_code <> ''
+    GROUP BY country_code, country_name
+    ORDER BY country_name ASC
+  `).all(req.user.id);
+  res.json({ flipbooks: rows, countries });
 });
 
 /* ── DELETE /api/leaflets/:id ── */
@@ -3930,7 +4010,8 @@ app.get('/api/leaflets/:id/exported-pdfs/:filename', authMiddleware, (req, res) 
   const fullPath = path.join(PDF_EXPORTS_DIR, String(req.user.id), row.filename);
   if (!fs.existsSync(fullPath)) { res.status(404).json({ error: 'Saved PDF file is missing.' }); return; }
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="${String(row.original_name || row.filename).replace(/"/g, '')}"`);
+  const disposition = req.query.inline === '1' ? 'inline' : 'attachment';
+  res.setHeader('Content-Disposition', `${disposition}; filename="${String(row.original_name || row.filename).replace(/"/g, '')}"`);
   res.sendFile(fullPath);
 });
 

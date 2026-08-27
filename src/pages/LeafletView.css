@@ -3163,6 +3163,32 @@ body.dragging-icon .lv-card-drop-layer {
   gap: 8px;
   flex-shrink: 0;
 }
+.lv-flipbook-country {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
+  border: 1px solid rgba(148, 163, 184, .24);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, .72);
+  color: #94a3b8;
+  font-size: .72rem;
+  font-weight: 800;
+}
+.lv-flipbook-country select {
+  max-width: 190px;
+  border: 0;
+  background: transparent;
+  color: #e2e8f0;
+  font: inherit;
+  font-size: .78rem;
+  outline: none;
+}
+.lv-flipbook-country option {
+  background: #0f172a;
+  color: #e2e8f0;
+}
 .lv-flipbook-export {
   height: 34px;
   display: inline-flex;
@@ -3202,6 +3228,27 @@ body.dragging-icon .lv-card-drop-layer {
 .lv-flipbook-close:hover:not(:disabled) {
   border-color: rgba(196, 181, 253, .58);
   color: #ede9fe;
+}
+.lv-flipbook-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 11px;
+  border: 1px solid rgba(73, 242, 182, .28);
+  border-radius: 8px;
+  background: rgba(73, 242, 182, .1);
+  color: #a7f3d0;
+  font-size: .82rem;
+  font-weight: 700;
+}
+.lv-flipbook-notice a {
+  color: #ffffff;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.lv-flipbook-notice a:hover {
+  color: #a7f3d0;
 }
 .lv-flipbook-stage {
   min-height: 420px;
@@ -8923,6 +8970,23 @@ button:disabled .lv-free-badge { display: none; }
   .lv-flipbook-modal {
     max-height: 94vh;
     padding: 16px;
+  }
+  .lv-flipbook-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .lv-flipbook-head-actions,
+  .lv-flipbook-country,
+  .lv-flipbook-export {
+    width: 100%;
+  }
+  .lv-flipbook-country select {
+    max-width: none;
+    flex: 1;
+  }
+  .lv-flipbook-notice {
+    flex-direction: column;
+    align-items: flex-start;
   }
   .lv-flipbook-stage,
   .lv-flipbook-state {
