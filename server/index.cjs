@@ -3149,27 +3149,7 @@ const saveExportedPdfRecord = db.transaction(details => {
     .get(details.leafletId, details.userId);
   if (!leaflet) throw httpError(404, 'Leaflet not found.');
 
-  let countedNow = false;
-  let usage = null;
-  if (!Number(leaflet.quota_counted || 0)) {
-    const quota = assertCanCountExportedLeaflet(details.userId);
-    const result = db.prepare(`
-      UPDATE leaflets
-      SET quota_counted = 1,
-          first_exported_at = COALESCE(first_exported_at, datetime('now'))
-      WHERE id = ? AND user_id = ? AND quota_counted = 0
-    `).run(leaflet.id, details.userId);
-    countedNow = result.changes > 0;
-    if (countedNow) {
-      db.prepare('UPDATE users SET exported_leaflets_used = exported_leaflets_used + 1 WHERE id = ?').run(details.userId);
-    }
-    usage = {
-      used: quota.used + (countedNow ? 1 : 0),
-      limit: Number.isFinite(quota.limit) ? quota.limit : null,
-      plan: normalizeSubscriptionPlan(quota.user.subscription_plan),
-      counted: countedNow,
-    };
-  }
+  const usage = countLeafletTowardExportQuota(details.userId, leaflet.id, leaflet);
 
   const result = db.prepare(`
     INSERT INTO leaflet_pdf_exports (user_id, leaflet_id, filename, original_name, size, share_token, allow_edit, export_type, country_code, country_name)
@@ -3187,18 +3167,42 @@ const saveExportedPdfRecord = db.transaction(details => {
     details.countryName || ''
   );
 
-  if (!usage) {
-    const user = db.prepare('SELECT email, role, subscription_plan FROM users WHERE id = ?').get(details.userId);
-    const limit = leafletCreationLimitForUser(user);
-    usage = {
-      used: Number.isFinite(limit) ? exportedLeafletUsageForUser(details.userId) : 0,
-      limit: Number.isFinite(limit) ? limit : null,
-      plan: isUnlimitedUser(user) ? 'admin' : normalizeSubscriptionPlan(user?.subscription_plan),
-      counted: false,
+  return { exportId: result.lastInsertRowid, leaflet, usage };
+});
+
+const countLeafletTowardExportQuota = db.transaction((userId, leafletId, knownLeaflet = null) => {
+  const leaflet = knownLeaflet || db.prepare('SELECT id, title, quota_counted FROM leaflets WHERE id = ? AND user_id = ?')
+    .get(leafletId, userId);
+  if (!leaflet) throw httpError(404, 'Leaflet not found.');
+
+  if (!Number(leaflet.quota_counted || 0)) {
+    const quota = assertCanCountExportedLeaflet(userId);
+    const result = db.prepare(`
+      UPDATE leaflets
+      SET quota_counted = 1,
+          first_exported_at = COALESCE(first_exported_at, datetime('now'))
+      WHERE id = ? AND user_id = ? AND quota_counted = 0
+    `).run(leaflet.id, userId);
+    const countedNow = result.changes > 0;
+    if (countedNow) {
+      db.prepare('UPDATE users SET exported_leaflets_used = exported_leaflets_used + 1 WHERE id = ?').run(userId);
+    }
+    return {
+      used: quota.used + (countedNow ? 1 : 0),
+      limit: Number.isFinite(quota.limit) ? quota.limit : null,
+      plan: normalizeSubscriptionPlan(quota.user.subscription_plan),
+      counted: countedNow,
     };
   }
 
-  return { exportId: result.lastInsertRowid, leaflet, usage };
+  const user = db.prepare('SELECT email, role, subscription_plan FROM users WHERE id = ?').get(userId);
+  const limit = leafletCreationLimitForUser(user);
+  return {
+    used: Number.isFinite(limit) ? exportedLeafletUsageForUser(userId) : 0,
+    limit: Number.isFinite(limit) ? limit : null,
+    plan: isUnlimitedUser(user) ? 'admin' : normalizeSubscriptionPlan(user?.subscription_plan),
+    counted: false,
+  };
 });
 
 function cleanCountryName(value) {
@@ -3283,6 +3287,25 @@ function handleExportedPdfUpload(req, res) {
 /* ── POST /api/leaflets/:id/exported-pdfs ── */
 app.post('/api/leaflets/:id/exported-pdfs', authMiddleware, (req, res) => {
   handleExportedPdfUpload(req, res);
+});
+
+/* ── POST /api/leaflets/:id/count-export ── */
+app.post('/api/leaflets/:id/count-export', authMiddleware, (req, res) => {
+  try {
+    const usage = countLeafletTowardExportQuota(req.user.id, req.params.id);
+    res.json({
+      success: true,
+      quota_counted: usage.counted,
+      usage,
+    });
+  } catch (err) {
+    const status = err?.status || 500;
+    res.status(status).json({
+      error: err?.message || 'Unable to count this exported leaflet.',
+      limitReached: !!err?.limitReached,
+      usage: err?.usage,
+    });
+  }
 });
 
 /* ── GET /api/shared-pdfs/:token ── */

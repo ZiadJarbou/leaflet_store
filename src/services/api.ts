@@ -899,6 +899,19 @@ export async function exportFlipbookToStore(payload: {
   return data;
 }
 
+export function countLeafletExport(leafletId: string | number): Promise<{
+  success: boolean;
+  quota_counted: boolean;
+  usage: {
+    used: number;
+    limit: number | null;
+    plan: string;
+    counted: boolean;
+  };
+}> {
+  return request(`/leaflets/${leafletId}/count-export`, { method: 'POST' });
+}
+
 /* ─────────────────────────────────────────────
    User / Account
 ───────────────────────────────────────────── */

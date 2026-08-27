@@ -7,7 +7,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import HTMLFlipBook from 'react-pageflip';
 import { Link, useParams } from 'react-router-dom';
-import { getLeaflet, getAdminLeaflet, updateProduct, uploadImage, deleteProduct, getLeafletLayout, getAdminLeafletLayout, saveLeafletLayout, resetLeafletLayout, saveLeafletThumbnail, createCheckoutSession, searchProductImages, getIconLibrary, getLayoutTemplates, deleteLayoutTemplate, startA4CoverImageJob, getA4CoverImageJob, getCoverLayoutTemplates, createCoverLayoutTemplate, createAdminCoverLayoutTemplate, updateAdminCoverLayoutTemplate, deleteCoverLayoutTemplate, deleteAdminCoverLayoutTemplate, getPublicSettings, deleteAdminDealTag, exportFlipbookToStore, getRegionCountry } from '../services/api';
+import { getLeaflet, getAdminLeaflet, updateProduct, uploadImage, deleteProduct, getLeafletLayout, getAdminLeafletLayout, saveLeafletLayout, resetLeafletLayout, saveLeafletThumbnail, createCheckoutSession, searchProductImages, getIconLibrary, getLayoutTemplates, deleteLayoutTemplate, startA4CoverImageJob, getA4CoverImageJob, getCoverLayoutTemplates, createCoverLayoutTemplate, createAdminCoverLayoutTemplate, updateAdminCoverLayoutTemplate, deleteCoverLayoutTemplate, deleteAdminCoverLayoutTemplate, getPublicSettings, deleteAdminDealTag, exportFlipbookToStore, getRegionCountry, countLeafletExport } from '../services/api';
 import { getStoredToken } from '../services/authService';
 import { countryToFlag, countryToIso } from '../utils/countryToFlag';
 import type { CardLayout, CardElementPos, TextElementStyle, ProductImageSuggestion, LayoutTemplate, CoverLayoutTemplate } from '../services/api';
@@ -8855,6 +8855,8 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         return renderedPages;
     }
     async function openFlipbook() {
+        if (!id)
+            return;
         setFlipbookOpen(true);
         setFlipbookLoading(true);
         setFlipbookError(null);
@@ -8863,8 +8865,30 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         setFlipbookPages([]);
         try {
             const blob = await createPdfBlob();
-            setFlipbookPdfBlob(blob);
             const renderedPages = await renderPdfBlobToFlipbookPages(blob);
+            const counted = await countLeafletExport(id);
+            if (counted.usage) {
+                setExportQuota(prev => ({
+                    plan: String(counted.usage.plan || prev?.plan || 'free'),
+                    free_pdf_used: prev?.free_pdf_used ?? 0,
+                    free_pdf_limit: prev?.free_pdf_limit ?? 1,
+                    free_book_used: prev?.free_book_used ?? 0,
+                    exported_leaflets_used: Number(counted.usage.used ?? prev?.exported_leaflets_used ?? 0),
+                    exported_leaflets_limit: counted.usage.limit ?? prev?.exported_leaflets_limit ?? null,
+                    unlimited: prev?.unlimited,
+                }));
+            }
+            if (counted.quota_counted) {
+                setData(prev => prev ? {
+                    ...prev,
+                    leaflet: {
+                        ...prev.leaflet,
+                        quota_counted: true,
+                        first_exported_at: prev.leaflet.first_exported_at || new Date().toISOString(),
+                    },
+                } : prev);
+            }
+            setFlipbookPdfBlob(blob);
             setFlipbookPages(renderedPages);
         }
         catch (e) {
@@ -10112,7 +10136,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
               {'\u{1F4DA}'} Convert to Book
               {exportQuota?.plan === 'free' && canExportBook && (<span className="lv-free-badge">1 free</span>)}
             </button>
-            <button className="lv-flipbook-btn" title="Create an interactive flipbook preview from this leaflet PDF" disabled={savingPdf || flipbookLoading} onClick={openFlipbook}>
+            <button className="lv-flipbook-btn" title={canExportPdf ? "Create an interactive flipbook preview from this leaflet PDF" : exportedLeafletLimitMessage} disabled={savingPdf || flipbookLoading || !canExportPdf} onClick={openFlipbook}>
               <span className="material-symbol" aria-hidden="true">auto_stories</span>
               {flipbookLoading ? 'Creating...' : 'Flipbook'}
             </button>
