@@ -1,0 +1,146 @@
+.sf-viewer {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(circle at top left, rgba(73, 242, 182, .12), transparent 32%),
+    linear-gradient(135deg, #07111f 0%, #111827 54%, #182033 100%);
+  color: #f8fafc;
+}
+
+.sf-viewer .material-symbol {
+  font-family: 'Material Symbols Outlined';
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'liga';
+}
+
+.sf-topbar {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px clamp(16px, 4vw, 42px);
+  border-bottom: 1px solid rgba(148, 163, 184, .16);
+  background: rgba(2, 6, 23, .58);
+  backdrop-filter: blur(14px);
+}
+
+.sf-back,
+.sf-pdf {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid rgba(148, 163, 184, .2);
+  border-radius: 8px;
+  color: #dbeafe;
+  font-size: .86rem;
+  font-weight: 800;
+  text-decoration: none;
+  background: rgba(255, 255, 255, .06);
+}
+
+.sf-back:hover,
+.sf-pdf:hover {
+  border-color: rgba(73, 242, 182, .42);
+  color: #a7f3d0;
+}
+
+.sf-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(18px, 4vw, 42px);
+  overflow: hidden;
+}
+
+.sf-book {
+  filter: drop-shadow(0 28px 45px rgba(0, 0, 0, .34));
+}
+
+.sf-page {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .08);
+}
+
+.sf-page img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  background: #fff;
+}
+
+.sf-page span {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  min-width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, .68);
+  color: #fff;
+  font-size: .72rem;
+  font-weight: 800;
+}
+
+.sf-state {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  padding: 40px 16px;
+  color: #cbd5e1;
+  text-align: center;
+}
+
+.sf-state--error {
+  color: #fca5a5;
+}
+
+.sf-spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 3px solid rgba(148, 163, 184, .24);
+  border-top-color: #49f2b6;
+  animation: sf-spin .8s linear infinite;
+}
+
+@keyframes sf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 720px) {
+  .sf-topbar {
+    padding: 12px 14px;
+  }
+  .sf-back,
+  .sf-pdf {
+    min-height: 36px;
+    padding: 0 10px;
+    font-size: .78rem;
+  }
+  .sf-stage {
+    padding: 14px;
+  }
+}

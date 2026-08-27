@@ -184,6 +184,11 @@
   font-size: .82rem;
 }
 
+.ls-card-actions button.btn {
+  border: 1px solid rgba(148, 163, 184, .22);
+  cursor: pointer;
+}
+
 .ls-state,
 .ls-empty {
   min-height: 320px;
@@ -226,6 +231,87 @@
   line-height: 1.55;
 }
 
+.ls-share-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(2, 6, 23, .7);
+  backdrop-filter: blur(10px);
+}
+
+.ls-share-dialog {
+  width: min(520px, 100%);
+  border: 1px solid rgba(148, 163, 184, .22);
+  border-radius: 8px;
+  background: #0f172a;
+  color: #f8fafc;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .45);
+  padding: 18px;
+}
+
+.ls-share-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ls-share-head h2 {
+  margin: 0;
+  font-size: 1.12rem;
+  line-height: 1.35;
+}
+
+.ls-share-close {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(148, 163, 184, .22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .06);
+  color: #e2e8f0;
+  cursor: pointer;
+}
+
+.ls-share-link {
+  display: grid;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: .82rem;
+  font-weight: 800;
+}
+
+.ls-share-link input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(148, 163, 184, .22);
+  border-radius: 8px;
+  background: rgba(2, 6, 23, .62);
+  color: #e2e8f0;
+  padding: 0 12px;
+  font: inherit;
+  font-size: .84rem;
+  outline: none;
+}
+
+.ls-share-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.ls-share-actions .btn {
+  min-height: 38px;
+  justify-content: center;
+}
+
 @media (max-width: 720px) {
   .ls-page {
     padding: 28px 0 56px;
@@ -251,5 +337,11 @@
   }
   .ls-grid {
     grid-template-columns: 1fr;
+  }
+  .ls-share-actions {
+    flex-direction: column;
+  }
+  .ls-share-actions .btn {
+    width: 100%;
   }
 }

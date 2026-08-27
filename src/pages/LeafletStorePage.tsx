@@ -24,6 +24,8 @@ export default function LeafletStorePage() {
   const [countries, setCountries] = useState<LeafletStoreCountry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [shareFlipbook, setShareFlipbook] = useState<LeafletStoreFlipbook | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -55,6 +57,35 @@ export default function LeafletStorePage() {
   const countryCountByCode = useMemo(() => {
     return new Map(countries.map(country => [country.country_code, country.count]));
   }, [countries]);
+
+  const interactiveUrlFor = (flipbook: LeafletStoreFlipbook) => {
+    const token = flipbook.share_token || flipbook.share_url.split('/').pop() || '';
+    return token ? `/leaflet-store/flipbook/${encodeURIComponent(token)}` : flipbook.url;
+  };
+
+  const absoluteInteractiveUrl = (flipbook: LeafletStoreFlipbook) => {
+    return new URL(interactiveUrlFor(flipbook), window.location.origin).href;
+  };
+
+  const openShareDialog = (flipbook: LeafletStoreFlipbook) => {
+    setShareCopied(false);
+    setShareFlipbook(flipbook);
+  };
+
+  const copyShareLink = async () => {
+    if (!shareFlipbook) return;
+    await navigator.clipboard.writeText(absoluteInteractiveUrl(shareFlipbook));
+    setShareCopied(true);
+  };
+
+  const nativeShare = async () => {
+    if (!shareFlipbook || !navigator.share) return;
+    await navigator.share({
+      title: shareFlipbook.title,
+      text: `Open this interactive flipbook from LeafletAI.`,
+      url: absoluteInteractiveUrl(shareFlipbook),
+    });
+  };
 
   return (
     <>
@@ -110,8 +141,8 @@ export default function LeafletStorePage() {
                   <h2>{flipbook.title}</h2>
                   {flipbook.description && <p>{flipbook.description}</p>}
                   <div className="ls-card-actions">
-                    <a className="btn primary" href={flipbook.url} target="_blank" rel="noreferrer">Open flipbook</a>
-                    <a className="btn ghost" href={flipbook.share_url || flipbook.url} target="_blank" rel="noreferrer">Share link</a>
+                    <Link className="btn primary" to={interactiveUrlFor(flipbook)}>Open flipbook</Link>
+                    <button type="button" className="btn ghost" onClick={() => openShareDialog(flipbook)}>Share link</button>
                   </div>
                   <div className="ls-card-foot">
                     <span>{flipbook.country_code}</span>
@@ -123,6 +154,32 @@ export default function LeafletStorePage() {
           </div>
         )}
       </main>
+      {shareFlipbook && (
+        <div className="ls-share-backdrop" role="presentation" onMouseDown={e => {
+          if (e.target === e.currentTarget) setShareFlipbook(null);
+        }}>
+          <div className="ls-share-dialog" role="dialog" aria-modal="true" aria-labelledby="ls-share-title">
+            <div className="ls-share-head">
+              <div>
+                <p className="ls-eyebrow">Share flipbook</p>
+                <h2 id="ls-share-title">{shareFlipbook.title}</h2>
+              </div>
+              <button type="button" className="ls-share-close material-symbol" onClick={() => setShareFlipbook(null)} aria-label="Close share dialog">close</button>
+            </div>
+            <label className="ls-share-link">
+              <span>Interactive flipbook link</span>
+              <input value={absoluteInteractiveUrl(shareFlipbook)} readOnly onFocus={e => e.currentTarget.select()} />
+            </label>
+            <div className="ls-share-actions">
+              <button type="button" className="btn primary" onClick={copyShareLink}>
+                {shareCopied ? 'Copied' : 'Copy link'}
+              </button>
+              {'share' in navigator && <button type="button" className="btn ghost" onClick={nativeShare}>Share</button>}
+              <Link className="btn ghost" to={interactiveUrlFor(shareFlipbook)}>Open</Link>
+            </div>
+          </div>
+        </div>
+      )}
       <Footer />
     </>
   );

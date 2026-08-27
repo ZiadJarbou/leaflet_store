@@ -12,6 +12,7 @@ import CreateLeaflet from './pages/CreateLeaflet';
 import LeafletView from './pages/LeafletView';
 import MyLeaflets from './pages/MyLeaflets';
 import LeafletStorePage from './pages/LeafletStorePage';
+import LeafletStoreFlipbookPage from './pages/LeafletStoreFlipbookPage';
 import PricingPage from './pages/PricingPage';
 import PaymentSuccess from './pages/PaymentSuccess';
 import WhyPage from './pages/WhyPage';
@@ -71,6 +72,7 @@ function AppShell() {
                 <MyLeaflets />
               </ProtectedRoute>}/>
           <Route path="/leaflet-store" element={<LeafletStorePage />}/>
+          <Route path="/leaflet-store/flipbook/:token" element={<LeafletStoreFlipbookPage />}/>
           <Route path="/dashboard" element={<ProtectedRoute>
                 <DashboardPage />
               </ProtectedRoute>}/>

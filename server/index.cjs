@@ -286,8 +286,7 @@ function detectCheckoutCountry(req, bodyCountry) {
 }
 
 function detectRequestCountry(req, bodyCountry) {
-  return detectCheckoutCountry(req, bodyCountry)
-    || countryFromLocale(req.headers['accept-language']);
+  return detectCheckoutCountry(req, bodyCountry);
 }
 
 function authPayloadFromRequest(req) {
@@ -3400,6 +3399,7 @@ app.get('/api/leaflet-store', (req, res) => {
     thumbnail_url: row.thumbnail || null,
     url: row.share_token ? `/api/shared-pdfs/${row.share_token}` : '',
     share_url: row.share_token ? `/api/shared-pdfs/${row.share_token}` : '',
+    share_token: row.share_token || '',
   }));
   const countries = db.prepare(`
     SELECT country_code, country_name, COUNT(*) AS count

@@ -830,6 +830,7 @@ export interface LeafletStoreFlipbook {
   thumbnail_url: string | null;
   url: string;
   share_url: string;
+  share_token: string;
 }
 
 export interface LeafletStoreCountry {
@@ -838,8 +839,24 @@ export interface LeafletStoreCountry {
   count: number;
 }
 
-export function getRegionCountry(): Promise<{ country_code: string }> {
-  return request('/region-country');
+function countryFromCloudflareTrace(text: string) {
+  const match = text.match(/^loc=([A-Za-z]{2})$/m);
+  return match?.[1]?.toUpperCase() || '';
+}
+
+export async function getRegionCountry(): Promise<{ country_code: string }> {
+  const data = await request<{ country_code: string }>('/region-country');
+  if (data.country_code) return data;
+
+  try {
+    const trace = await fetch('/cdn-cgi/trace', { cache: 'no-store' });
+    if (trace.ok) {
+      const countryCode = countryFromCloudflareTrace(await trace.text());
+      if (countryCode) return { country_code: countryCode };
+    }
+  } catch {}
+
+  return data;
 }
 
 export function getLeafletStore(countryCode = ''): Promise<{ flipbooks: LeafletStoreFlipbook[]; countries: LeafletStoreCountry[] }> {
