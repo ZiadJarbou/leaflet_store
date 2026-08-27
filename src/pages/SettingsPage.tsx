@@ -5,6 +5,16 @@ import Footer from '../components/Footer';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { updateProfile, changePassword, deleteAccount, createPortalSession, getSubscription, type SubscriptionInfo } from '../services/api';
+import { useCmsContent, cmsJson } from '../hooks/useCmsContent';
+import {
+  DEFAULT_FEATURES,
+  DEFAULT_PLANS,
+  findPricingPlan,
+  planDisplayName,
+  planFeatureList,
+  type PlanFeature,
+  type PricingPlan,
+} from '../data/pricingPlans';
 import './SettingsPage.css';
 type Tab = 'profile' | 'security' | 'subscription';
 function formatSubscriptionDate(value: string | null) {
@@ -47,6 +57,7 @@ export default function SettingsPage() {
     /* subscription */
     const [sub, setSub] = useState<SubscriptionInfo | null>(null);
     const [portalL, setPortalL] = useState(false);
+    const pricingContent = useCmsContent('pricing');
     /* toast */
     const [toast, setToast] = useState<{
         msg: string;
@@ -148,7 +159,15 @@ export default function SettingsPage() {
         return null;
     const initial = user.name.charAt(0).toUpperCase();
     const PLAN_COLOR: Record<string, string> = { free: '#64748b', starter: '#38bdf8', pro: '#49f2b6', business: '#7c5cff', agency: '#f59e0b', admin: '#f59e0b' };
-    const planColor = PLAN_COLOR[sub?.subscription_plan ?? 'free'];
+    const plans = cmsJson<PricingPlan>(pricingContent, 'plans', 'items', DEFAULT_PLANS);
+    const features = cmsJson<PlanFeature>(pricingContent, 'features', 'items', DEFAULT_FEATURES);
+    const activePlanId = sub?.subscription_plan ?? 'free';
+    const activePlan = findPricingPlan(plans, activePlanId);
+    const activePlanName = activePlan?.name ?? planDisplayName(activePlanId);
+    const activePlanFeatures = activePlanId === 'admin'
+        ? ['Unlimited leaflet creation', 'Unlimited product imports', 'All platform capabilities', 'Administration access']
+        : planFeatureList(activePlan, activePlanId, features);
+    const planColor = PLAN_COLOR[activePlanId] ?? '#64748b';
     const hasPaidSubscription = !!sub && sub.subscription_plan !== 'free' && sub.subscription_plan !== 'admin';
     return (<>
       <SEOHelmet pageKey="settings"/>
@@ -268,8 +287,9 @@ export default function SettingsPage() {
                     <div className={cx("st-sub-plan-icon", cssClass({ background: `${planColor}18`, color: planColor }))}>star</div>
                     <div>
                       <div className={cx("st-sub-plan-name", cssClass({ color: planColor }))}>
-                        {sub.subscription_plan.charAt(0).toUpperCase() + sub.subscription_plan.slice(1)} Plan
+                        {activePlanName} Plan
                       </div>
+                      {activePlan?.desc && <p className="st-sub-plan-desc">{activePlan.desc}</p>}
                       {sub.subscription_plan !== 'free' && (<div className="st-sub-plan-detail">
                           {sub.subscription_period === 'annual' ? 'Billed annually' : 'Billed monthly'}
                           <span className="material-symbol st-sub-detail-separator" aria-hidden="true">fiber_manual_record</span>
@@ -290,21 +310,10 @@ export default function SettingsPage() {
                   </div>)}
 
                   <div className="st-sub-features">
-                    {[
-                    { label: 'Leaflets', free: '3', pro: '50', biz: 'Unlimited' },
-                    { label: 'Products/leaflet', free: '30', pro: '500', biz: 'Unlimited' },
-                    { label: 'Flipbook export', free: 'close', pro: 'check', biz: 'check' },
-                    { label: 'Cover & back page', free: 'close', pro: 'check', biz: 'check' },
-                    { label: 'Remove watermark', free: 'close', pro: 'check', biz: 'check' },
-                ].map(row => (<div key={row.label} className="st-sub-feat-row">
-                        <span className="st-sub-feat-label">{row.label}</span>
+                    {activePlanFeatures.map(feature => (<div key={feature} className="st-sub-feat-row">
+                        <span className="st-sub-feat-label">{feature}</span>
                         <span className="st-sub-feat-val">
-                          {(() => {
-                            const val = sub.subscription_plan === 'pro' ? row.pro
-                              : sub.subscription_plan === 'business' ? row.biz
-                                : row.free;
-                            return val === 'check' || val === 'close' ? <span className="material-symbol">{val}</span> : val;
-                          })()}
+                          <span className="material-symbol" aria-label="Included">check</span>
                         </span>
                       </div>))}
                   </div>

@@ -136,6 +136,7 @@
   display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0;
 }
 .st-sub-plan-name { font-size: 1.2rem; font-weight: 800; letter-spacing: -.02em; }
+.st-sub-plan-desc { max-width: 620px; margin: 5px 0 0; color: var(--muted); font-size: .86rem; line-height: 1.5; }
 .st-sub-plan-detail { font-size: .8rem; color: var(--muted2); margin-top: 3px; }
 .st-sub-detail-separator { display: inline-block; margin: 0 5px; font-size: 7px; vertical-align: middle; }
 
