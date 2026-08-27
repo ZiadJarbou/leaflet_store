@@ -7,7 +7,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import HTMLFlipBook from 'react-pageflip';
 import { Link, useParams } from 'react-router-dom';
-import { getLeaflet, getAdminLeaflet, updateProduct, uploadImage, deleteProduct, getLeafletLayout, getAdminLeafletLayout, saveLeafletLayout, resetLeafletLayout, saveLeafletThumbnail, createCheckoutSession, searchProductImages, getIconLibrary, getLayoutTemplates, deleteLayoutTemplate, startA4CoverImageJob, getA4CoverImageJob, getCoverLayoutTemplates, createCoverLayoutTemplate, createAdminCoverLayoutTemplate, updateAdminCoverLayoutTemplate, deleteCoverLayoutTemplate, deleteAdminCoverLayoutTemplate, getPublicSettings, deleteAdminDealTag, exportFlipbookToStore } from '../services/api';
+import { getLeaflet, getAdminLeaflet, updateProduct, uploadImage, deleteProduct, getLeafletLayout, getAdminLeafletLayout, saveLeafletLayout, resetLeafletLayout, saveLeafletThumbnail, createCheckoutSession, searchProductImages, getIconLibrary, getLayoutTemplates, deleteLayoutTemplate, startA4CoverImageJob, getA4CoverImageJob, getCoverLayoutTemplates, createCoverLayoutTemplate, createAdminCoverLayoutTemplate, updateAdminCoverLayoutTemplate, deleteCoverLayoutTemplate, deleteAdminCoverLayoutTemplate, getPublicSettings, deleteAdminDealTag, exportFlipbookToStore, getRegionCountry } from '../services/api';
 import { getStoredToken } from '../services/authService';
 import { countryToFlag, countryToIso } from '../utils/countryToFlag';
 import type { CardLayout, CardElementPos, TextElementStyle, ProductImageSuggestion, LayoutTemplate, CoverLayoutTemplate } from '../services/api';
@@ -2899,6 +2899,20 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const [flipbookCountry, setFlipbookCountry] = useState(() => detectUserCountryCode());
     const [flipbookExporting, setFlipbookExporting] = useState(false);
     const [flipbookExportNotice, setFlipbookExportNotice] = useState<string | null>(null);
+    useEffect(() => {
+        let alive = true;
+        getRegionCountry()
+            .then(data => {
+                const code = data.country_code;
+                if (alive && code && countryNameForCode(code)) {
+                    setFlipbookCountry(code);
+                }
+            })
+            .catch(() => { });
+        return () => {
+            alive = false;
+        };
+    }, []);
     const [editorTourOpen, setEditorTourOpen] = useState(false);
     const [editorTourStep, setEditorTourStep] = useState(0);
     const [editorTourSkipped, setEditorTourSkipped] = useState(false);

@@ -285,6 +285,35 @@ function detectCheckoutCountry(req, bodyCountry) {
     || normalizeCountryCode(bodyCountry);
 }
 
+function detectRequestCountry(req, bodyCountry) {
+  return detectCheckoutCountry(req, bodyCountry)
+    || countryFromLocale(req.headers['accept-language']);
+}
+
+function authPayloadFromRequest(req) {
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : (req.query.token ? String(req.query.token) : null);
+  if (!token) return null;
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    if (payload.sid) {
+      const session = db.prepare(`
+        SELECT id
+        FROM user_sessions
+        WHERE user_id = ?
+          AND session_id = ?
+          AND revoked_at IS NULL
+          AND datetime(expires_at) > datetime('now')
+      `).get(payload.id, payload.sid);
+      if (!session) return null;
+      db.prepare("UPDATE user_sessions SET last_seen_at = datetime('now') WHERE id = ?").run(session.id);
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 async function getUsdExchangeRates() {
   const sixHours = 6 * 60 * 60 * 1000;
   if (usdRateCache.rates && Date.now() - usdRateCache.fetchedAt < sixHours) return usdRateCache.rates;
@@ -3293,6 +3322,12 @@ app.get('/api/shared-pdfs/:token/meta', (req, res) => {
   });
 });
 
+/* ── GET /api/region-country ── public country detected from request IP headers ── */
+app.get('/api/region-country', (req, res) => {
+  const countryCode = detectRequestCountry(req, req.query.country);
+  res.json({ country_code: countryCode });
+});
+
 /* ── GET /api/leaflets/:id/exported-pdfs ── */
 app.get('/api/leaflets/:id/exported-pdfs', authMiddleware, (req, res) => {
   const leaflet = db.prepare('SELECT id FROM leaflets WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
@@ -3311,15 +3346,21 @@ app.get('/api/leaflets/:id/exported-pdfs', authMiddleware, (req, res) => {
 });
 
 /* ── GET /api/leaflets/:id/exported-pdfs/:filename ── */
-app.get('/api/leaflets/:id/exported-pdfs/:filename', authMiddleware, (req, res) => {
+app.get('/api/leaflets/:id/exported-pdfs/:filename', (req, res) => {
   const row = db.prepare(`
-    SELECT e.filename, e.original_name
+    SELECT e.user_id, e.filename, e.original_name, e.export_type, e.share_token
     FROM leaflet_pdf_exports e
     JOIN leaflets l ON l.id = e.leaflet_id
-    WHERE e.leaflet_id = ? AND e.user_id = ? AND l.user_id = ? AND e.filename = ?
-  `).get(req.params.id, req.user.id, req.user.id, req.params.filename);
+    WHERE e.leaflet_id = ? AND e.filename = ?
+  `).get(req.params.id, req.params.filename);
   if (!row) { res.status(404).json({ error: 'Saved PDF not found.' }); return; }
-  const fullPath = path.join(PDF_EXPORTS_DIR, String(req.user.id), row.filename);
+  const user = authPayloadFromRequest(req);
+  const isPublicFlipbook = row.export_type === 'flipbook' && row.share_token;
+  if (!isPublicFlipbook && (!user || Number(user.id) !== Number(row.user_id))) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  const fullPath = path.join(PDF_EXPORTS_DIR, String(row.user_id), row.filename);
   if (!fs.existsSync(fullPath)) { res.status(404).json({ error: 'Saved PDF file is missing.' }); return; }
   res.setHeader('Content-Type', 'application/pdf');
   const disposition = req.query.inline === '1' ? 'inline' : 'attachment';
@@ -4000,15 +4041,21 @@ app.get('/api/leaflets/:id/exported-pdfs', authMiddleware, (req, res) => {
 });
 
 /* -- GET /api/leaflets/:id/exported-pdfs/:filename -- */
-app.get('/api/leaflets/:id/exported-pdfs/:filename', authMiddleware, (req, res) => {
+app.get('/api/leaflets/:id/exported-pdfs/:filename', (req, res) => {
   const row = db.prepare(`
-    SELECT e.filename, e.original_name
+    SELECT e.user_id, e.filename, e.original_name, e.export_type, e.share_token
     FROM leaflet_pdf_exports e
     JOIN leaflets l ON l.id = e.leaflet_id
-    WHERE e.leaflet_id = ? AND e.user_id = ? AND l.user_id = ? AND e.filename = ?
-  `).get(req.params.id, req.user.id, req.user.id, req.params.filename);
+    WHERE e.leaflet_id = ? AND e.filename = ?
+  `).get(req.params.id, req.params.filename);
   if (!row) { res.status(404).json({ error: 'Saved PDF not found.' }); return; }
-  const fullPath = path.join(PDF_EXPORTS_DIR, String(req.user.id), row.filename);
+  const user = authPayloadFromRequest(req);
+  const isPublicFlipbook = row.export_type === 'flipbook' && row.share_token;
+  if (!isPublicFlipbook && (!user || Number(user.id) !== Number(row.user_id))) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  const fullPath = path.join(PDF_EXPORTS_DIR, String(row.user_id), row.filename);
   if (!fs.existsSync(fullPath)) { res.status(404).json({ error: 'Saved PDF file is missing.' }); return; }
   res.setHeader('Content-Type', 'application/pdf');
   const disposition = req.query.inline === '1' ? 'inline' : 'attachment';

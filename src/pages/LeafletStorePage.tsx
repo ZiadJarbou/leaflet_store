@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import SEOHelmet from '../components/SEOHelmet';
 import Footer from '../components/Footer';
-import { getLeafletStore, type LeafletStoreCountry, type LeafletStoreFlipbook } from '../services/api';
-import { COUNTRY_OPTIONS, detectUserCountryCode } from '../data/countries';
+import { getLeafletStore, getRegionCountry, type LeafletStoreCountry, type LeafletStoreFlipbook } from '../services/api';
+import { COUNTRY_OPTIONS, countryNameForCode, detectUserCountryCode } from '../data/countries';
 import './LeafletStorePage.css';
 
 function formatDate(value: string) {
@@ -24,6 +24,21 @@ export default function LeafletStorePage() {
   const [countries, setCountries] = useState<LeafletStoreCountry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    getRegionCountry()
+      .then(data => {
+        const code = data.country_code;
+        if (alive && code && countryNameForCode(code)) {
+          setSelectedCountry(code);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     setLoading(true);

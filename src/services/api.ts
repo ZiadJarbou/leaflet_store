@@ -838,6 +838,10 @@ export interface LeafletStoreCountry {
   count: number;
 }
 
+export function getRegionCountry(): Promise<{ country_code: string }> {
+  return request('/region-country');
+}
+
 export function getLeafletStore(countryCode = ''): Promise<{ flipbooks: LeafletStoreFlipbook[]; countries: LeafletStoreCountry[] }> {
   const params = new URLSearchParams();
   if (countryCode) params.set('country', countryCode);
