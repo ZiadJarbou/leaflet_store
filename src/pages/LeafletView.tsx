@@ -2893,6 +2893,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const [flipbookOpen, setFlipbookOpen] = useState(false);
     const [flipbookLoading, setFlipbookLoading] = useState(false);
     const [flipbookError, setFlipbookError] = useState<string | null>(null);
+    const [flipbookPdfBlob, setFlipbookPdfBlob] = useState<Blob | null>(null);
     const [flipbookPages, setFlipbookPages] = useState<FlipbookPageImage[]>([]);
     const [editorTourOpen, setEditorTourOpen] = useState(false);
     const [editorTourStep, setEditorTourStep] = useState(0);
@@ -8839,9 +8840,11 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         setFlipbookOpen(true);
         setFlipbookLoading(true);
         setFlipbookError(null);
+        setFlipbookPdfBlob(null);
         setFlipbookPages([]);
         try {
             const blob = await createPdfBlob();
+            setFlipbookPdfBlob(blob);
             const renderedPages = await renderPdfBlobToFlipbookPages(blob);
             setFlipbookPages(renderedPages);
         }
@@ -8855,7 +8858,26 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     function closeFlipbook() {
         setFlipbookOpen(false);
         setFlipbookError(null);
+        setFlipbookPdfBlob(null);
         setFlipbookPages([]);
+    }
+    async function exportFlipbookPdf() {
+        try {
+            const blob = flipbookPdfBlob ?? await createPdfBlob();
+            if (!flipbookPdfBlob)
+                setFlipbookPdfBlob(blob);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${pdfFileBaseName()}-flipbook.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        catch (e) {
+            setFlipbookError(e instanceof Error ? e.message : 'Unable to export flipbook.');
+        }
     }
     function addLinkAnnotations(pdf: jsPDF, exportEl: HTMLElement, pageW: number, pageH: number) {
         const pageEl = exportEl.querySelector<HTMLElement>('.lv-a4-page') ?? exportEl;
@@ -10166,10 +10188,15 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         <div className="lv-flipbook-modal" role="dialog" aria-modal="true" aria-labelledby="lv-flipbook-title">
           <div className="lv-flipbook-head">
             <div>
-              <p className="lv-flipbook-kicker">PDF.js + PageFlip</p>
               <h2 id="lv-flipbook-title">{leaflet?.title || 'Leaflet'} Flipbook</h2>
             </div>
-            <button type="button" className="lv-flipbook-close material-symbol" onClick={closeFlipbook} disabled={flipbookLoading} aria-label="Close flipbook">close</button>
+            <div className="lv-flipbook-head-actions">
+              <button type="button" className="lv-flipbook-export" onClick={exportFlipbookPdf} disabled={flipbookLoading || !!flipbookError || !flipbookPages.length}>
+                <span className="material-symbol" aria-hidden="true">download</span>
+                Export
+              </button>
+              <button type="button" className="lv-flipbook-close material-symbol" onClick={closeFlipbook} disabled={flipbookLoading} aria-label="Close flipbook">close</button>
+            </div>
           </div>
 
           {flipbookLoading ? (<div className="lv-flipbook-state" aria-live="polite">

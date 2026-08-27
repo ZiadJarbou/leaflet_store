@@ -3151,19 +3151,44 @@ body.dragging-icon .lv-card-drop-layer {
   justify-content: space-between;
   gap: 16px;
 }
-.lv-flipbook-kicker {
-  margin: 0 0 5px;
-  color: #a78bfa;
-  font-size: .72rem;
-  font-weight: 800;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
 .lv-flipbook-head h2 {
   margin: 0;
   color: #f8fafc;
   font-size: 1.08rem;
   line-height: 1.25;
+}
+.lv-flipbook-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.lv-flipbook-export {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid rgba(73, 242, 182, .36);
+  border-radius: 8px;
+  background: rgba(73, 242, 182, .12);
+  color: #a7f3d0;
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.lv-flipbook-export .material-symbol {
+  font-size: 17px;
+}
+.lv-flipbook-export:hover:not(:disabled) {
+  border-color: rgba(73, 242, 182, .58);
+  background: rgba(73, 242, 182, .2);
+}
+.lv-flipbook-export:disabled {
+  opacity: .5;
+  cursor: not-allowed;
 }
 .lv-flipbook-close {
   width: 34px;
@@ -3182,8 +3207,16 @@ body.dragging-icon .lv-card-drop-layer {
   min-height: 420px;
   display: grid;
   place-items: center;
-  overflow: auto;
+  overflow: hidden;
   padding: 10px 0 18px;
+}
+.lv-flipbook-modal,
+.lv-flipbook-stage {
+  scrollbar-width: none;
+}
+.lv-flipbook-modal::-webkit-scrollbar,
+.lv-flipbook-stage::-webkit-scrollbar {
+  display: none;
 }
 .lv-flipbook {
   margin: 0 auto;
