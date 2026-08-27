@@ -3,6 +3,9 @@ import React, { useEffect, useRef, useState, Component } from 'react';
 import ReactDOM from 'react-dom';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
+import HTMLFlipBook from 'react-pageflip';
 import { Link, useParams } from 'react-router-dom';
 import { getLeaflet, getAdminLeaflet, updateProduct, uploadImage, deleteProduct, getLeafletLayout, getAdminLeafletLayout, saveLeafletLayout, resetLeafletLayout, saveLeafletThumbnail, createCheckoutSession, searchProductImages, getIconLibrary, getLayoutTemplates, deleteLayoutTemplate, startA4CoverImageJob, getA4CoverImageJob, getCoverLayoutTemplates, createCoverLayoutTemplate, createAdminCoverLayoutTemplate, updateAdminCoverLayoutTemplate, deleteCoverLayoutTemplate, deleteAdminCoverLayoutTemplate, getPublicSettings, deleteAdminDealTag } from '../services/api';
 import { getStoredToken } from '../services/authService';
@@ -22,6 +25,23 @@ import CountryPicker from '../components/CountryPicker';
 import OriginInput from '../components/OriginInput';
 import './LeafletView.css';
 import './NotFoundPage.css';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
+
+interface FlipbookPageImage {
+    page: number;
+    src: string;
+    width: number;
+    height: number;
+}
+
+const FlipbookPage = React.forwardRef<HTMLDivElement, FlipbookPageImage>(({ page, src }, ref) => (
+    <div className="lv-flipbook-page" ref={ref}>
+      <img src={src} alt={`Flipbook page ${page}`}/>
+      <span className="lv-flipbook-page-num">{page}</span>
+    </div>
+));
+FlipbookPage.displayName = 'FlipbookPage';
 const LEAFLET_EDITOR_TOUR_SEEN_KEY = 'leafletai_leaflet_editor_tour_seen';
 const LEAFLET_EDITOR_TOUR_SKIPPED_KEY = 'leafletai_leaflet_editor_tour_skipped';
 const NANO_A4_VISIBILITY_STORAGE_KEY = 'leafletai_nano_a4_enabled';
@@ -2870,6 +2890,10 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const [, setSharePdfNotice] = useState<string | null>(null);
     const [sharePdfMenuOpen, setSharePdfMenuOpen] = useState(false);
     const [sharePdfFallbackOpen, setSharePdfFallbackOpen] = useState(false);
+    const [flipbookOpen, setFlipbookOpen] = useState(false);
+    const [flipbookLoading, setFlipbookLoading] = useState(false);
+    const [flipbookError, setFlipbookError] = useState<string | null>(null);
+    const [flipbookPages, setFlipbookPages] = useState<FlipbookPageImage[]>([]);
     const [editorTourOpen, setEditorTourOpen] = useState(false);
     const [editorTourStep, setEditorTourStep] = useState(0);
     const [editorTourSkipped, setEditorTourSkipped] = useState(false);
@@ -8781,6 +8805,58 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         }
         return pdf.output('blob');
     }
+    async function renderPdfBlobToFlipbookPages(blob: Blob): Promise<FlipbookPageImage[]> {
+        const bytes = await blob.arrayBuffer();
+        const loadingTask = pdfjsLib.getDocument({ data: bytes });
+        const pdf = await loadingTask.promise;
+        const renderedPages: FlipbookPageImage[] = [];
+        try {
+            for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+                const page = await pdf.getPage(pageNumber);
+                const viewport = page.getViewport({ scale: 1.65 });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                if (!context)
+                    throw new Error('Your browser could not prepare the flipbook canvas.');
+                canvas.width = Math.ceil(viewport.width);
+                canvas.height = Math.ceil(viewport.height);
+                await page.render({ canvas, canvasContext: context, viewport }).promise;
+                renderedPages.push({
+                    page: pageNumber,
+                    src: canvas.toDataURL('image/jpeg', 0.92),
+                    width: canvas.width,
+                    height: canvas.height,
+                });
+                page.cleanup();
+            }
+        }
+        finally {
+            await loadingTask.destroy();
+        }
+        return renderedPages;
+    }
+    async function openFlipbook() {
+        setFlipbookOpen(true);
+        setFlipbookLoading(true);
+        setFlipbookError(null);
+        setFlipbookPages([]);
+        try {
+            const blob = await createPdfBlob();
+            const renderedPages = await renderPdfBlobToFlipbookPages(blob);
+            setFlipbookPages(renderedPages);
+        }
+        catch (e) {
+            setFlipbookError(e instanceof Error ? e.message : 'Unable to create flipbook.');
+        }
+        finally {
+            setFlipbookLoading(false);
+        }
+    }
+    function closeFlipbook() {
+        setFlipbookOpen(false);
+        setFlipbookError(null);
+        setFlipbookPages([]);
+    }
     function addLinkAnnotations(pdf: jsPDF, exportEl: HTMLElement, pageW: number, pageH: number) {
         const pageEl = exportEl.querySelector<HTMLElement>('.lv-a4-page') ?? exportEl;
         const pageRect = pageEl.getBoundingClientRect();
@@ -9981,6 +10057,10 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
               {'\u{1F4DA}'} Convert to Book
               {exportQuota?.plan === 'free' && canExportBook && (<span className="lv-free-badge">1 free</span>)}
             </button>
+            <button className="lv-flipbook-btn" title="Create an interactive flipbook preview from this leaflet PDF" disabled={savingPdf || flipbookLoading} onClick={openFlipbook}>
+              <span className="material-symbol" aria-hidden="true">auto_stories</span>
+              {flipbookLoading ? 'Creating...' : 'Flipbook'}
+            </button>
           </div>
         </div>
 
@@ -10078,6 +10158,65 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             }}/>)}
     {templateOpen && id && (<CardTemplateModal leafletId={id} onApply={applyCardTemplateToLeafletAndCovers} onClose={() => setTemplateOpen(false)}/>)}
     {bookBuilderOpen && (<BookBuilder leafletTitle={leaflet?.title ?? 'Leaflet'} pages={pages} coverPage={coverPage} backPage={backPage} cardLayout={cardLayout} a4W={A4_W} a4H={A4_H} gridW={gridW} gridH={gridH} cardWidth={cardW} cardHeight={cardH} colsPerPage={colsPerPage} rowsPerPage={rowsPerPage} colGap={colGap} rowGap={rowGap} pageBg={pageBg} isLandscape={isLandscape} headerStyle={headerStyle} footerStyle={footerStyle} headerSettings={{ show: headerSettings.show, text: headerSettings.text, showText: headerSettings.showText, textAlign: headerSettings.textAlign, blockAlign: headerSettings.blockAlign, widthMode: String(headerBarState.widthMode), widthPct: headerWidthPct, height: headerSettings.height, logoUrl: headerSettings.logoUrl, logoHeight: headerSettings.logoHeight, logoWidth: headerSettings.logoWidth, logoX: headerSettings.logoX, logoY: headerSettings.logoY, logoGap: headerSettings.logoGap, textWidth: headerSettings.textWidth, textHeight: headerSettings.textHeight, textX: headerSettings.textX, textY: headerSettings.textY }} footerSettings={{ show: footerSettings.show, text: footerSettings.text, showText: footerSettings.showText, textAlign: footerSettings.textAlign, widthMode: footerSettings.widthMode, height: footerSettings.height }} renderProductCard={(p, opts) => (<ProductCard p={p} isTwoLang={isTwoLang} leafletId={id ?? ''} onUpdate={() => { }} onDelete={() => { }} cardLayout={cardLayout} cardWidth={opts.cardWidth} cardHeight={opts.cardHeight} overlays={overlays[p.id] ?? []}/>)} onClose={() => setBookBuilderOpen(false)}/>)}
+    {flipbookOpen && ReactDOM.createPortal(
+      <div className="lv-flipbook-backdrop" onMouseDown={e => {
+                if (e.target === e.currentTarget && !flipbookLoading)
+                    closeFlipbook();
+            }}>
+        <div className="lv-flipbook-modal" role="dialog" aria-modal="true" aria-labelledby="lv-flipbook-title">
+          <div className="lv-flipbook-head">
+            <div>
+              <p className="lv-flipbook-kicker">PDF.js + PageFlip</p>
+              <h2 id="lv-flipbook-title">{leaflet?.title || 'Leaflet'} Flipbook</h2>
+            </div>
+            <button type="button" className="lv-flipbook-close material-symbol" onClick={closeFlipbook} disabled={flipbookLoading} aria-label="Close flipbook">close</button>
+          </div>
+
+          {flipbookLoading ? (<div className="lv-flipbook-state" aria-live="polite">
+              <span className="lv-share-pdf-spinner" aria-hidden="true"/>
+              <span>Creating flipbook pages...</span>
+            </div>) : flipbookError ? (<div className="lv-flipbook-state lv-flipbook-state--error" aria-live="polite">
+              <span>{flipbookError}</span>
+              <button type="button" className="btn ghost" onClick={openFlipbook}>Try again</button>
+            </div>) : flipbookPages.length ? (() => {
+                const firstPage = flipbookPages[0];
+                const portrait = firstPage.height >= firstPage.width;
+                const bookWidth = portrait ? 420 : 560;
+                const bookHeight = portrait ? 594 : 396;
+                return (<div className="lv-flipbook-stage">
+                  <HTMLFlipBook
+                    className="lv-flipbook"
+                    style={{}}
+                    startPage={0}
+                    size="stretch"
+                    width={bookWidth}
+                    height={bookHeight}
+                    minWidth={240}
+                    maxWidth={bookWidth}
+                    minHeight={320}
+                    maxHeight={bookHeight}
+                    drawShadow={true}
+                    flippingTime={650}
+                    usePortrait={true}
+                    startZIndex={20}
+                    autoSize={true}
+                    maxShadowOpacity={0.28}
+                    showCover={true}
+                    mobileScrollSupport={true}
+                    clickEventForward={true}
+                    useMouseEvents={true}
+                    swipeDistance={25}
+                    showPageCorners={true}
+                    disableFlipByClick={false}
+                  >
+                    {flipbookPages.map(page => <FlipbookPage key={page.page} {...page}/>)}
+                  </HTMLFlipBook>
+                </div>);
+            })() : null}
+        </div>
+      </div>,
+      document.body
+    )}
     {coverBuilderOpen && renderCoverBuilderModal()}
     {coverBuilderEditingProduct && (<EditModal product={coverBuilderEditingProduct} isTwoLang={isTwoLang} leafletId={id ?? ''} onClose={() => setCoverBuilderEditingProduct(null)} onSave={updated => {
                 handleProductUpdate(updated);

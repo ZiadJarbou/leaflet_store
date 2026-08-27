@@ -3089,6 +3089,152 @@ body.dragging-icon .lv-card-drop-layer {
   cursor: not-allowed;
   transform: none;
 }
+
+.lv-flipbook-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 15px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(167, 139, 250, .42);
+  background: rgba(124, 92, 255, .14);
+  color: #ddd6fe;
+  font-size: .88rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity .15s, transform .1s, background .15s, border-color .15s;
+  flex-shrink: 0;
+}
+.lv-flipbook-btn .material-symbol {
+  font-size: 18px;
+}
+.lv-flipbook-btn:hover:not(:disabled) {
+  background: rgba(124, 92, 255, .24);
+  border-color: rgba(196, 181, 253, .66);
+  transform: translateY(-1px);
+}
+.lv-flipbook-btn:disabled {
+  opacity: .55;
+  cursor: wait;
+  transform: none;
+}
+
+.lv-flipbook-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 13000;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(2, 6, 23, .78);
+  backdrop-filter: blur(8px);
+}
+.lv-flipbook-modal {
+  width: min(1120px, 100%);
+  max-height: min(92vh, 900px);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid rgba(148, 163, 184, .24);
+  border-radius: 8px;
+  background: #0f172a;
+  color: #e2e8f0;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .56);
+  overflow: hidden;
+}
+.lv-flipbook-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.lv-flipbook-kicker {
+  margin: 0 0 5px;
+  color: #a78bfa;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.lv-flipbook-head h2 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 1.08rem;
+  line-height: 1.25;
+}
+.lv-flipbook-close {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(148, 163, 184, .24);
+  border-radius: 50%;
+  background: rgba(15, 23, 42, .72);
+  color: #cbd5e1;
+  cursor: pointer;
+}
+.lv-flipbook-close:hover:not(:disabled) {
+  border-color: rgba(196, 181, 253, .58);
+  color: #ede9fe;
+}
+.lv-flipbook-stage {
+  min-height: 420px;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: 10px 0 18px;
+}
+.lv-flipbook {
+  margin: 0 auto;
+}
+.lv-flipbook-page {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .08);
+}
+.lv-flipbook-page img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+.lv-flipbook-page-num {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  min-width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, .72);
+  color: #ffffff;
+  font-size: .68rem;
+  font-weight: 800;
+}
+.lv-flipbook-state {
+  min-height: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #cbd5e1;
+  font-size: .88rem;
+}
+.lv-flipbook-state--error {
+  flex-direction: column;
+  color: #fca5a5;
+  text-align: center;
+}
 .lv-save-pdf-status {
   display: inline-flex;
   align-items: center;
@@ -8606,7 +8752,8 @@ button:disabled .lv-free-badge { display: none; }
   .lv-header-right button,
   .lv-btn-duplicate,
   .lv-btn-set-default,
-  .lv-btn-add-product {
+  .lv-btn-add-product,
+  .lv-flipbook-btn {
     width: 100%;
     justify-content: center;
     margin-left: 0;
@@ -8735,6 +8882,18 @@ button:disabled .lv-free-badge { display: none; }
   }
   .lv-dup-actions button {
     width: 100%;
+  }
+  .lv-flipbook-backdrop {
+    padding: 10px;
+    align-items: flex-end;
+  }
+  .lv-flipbook-modal {
+    max-height: 94vh;
+    padding: 16px;
+  }
+  .lv-flipbook-stage,
+  .lv-flipbook-state {
+    min-height: 360px;
   }
 }
 
