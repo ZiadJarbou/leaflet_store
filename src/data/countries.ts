@@ -74,23 +74,8 @@ const TIME_ZONE_COUNTRY: Record<string, string> = {
   'Africa/Johannesburg': 'ZA',
 };
 
-function countryFromLocale(locale: string) {
-  const match = String(locale || '').match(/[-_]([A-Za-z]{2})\b/);
-  const code = match?.[1]?.toUpperCase() || '';
-  return countryNameForCode(code) ? code : '';
-}
-
 export function detectUserCountryCode() {
   if (typeof window === 'undefined') return '';
-
-  const languages = [
-    navigator.language,
-    ...(Array.isArray(navigator.languages) ? navigator.languages : []),
-  ];
-  for (const language of languages) {
-    const code = countryFromLocale(language);
-    if (code) return code;
-  }
 
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const timeZoneCountry = TIME_ZONE_COUNTRY[timeZone];

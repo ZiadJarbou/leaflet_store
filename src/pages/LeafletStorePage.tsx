@@ -19,7 +19,7 @@ function formatSize(bytes: number) {
 }
 
 export default function LeafletStorePage() {
-  const [selectedCountry, setSelectedCountry] = useState(() => detectUserCountryCode());
+  const [selectedCountry, setSelectedCountry] = useState('');
   const [flipbooks, setFlipbooks] = useState<LeafletStoreFlipbook[]>([]);
   const [countries, setCountries] = useState<LeafletStoreCountry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,8 +32,14 @@ export default function LeafletStorePage() {
     getRegionCountry()
       .then(data => {
         const code = data.country_code;
-        if (alive && code && countryNameForCode(code)) {
+        if (!alive) return;
+        if (code && countryNameForCode(code)) {
           setSelectedCountry(code);
+          return;
+        }
+        const fallback = detectUserCountryCode();
+        if (fallback) {
+          setSelectedCountry(fallback);
         }
       })
       .catch(() => {});

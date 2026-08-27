@@ -260,6 +260,7 @@ const STRIPE_ZERO_DECIMAL_CURRENCIES = new Set([
   'bif','clp','djf','gnf','jpy','kmf','krw','mga','pyg','rwf','ugx','vnd','vuv','xaf','xof','xpf',
 ]);
 let usdRateCache = { fetchedAt: 0, rates: null };
+const regionCountryCache = new Map();
 
 function normalizeCountryCode(value) {
   const code = String(value || '').trim().slice(0, 2).toUpperCase();
@@ -285,8 +286,69 @@ function detectCheckoutCountry(req, bodyCountry) {
     || normalizeCountryCode(bodyCountry);
 }
 
-function detectRequestCountry(req, bodyCountry) {
-  return detectCheckoutCountry(req, bodyCountry);
+function normalizeClientIp(value) {
+  let ip = String(value || '').trim();
+  if (!ip) return '';
+  if (ip.startsWith('::ffff:')) ip = ip.slice(7);
+  ip = ip.replace(/^\[/, '').replace(/\]$/, '');
+  if (ip.includes(':') && ip.includes('.')) ip = ip.split(':').pop();
+  return net.isIP(ip) ? ip : '';
+}
+
+function isPrivateIp(ip) {
+  if (!ip) return true;
+  if (ip === '::1') return true;
+  if (ip.includes(':')) {
+    return /^(fc|fd|fe80):/i.test(ip);
+  }
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part))) return true;
+  const [a, b] = parts;
+  return a === 10
+    || a === 127
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168)
+    || (a === 169 && b === 254)
+    || (a === 100 && b >= 64 && b <= 127)
+    || a === 0;
+}
+
+function requestClientIp(req) {
+  const candidates = [
+    req.headers['cf-connecting-ip'],
+    req.headers['true-client-ip'],
+    req.headers['x-real-ip'],
+    req.headers['x-client-ip'],
+    req.headers['x-forwarded-for'],
+    req.ip,
+    req.socket?.remoteAddress,
+  ].flatMap(value => String(value || '').split(','));
+
+  for (const value of candidates) {
+    const ip = normalizeClientIp(value);
+    if (ip && !isPrivateIp(ip)) return ip;
+  }
+  return '';
+}
+
+async function countryFromClientIp(ip) {
+  if (!ip) return '';
+  const cached = regionCountryCache.get(ip);
+  if (cached && Date.now() - cached.fetchedAt < 6 * 60 * 60 * 1000) return cached.countryCode;
+  try {
+    const data = await httpsGet(`https://ipwho.is/${encodeURIComponent(ip)}?fields=success,country_code`);
+    const countryCode = data?.success === false ? '' : normalizeCountryCode(data?.country_code);
+    regionCountryCache.set(ip, { fetchedAt: Date.now(), countryCode });
+    return countryCode;
+  } catch (err) {
+    console.warn('[region-country] lookup failed', err?.message || err);
+    return '';
+  }
+}
+
+async function detectRequestCountry(req, bodyCountry) {
+  return detectCheckoutCountry(req, bodyCountry)
+    || await countryFromClientIp(requestClientIp(req));
 }
 
 function authPayloadFromRequest(req) {
@@ -1162,6 +1224,7 @@ if (!hasMigration('pricing_concurrent_logins_2026_08_24_v1')) {
 }
 
 const app = express();
+app.set('trust proxy', true);
 app.use((req, res, next) => {
   res.setHeader(
     'Content-Security-Policy',
@@ -3344,9 +3407,9 @@ app.get('/api/shared-pdfs/:token/meta', (req, res) => {
   });
 });
 
-/* ── GET /api/region-country ── public country detected from request IP headers ── */
-app.get('/api/region-country', (req, res) => {
-  const countryCode = detectRequestCountry(req, req.query.country);
+/* ── GET /api/region-country ── public country detected from request IP ── */
+app.get('/api/region-country', async (req, res) => {
+  const countryCode = await detectRequestCountry(req, req.query.country);
   res.json({ country_code: countryCode });
 });
 
