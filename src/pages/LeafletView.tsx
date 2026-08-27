@@ -13,7 +13,7 @@ import { countryToFlag, countryToIso } from '../utils/countryToFlag';
 import type { CardLayout, CardElementPos, TextElementStyle, ProductImageSuggestion, LayoutTemplate, CoverLayoutTemplate } from '../services/api';
 import { trackProductClick } from '../services/api';
 import { WORLD_CURRENCIES } from '../data/currencies';
-import { COUNTRY_OPTIONS, countryNameForCode } from '../data/countries';
+import { COUNTRY_OPTIONS, countryNameForCode, detectUserCountryCode } from '../data/countries';
 import { PRESET_ICON_URLS } from '../data/editorIcons';
 import type { LeafletDetail, LeafletProduct } from '../types/leaflet';
 import { hexToRgba, LINK_ICONS, DEFAULT_POSITIONS, loadGoogleFont, FontPickerSection } from '../components/LayoutCustomizer';
@@ -2896,7 +2896,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const [flipbookError, setFlipbookError] = useState<string | null>(null);
     const [flipbookPdfBlob, setFlipbookPdfBlob] = useState<Blob | null>(null);
     const [flipbookPages, setFlipbookPages] = useState<FlipbookPageImage[]>([]);
-    const [flipbookCountry, setFlipbookCountry] = useState('');
+    const [flipbookCountry, setFlipbookCountry] = useState(() => detectUserCountryCode());
     const [flipbookExporting, setFlipbookExporting] = useState(false);
     const [flipbookExportNotice, setFlipbookExportNotice] = useState<string | null>(null);
     const [editorTourOpen, setEditorTourOpen] = useState(false);

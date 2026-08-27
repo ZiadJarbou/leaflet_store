@@ -33,16 +33,13 @@ export default function Navbar() {
             <Link to="/pricing"  className={location.pathname === '/pricing'  ? 'menu-active' : ''}>Pricing</Link>
             <Link to="/faq"      className={location.pathname === '/faq'      ? 'menu-active' : ''}>FAQ</Link>
             <Link to="/help"     className={location.pathname === '/help'     ? 'menu-active' : ''}>Help</Link>
+            <Link to="/leaflet-store" className={location.pathname === '/leaflet-store' ? 'menu-active' : ''}>Leaflet Store</Link>
             {user && (
               <>
                 <Link
                   to="/my-leaflets"
                   className={`nav-my-leaflets${location.pathname === '/my-leaflets' ? ' active' : ''}`}
                 >My Leaflets</Link>
-                <Link
-                  to="/leaflet-store"
-                  className={location.pathname === '/leaflet-store' ? 'menu-active' : ''}
-                >Leaflet Store</Link>
               </>
             )}
           </div>

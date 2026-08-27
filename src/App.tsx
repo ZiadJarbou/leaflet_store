@@ -70,9 +70,7 @@ function AppShell() {
           <Route path="/my-leaflets" element={<ProtectedRoute>
                 <MyLeaflets />
               </ProtectedRoute>}/>
-          <Route path="/leaflet-store" element={<ProtectedRoute>
-                <LeafletStorePage />
-              </ProtectedRoute>}/>
+          <Route path="/leaflet-store" element={<LeafletStorePage />}/>
           <Route path="/dashboard" element={<ProtectedRoute>
                 <DashboardPage />
               </ProtectedRoute>}/>

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import SEOHelmet from '../components/SEOHelmet';
 import Footer from '../components/Footer';
 import { getLeafletStore, type LeafletStoreCountry, type LeafletStoreFlipbook } from '../services/api';
-import { COUNTRY_OPTIONS } from '../data/countries';
+import { COUNTRY_OPTIONS, detectUserCountryCode } from '../data/countries';
 import './LeafletStorePage.css';
 
 function formatDate(value: string) {
@@ -19,7 +19,7 @@ function formatSize(bytes: number) {
 }
 
 export default function LeafletStorePage() {
-  const [selectedCountry, setSelectedCountry] = useState('');
+  const [selectedCountry, setSelectedCountry] = useState(() => detectUserCountryCode());
   const [flipbooks, setFlipbooks] = useState<LeafletStoreFlipbook[]>([]);
   const [countries, setCountries] = useState<LeafletStoreCountry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,13 +43,13 @@ export default function LeafletStorePage() {
 
   return (
     <>
-      <SEOHelmet pageKey="leaflet_store" titleOverride="Leaflet Store - LeafletAI" descriptionOverride="Browse your exported flipbooks by country." />
+      <SEOHelmet pageKey="leaflet_store" titleOverride="Leaflet Store - LeafletAI" descriptionOverride="Browse exported flipbooks by country." />
       <main className="ls-page container">
         <header className="ls-header">
           <div>
             <p className="ls-eyebrow">Leaflet Store</p>
-            <h1>Your exported flipbooks</h1>
-            <p>Browse the flipbooks you exported from leaflet view, grouped by country for different stores in the same market.</p>
+            <h1>Leaflet flipbooks by country</h1>
+            <p>Browse exported flipbooks from different stores in the same market, grouped by country.</p>
           </div>
           <Link className="btn primary" to="/my-leaflets">Create more flipbooks</Link>
         </header>
@@ -76,8 +76,8 @@ export default function LeafletStorePage() {
         ) : !flipbooks.length ? (
           <div className="ls-empty">
             <span className="material-symbol" aria-hidden="true">auto_stories</span>
-            <h2>No flipbooks exported yet</h2>
-            <p>Open a leaflet, click Flipbook, select a country, then export it to Leaflet Store.</p>
+            <h2>No flipbooks for this country yet</h2>
+            <p>Open a leaflet, click Flipbook, confirm the country, then export it to Leaflet Store.</p>
             <Link className="btn primary" to="/my-leaflets">Go to My Leaflets</Link>
           </div>
         ) : (

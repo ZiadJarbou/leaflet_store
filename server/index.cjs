@@ -740,6 +740,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_ai_cover_generations_usage ON ai_cover_generations(user_id, leaflet_id, status);
   CREATE INDEX IF NOT EXISTS idx_leaflets_export_quota ON leaflets(user_id, quota_counted);
   CREATE INDEX IF NOT EXISTS idx_leaflet_pdf_exports_store ON leaflet_pdf_exports(user_id, export_type, country_code, created_at);
+  CREATE INDEX IF NOT EXISTS idx_leaflet_pdf_exports_public_store ON leaflet_pdf_exports(export_type, country_code, created_at);
 `);
 
 const PLATFORM_DEFAULT_TEMPLATE_NAMES = Array.from({ length: 7 }, (_, i) => `Template ${i + 1}`);
@@ -3326,10 +3327,10 @@ app.get('/api/leaflets/:id/exported-pdfs/:filename', authMiddleware, (req, res) 
   res.sendFile(fullPath);
 });
 
-/* ── GET /api/leaflet-store ── user's exported flipbooks grouped by country ── */
-app.get('/api/leaflet-store', authMiddleware, (req, res) => {
+/* ── GET /api/leaflet-store ── public exported flipbooks grouped by country ── */
+app.get('/api/leaflet-store', (req, res) => {
   const country = normalizeCountryCode(req.query.country);
-  const params = [req.user.id];
+  const params = [];
   let whereCountry = '';
   if (country) {
     whereCountry = 'AND e.country_code = ?';
@@ -3341,8 +3342,8 @@ app.get('/api/leaflet-store', authMiddleware, (req, res) => {
            l.title, l.description, l.thumbnail
     FROM leaflet_pdf_exports e
     JOIN leaflets l ON l.id = e.leaflet_id
-    WHERE e.user_id = ?
-      AND e.export_type = 'flipbook'
+    WHERE e.export_type = 'flipbook'
+      AND e.share_token <> ''
       ${whereCountry}
     ORDER BY e.country_name ASC, e.created_at DESC
     LIMIT 200
@@ -3356,18 +3357,18 @@ app.get('/api/leaflet-store', authMiddleware, (req, res) => {
     created_at: row.created_at,
     size: row.size,
     thumbnail_url: row.thumbnail || null,
-    url: `/api/leaflets/${row.leaflet_id}/exported-pdfs/${row.filename}?inline=1`,
+    url: row.share_token ? `/api/shared-pdfs/${row.share_token}` : '',
     share_url: row.share_token ? `/api/shared-pdfs/${row.share_token}` : '',
   }));
   const countries = db.prepare(`
     SELECT country_code, country_name, COUNT(*) AS count
     FROM leaflet_pdf_exports
-    WHERE user_id = ?
-      AND export_type = 'flipbook'
+    WHERE export_type = 'flipbook'
+      AND share_token <> ''
       AND country_code <> ''
     GROUP BY country_code, country_name
     ORDER BY country_name ASC
-  `).all(req.user.id);
+  `).all();
   res.json({ flipbooks: rows, countries });
 });
 
