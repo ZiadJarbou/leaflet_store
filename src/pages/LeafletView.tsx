@@ -12,7 +12,7 @@ import { getStoredToken } from '../services/authService';
 import { countryToFlag, countryToIso } from '../utils/countryToFlag';
 import type { CardLayout, CardElementPos, TextElementStyle, ProductImageSuggestion, LayoutTemplate, CoverLayoutTemplate } from '../services/api';
 import { trackProductClick } from '../services/api';
-import { WORLD_CURRENCIES } from '../data/currencies';
+import { WORLD_CURRENCIES, currencyForCountryCode, defaultCurrencySymbolForCountryCode } from '../data/currencies';
 import { COUNTRY_OPTIONS, countryNameForCode, detectUserCountryCode } from '../data/countries';
 import { PRESET_ICON_URLS } from '../data/editorIcons';
 import type { LeafletDetail, LeafletProduct } from '../types/leaflet';
@@ -2803,6 +2803,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [cardLayout, setCardLayout] = useState<CardLayout | null>(null);
+    const [detectedCountryCode, setDetectedCountryCode] = useState(() => detectUserCountryCode());
     const [coverLayoutLoaded, setCoverLayoutLoaded] = useState(false);
     const [customizerOpen, setCustomizerOpen] = useState(false);
     const [templateOpen, setTemplateOpen] = useState(false);
@@ -2905,6 +2906,7 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             .then(data => {
                 const code = data.country_code;
                 if (alive && code && countryNameForCode(code)) {
+                    setDetectedCountryCode(code);
                     setFlipbookCountry(code);
                 }
             })
@@ -3535,6 +3537,23 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
             .then(d => { setIsDefault(String(d.default_leaflet_id) === String(id)); })
             .catch(() => { });
     }, [id]);
+    useEffect(() => {
+        if (coverBuilderOnly || !id || !coverLayoutLoaded || !cardLayout || cardLayout.currency_code || cardLayout.currency_symbol)
+            return;
+        const currency = currencyForCountryCode(detectedCountryCode);
+        if (!currency)
+            return;
+        const symbol = defaultCurrencySymbolForCountryCode(detectedCountryCode);
+        const next = {
+            ...cardLayout,
+            currency_code: currency.code,
+            currency_symbol: symbol,
+            show_currency_current: cardLayout.show_currency_current ?? true,
+            show_currency_old: cardLayout.show_currency_old ?? true,
+        };
+        setCardLayout(next);
+        saveLeafletLayout(id, next).catch(() => null);
+    }, [coverBuilderOnly, id, coverLayoutLoaded, cardLayout, detectedCountryCode]);
     /* -- Persist cover/back page changes -- */
     useEffect(() => {
         if (!coverBackLoadedRef.current)
