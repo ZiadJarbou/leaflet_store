@@ -15,6 +15,33 @@ LEGACY_ENV="$REPO_DIR/server/.env"
 NODE_VERSION="20"
 DEPLOY_BACKUP_DIR="$APP_DIR/deploy-backups/$(date +%Y%m%d-%H%M%S)"
 
+restore_from_latest_backup() {
+  if [ -f "$DATA_DIR/leafletai.db" ]; then
+    return 0
+  fi
+
+  LATEST_DB="$(find "$APP_DIR/deploy-backups" -mindepth 2 -maxdepth 2 -type f -name 'leafletai.db' -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n 1 | cut -d' ' -f2-)"
+  if [ -z "$LATEST_DB" ]; then
+    return 1
+  fi
+
+  LATEST_DIR="$(dirname "$LATEST_DB")"
+  echo "Restoring production database from deployment backup: $LATEST_DB"
+  cp -a "$LATEST_DB" "$DATA_DIR/leafletai.db"
+  for item in leafletai.db-wal leafletai.db-shm; do
+    if [ -f "$LATEST_DIR/$item" ]; then
+      cp -a "$LATEST_DIR/$item" "$DATA_DIR/$item"
+    fi
+  done
+  for dir in uploads pdf_exports backups; do
+    mkdir -p "$DATA_DIR/$dir"
+    if [ -d "$LATEST_DIR/$dir" ]; then
+      cp -an "$LATEST_DIR/$dir/." "$DATA_DIR/$dir/"
+    fi
+  done
+  return 0
+}
+
 echo "======================================================"
 echo " LeafletAI Deployment Script"
 echo "======================================================"
@@ -93,6 +120,7 @@ for dir in uploads pdf_exports backups; do
     cp -an "$REPO_DIR/server/$dir/." "$DATA_DIR/$dir/"
   fi
 done
+restore_from_latest_backup || true
 
 if [ ! -f "$PERSISTENT_ENV" ] && [ -f "$LEGACY_ENV" ]; then
   cp -a "$LEGACY_ENV" "$PERSISTENT_ENV"
@@ -133,8 +161,12 @@ else
 fi
 
 if [ ! -f "$DATA_DIR/leafletai.db" ]; then
+  restore_from_latest_backup || true
+fi
+
+if [ ! -f "$DATA_DIR/leafletai.db" ]; then
   echo "ERROR: Production database not found at $DATA_DIR/leafletai.db."
-  echo "Refusing to deploy an empty database. Restore the existing DB before restarting."
+  echo "Refusing to deploy an empty database. Restore the existing DB from /var/www/leafletai/deploy-backups/ before restarting."
   exit 1
 fi
 

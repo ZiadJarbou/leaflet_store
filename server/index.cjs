@@ -63,6 +63,38 @@ function copyDirectoryIfMissing(source, destination) {
   fs.cpSync(source, destination, { recursive: true });
 }
 
+function findLatestDeployBackupWithDb() {
+  const backupRoot = path.resolve(DATA_DIR, '..', 'deploy-backups');
+  if (!IS_PRODUCTION || !fs.existsSync(backupRoot)) return null;
+  const candidates = [];
+  for (const entry of fs.readdirSync(backupRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const backupDir = path.join(backupRoot, entry.name);
+    const dbPath = path.join(backupDir, 'leafletai.db');
+    if (!fs.existsSync(dbPath)) continue;
+    const stat = fs.statSync(dbPath);
+    candidates.push({ backupDir, dbPath, mtimeMs: stat.mtimeMs });
+  }
+  candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  return candidates[0] || null;
+}
+
+function restoreProductionDataFromDeployBackup() {
+  if (!IS_PRODUCTION || fs.existsSync(DB_PATH)) return false;
+  const backup = findLatestDeployBackupWithDb();
+  if (!backup) return false;
+  console.warn(`[production-data] Restoring database from deployment backup ${backup.dbPath} to ${DB_PATH}.`);
+  fs.copyFileSync(backup.dbPath, DB_PATH);
+  for (const suffix of ['-wal', '-shm']) {
+    const source = path.join(backup.backupDir, `leafletai.db${suffix}`);
+    if (fs.existsSync(source)) fs.copyFileSync(source, `${DB_PATH}${suffix}`);
+  }
+  copyDirectoryIfMissing(path.join(backup.backupDir, 'uploads'), path.join(DATA_DIR, 'uploads'));
+  copyDirectoryIfMissing(path.join(backup.backupDir, 'pdf_exports'), path.join(DATA_DIR, 'pdf_exports'));
+  copyDirectoryIfMissing(path.join(backup.backupDir, 'backups'), path.join(DATA_DIR, 'backups'));
+  return true;
+}
+
 function prepareProductionDataDir() {
   ensureDir(DATA_DIR);
 
@@ -77,6 +109,8 @@ function prepareProductionDataDir() {
     copyDirectoryIfMissing(path.join(LEGACY_DATA_DIR, 'pdf_exports'), path.join(DATA_DIR, 'pdf_exports'));
     copyDirectoryIfMissing(path.join(LEGACY_DATA_DIR, 'backups'), path.join(DATA_DIR, 'backups'));
   }
+
+  restoreProductionDataFromDeployBackup();
 
   if (IS_PRODUCTION && !fs.existsSync(DB_PATH) && !ALLOW_PRODUCTION_DB_BOOTSTRAP) {
     throw new Error(

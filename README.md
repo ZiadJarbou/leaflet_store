@@ -48,3 +48,5 @@ Production also blocks silent empty database creation. For an existing productio
 ```env
 DATA_DIR=/var/www/leafletai/data
 ```
+
+If production returns 503 after this safety check, check that `/var/www/leafletai/data/leafletai.db` exists. The deploy script and app startup will recover it from the newest `/var/www/leafletai/deploy-backups/*/leafletai.db` when available. If no backup exists on the server, restore the last real production database backup to that path before restarting PM2.
