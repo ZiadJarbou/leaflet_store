@@ -5,6 +5,11 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
+if (process.env.NODE_ENV === 'production' && process.env.ALLOW_PRODUCTION_SEEDING !== 'I_UNDERSTAND_THIS_SEEDS_PRODUCTION') {
+  console.error('Blocked: seed-help-center.cjs must not run in production without explicit ALLOW_PRODUCTION_SEEDING approval.');
+  process.exit(1);
+}
+
 const DATA_DIR = path.resolve(process.env.DATA_DIR || __dirname);
 const DB_PATH = path.join(DATA_DIR, 'leafletai.db');
 const db = new Database(DB_PATH);

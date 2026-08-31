@@ -1,73 +1,38 @@
-# React + TypeScript + Vite
+# Leaflet Store
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Production Deployment Safety
 
-Currently, two official plugins are available:
+Production deployments must deploy application code only. The production database, `.env`, uploaded files, PDF exports, and backups must stay on the production server unchanged.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Use:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run deploy:production
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+This builds the frontend and prepares `deploy/production-code-only/`. Upload the contents of that folder to production.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Do not upload or replace any of these production runtime files or directories:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- `.env` or any environment credential file
+- `server/leafletai.db`, `*.db`, `*.sqlite`, `*.sqlite3`
+- `*-wal`, `*-shm`
+- `server/uploads/`
+- `server/pdf_exports/`
+- `server/backups/`
+- seed scripts such as `server/seed-help-center.cjs` or `server/seed-default-layout.cjs`
+
+Never run destructive database commands in production, including:
+
+- `migrate:fresh`
+- `migrate:refresh`
+- `db:wipe`
+- `DROP TABLE`
+- `TRUNCATE`
+- any database reset script
+
+Do not run seeders in production unless explicitly requested and approved. Production seed scripts are blocked by default unless `ALLOW_PRODUCTION_SEEDING=I_UNDERSTAND_THIS_SEEDS_PRODUCTION` is deliberately set for that one command.
+
+If schema changes are needed, use safe incremental migrations only, such as `CREATE TABLE IF NOT EXISTS`, `ALTER TABLE ADD COLUMN`, or `CREATE INDEX IF NOT EXISTS`. These migrations must preserve all existing rows for users, leaflets, subscriptions, products, uploads, and exports.
+
+The production app blocks database backup import/restore while `NODE_ENV=production`, because that operation replaces the active database file.

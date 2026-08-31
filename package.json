@@ -13,6 +13,8 @@
     "server": "node server/index.cjs",
     "build": "vite build",
     "postbuild": "node scripts/compat-assets.cjs && node scripts/inline-entry-js.cjs && node scripts/create-spa-fallbacks.cjs",
+    "package:production": "npm run build && node scripts/package-production-code-only.cjs",
+    "deploy:production": "npm run package:production",
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "preview": "vite preview"

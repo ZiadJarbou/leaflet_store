@@ -77,6 +77,16 @@ const SMTP_PASS                    = smtpPasswordValue();
 const MAIL_FROM                    = envValue('MAIL_FROM') || 'LeafletAI <no-reply@leafletai.ai>';
 const SUBSCRIPTION_MAIL_FROM       = 'LeafletAI <no-reply@leafletai.ai>';
 const CONTACT_TO_EMAIL             = envValue('CONTACT_TO_EMAIL') || 'info@leafletai.ai';
+const IS_PRODUCTION                = process.env.NODE_ENV === 'production';
+const ALLOW_PRODUCTION_SEEDING     = process.env.ALLOW_PRODUCTION_SEEDING === 'I_UNDERSTAND_THIS_SEEDS_PRODUCTION';
+
+function productionSafetyError(operation) {
+  return new Error(`${operation} is blocked in production to protect existing database data and user-generated files.`);
+}
+
+function shouldSeedDefaultContent() {
+  return !IS_PRODUCTION || ALLOW_PRODUCTION_SEEDING;
+}
 
 let stripe = null;
 
@@ -982,7 +992,9 @@ const seoDefaults = [
 ];
 const insSeo = db.prepare(`INSERT OR IGNORE INTO seo_pages (page_key,page_name,page_path,title,description,keywords,og_title,og_description,og_image,canonical_url,robots)
   VALUES (@key,@name,@path,@title,@description,'','','','','','index, follow')`);
-for (const r of seoDefaults) insSeo.run(r);
+if (shouldSeedDefaultContent()) {
+  for (const r of seoDefaults) insSeo.run(r);
+}
 db.exec(`
   CREATE TABLE IF NOT EXISTS site_settings (
     key   TEXT PRIMARY KEY,
@@ -1034,7 +1046,9 @@ const settingDefaults = {
   help_video_6_url: '',
 };
 const insertSetting = db.prepare(`INSERT OR IGNORE INTO site_settings (key,value) VALUES (?,?)`);
-for (const [k,v] of Object.entries(settingDefaults)) insertSetting.run(k,v);
+if (shouldSeedDefaultContent()) {
+  for (const [k,v] of Object.entries(settingDefaults)) insertSetting.run(k,v);
+}
 
 function stripeSecretKeyValue() {
   const row = db.prepare("SELECT value FROM site_settings WHERE key = 'stripe_secret_key'").get();
@@ -1143,7 +1157,9 @@ const pcDefaults = [
   ['pricing','banner','cta_label',"Get started free"],
   ['pricing','banner','visible',  "1"],
 ];
-for (const [page,section,field,value] of pcDefaults) insPC.run(page,section,field,value);
+if (shouldSeedDefaultContent()) {
+  for (const [page,section,field,value] of pcDefaults) insPC.run(page,section,field,value);
+}
 
 if (!hasMigration('pricing_tiers_2026_08_05_v1')) {
   const upsertPricingContent = db.prepare(`
@@ -2377,9 +2393,11 @@ function startAutoBackup() {
 }
 
 // Seed default backup settings and start scheduler after DB is ready
-db.prepare("INSERT OR IGNORE INTO site_settings (key,value) VALUES ('backup_auto_enabled','0')").run();
-db.prepare("INSERT OR IGNORE INTO site_settings (key,value) VALUES ('backup_auto_hours','24')").run();
-db.prepare("INSERT OR IGNORE INTO site_settings (key,value) VALUES ('backup_max_keep','20')").run();
+if (shouldSeedDefaultContent()) {
+  db.prepare("INSERT OR IGNORE INTO site_settings (key,value) VALUES ('backup_auto_enabled','0')").run();
+  db.prepare("INSERT OR IGNORE INTO site_settings (key,value) VALUES ('backup_auto_hours','24')").run();
+  db.prepare("INSERT OR IGNORE INTO site_settings (key,value) VALUES ('backup_max_keep','20')").run();
+}
 startAutoBackup();
 
 let subscriptionExpiryTimer = null;
@@ -6214,6 +6232,9 @@ app.post('/api/admin/backup/create', adminMiddleware, async (req, res) => {
 app.post('/api/admin/backup/import', adminMiddleware, backupImportUpload.single('backup'), async (req, res) => {
   const cleanup = [];
   try {
+    if (IS_PRODUCTION) {
+      throw Object.assign(productionSafetyError('Database backup import/restore'), { statusCode: 403 });
+    }
     if (!req.file) {
       res.status(400).json({ error: 'Backup file is required.' });
       return;
