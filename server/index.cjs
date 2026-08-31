@@ -2,10 +2,27 @@
 const path = require('path');
 const dotenv = require('dotenv');
 
-dotenv.config({ path: path.resolve(__dirname, '../../data/.env') });
-dotenv.config({ path: path.resolve(__dirname, '../data/.env') });
-dotenv.config({ path: path.resolve(__dirname, '.env') });
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+function inferHostingerDomainRoot(startDir) {
+  const resolved = path.resolve(startDir);
+  const parts = resolved.split(path.sep);
+  const hbuildsIndex = parts.findIndex(part => part === 'hbuilds');
+  if (hbuildsIndex > 0 && parts[hbuildsIndex + 1] === 'versions') {
+    return parts.slice(0, hbuildsIndex).join(path.sep) || path.sep;
+  }
+  return null;
+}
+
+const HOSTING_DOMAIN_ROOT = inferHostingerDomainRoot(__dirname);
+
+for (const envPath of [
+  HOSTING_DOMAIN_ROOT ? path.join(HOSTING_DOMAIN_ROOT, 'data', '.env') : null,
+  path.resolve(__dirname, '../../data/.env'),
+  path.resolve(__dirname, '../data/.env'),
+  path.resolve(__dirname, '.env'),
+  path.resolve(__dirname, '../.env'),
+].filter(Boolean)) {
+  dotenv.config({ path: envPath });
+}
 process.on('uncaughtException', err => { console.error('[uncaughtException]', err); });
 process.on('unhandledRejection', (reason) => { console.error('[unhandledRejection]', reason); });
 
@@ -49,7 +66,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'leafletai-dev-secret-change-in-pro
 const IS_PRODUCTION                = process.env.NODE_ENV === 'production';
 const ALLOW_PRODUCTION_DB_BOOTSTRAP = process.env.ALLOW_PRODUCTION_DB_BOOTSTRAP === 'I_UNDERSTAND_THIS_CREATES_A_NEW_PRODUCTION_DATABASE';
 const LEGACY_DATA_DIR              = path.resolve(__dirname);
-const DEFAULT_PRODUCTION_DATA_DIR  = path.resolve(__dirname, '../..', 'data');
+const DEFAULT_PRODUCTION_DATA_DIR  = HOSTING_DOMAIN_ROOT
+  ? path.join(HOSTING_DOMAIN_ROOT, 'data')
+  : path.resolve(__dirname, '../..', 'data');
 const DATA_DIR                     = path.resolve(envValue('DATA_DIR', 'LEAFLETAI_DATA_DIR') || (IS_PRODUCTION ? DEFAULT_PRODUCTION_DATA_DIR : LEGACY_DATA_DIR));
 const DB_PATH                      = path.join(DATA_DIR, 'leafletai.db');
 const LEGACY_DB_PATH               = path.join(LEGACY_DATA_DIR, 'leafletai.db');
@@ -63,17 +82,84 @@ function copyDirectoryIfMissing(source, destination) {
   fs.cpSync(source, destination, { recursive: true });
 }
 
-function findLatestDeployBackupWithDb() {
-  const backupRoot = path.resolve(DATA_DIR, '..', 'deploy-backups');
-  if (!IS_PRODUCTION || !fs.existsSync(backupRoot)) return null;
+function existingFileStat(filePath) {
+  try {
+    const stat = fs.statSync(filePath);
+    return stat.isFile() && stat.size > 0 ? stat : null;
+  } catch {
+    return null;
+  }
+}
+
+function collectDbCandidate(dbPath, label, candidates) {
+  const resolved = path.resolve(dbPath);
+  if (resolved === DB_PATH) return;
+  const stat = existingFileStat(resolved);
+  if (stat) candidates.push({ dbPath: resolved, sourceDir: path.dirname(resolved), label, mtimeMs: stat.mtimeMs });
+}
+
+function findLatestExistingProductionDb() {
+  if (!IS_PRODUCTION || fs.existsSync(DB_PATH)) return null;
   const candidates = [];
-  for (const entry of fs.readdirSync(backupRoot, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const backupDir = path.join(backupRoot, entry.name);
-    const dbPath = path.join(backupDir, 'leafletai.db');
-    if (!fs.existsSync(dbPath)) continue;
-    const stat = fs.statSync(dbPath);
-    candidates.push({ backupDir, dbPath, mtimeMs: stat.mtimeMs });
+
+  collectDbCandidate(LEGACY_DB_PATH, 'legacy server data', candidates);
+  collectDbCandidate(path.resolve(__dirname, '../data/leafletai.db'), 'version data folder', candidates);
+  collectDbCandidate(path.resolve(__dirname, '../../data/leafletai.db'), 'parent data folder', candidates);
+
+  if (HOSTING_DOMAIN_ROOT) {
+    const versionsRoot = path.join(HOSTING_DOMAIN_ROOT, 'hbuilds', 'versions');
+    if (fs.existsSync(versionsRoot)) {
+      for (const entry of fs.readdirSync(versionsRoot, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const versionDir = path.join(versionsRoot, entry.name);
+        collectDbCandidate(path.join(versionDir, 'data', 'leafletai.db'), `Hostinger version data ${entry.name}`, candidates);
+        collectDbCandidate(path.join(versionDir, 'server', 'leafletai.db'), `Hostinger version server ${entry.name}`, candidates);
+      }
+    }
+  }
+
+  candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  return candidates[0] || null;
+}
+
+function restoreProductionDataFromCandidate(candidate) {
+  if (!candidate || fs.existsSync(DB_PATH)) return false;
+  console.warn(`[production-data] Restoring database from ${candidate.label}: ${candidate.dbPath} to ${DB_PATH}.`);
+  ensureDir(DATA_DIR);
+  fs.copyFileSync(candidate.dbPath, DB_PATH);
+  for (const suffix of ['-wal', '-shm']) {
+    const source = `${candidate.dbPath}${suffix}`;
+    if (fs.existsSync(source)) fs.copyFileSync(source, `${DB_PATH}${suffix}`);
+  }
+  copyDirectoryIfMissing(path.join(candidate.sourceDir, 'uploads'), path.join(DATA_DIR, 'uploads'));
+  copyDirectoryIfMissing(path.join(candidate.sourceDir, 'pdf_exports'), path.join(DATA_DIR, 'pdf_exports'));
+  copyDirectoryIfMissing(path.join(candidate.sourceDir, 'backups'), path.join(DATA_DIR, 'backups'));
+  return true;
+}
+
+function findDeployBackupRoots() {
+  const roots = new Set([
+    path.resolve(DATA_DIR, '..', 'deploy-backups'),
+    path.resolve(__dirname, '../deploy-backups'),
+    path.resolve(__dirname, '../../deploy-backups'),
+  ]);
+  if (HOSTING_DOMAIN_ROOT) roots.add(path.join(HOSTING_DOMAIN_ROOT, 'deploy-backups'));
+  return [...roots];
+}
+
+function findLatestDeployBackupWithDb() {
+  if (!IS_PRODUCTION) return null;
+  const candidates = [];
+  for (const backupRoot of findDeployBackupRoots()) {
+    if (!fs.existsSync(backupRoot)) continue;
+    for (const entry of fs.readdirSync(backupRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const backupDir = path.join(backupRoot, entry.name);
+      const dbPath = path.join(backupDir, 'leafletai.db');
+      const stat = existingFileStat(dbPath);
+      if (!stat) continue;
+      candidates.push({ backupDir, dbPath, mtimeMs: stat.mtimeMs });
+    }
   }
   candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
   return candidates[0] || null;
@@ -112,6 +198,7 @@ function prepareProductionDataDir() {
     }
 
     restoreProductionDataFromDeployBackup();
+    restoreProductionDataFromCandidate(findLatestExistingProductionDb());
 
     if (IS_PRODUCTION && !fs.existsSync(DB_PATH) && !ALLOW_PRODUCTION_DB_BOOTSTRAP) {
       throw new Error(
@@ -142,14 +229,14 @@ function startProductionRecoveryServer(error) {
     error: message,
     data_dir: DATA_DIR,
     database_path: DB_PATH,
-    deploy_backups_path: path.resolve(DATA_DIR, '..', 'deploy-backups'),
+    deploy_backups_paths: findDeployBackupRoots(),
   };
 
   recoveryApp.get('/api/health', (req, res) => res.status(503).json(recovery));
   recoveryApp.use('/api', (req, res) => res.status(503).json(recovery));
   recoveryApp.use((req, res) => {
     const safeDbPath = escapeHtml(DB_PATH);
-    const safeBackupsPath = escapeHtml(path.resolve(DATA_DIR, '..', 'deploy-backups'));
+    const safeBackupsPath = escapeHtml(findDeployBackupRoots().join(', '));
     const safeMessage = escapeHtml(message);
     res.status(503).type('html').send(`<!doctype html>
 <html lang="en">
