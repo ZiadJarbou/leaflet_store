@@ -77,7 +77,7 @@ bash deploy/deploy.sh
 ## Step 5 — Configure environment variables
 
 ```bash
-nano /var/www/leafletai/app/server/.env
+nano /var/www/leafletai/data/.env
 ```
 
 Fill in real values:
@@ -147,8 +147,8 @@ Open https://leafletai.ai in a browser — the platform should load.
 
 Production runtime data is stored outside the code folder in
 `/var/www/leafletai/data`. This includes users, user plans, user-created
-leaflets, uploaded images, PDF exports, and backups. Do not delete or overwrite
-that folder during deployment.
+leaflets, uploaded images, PDF exports, backups, and the production `.env`.
+Do not delete or overwrite that folder during deployment.
 
 The upload command below also preserves old deployments that still have runtime
 data under `server/`. Do not remove the excludes for `server/*.db`,

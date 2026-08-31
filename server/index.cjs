@@ -2,6 +2,8 @@
 const path = require('path');
 const dotenv = require('dotenv');
 
+dotenv.config({ path: path.resolve(__dirname, '../../data/.env') });
+dotenv.config({ path: path.resolve(__dirname, '../data/.env') });
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 process.on('uncaughtException', err => { console.error('[uncaughtException]', err); });
@@ -23,23 +25,6 @@ const nodemailer = require('nodemailer');
 
 const zlib = require('zlib');
 
-// In development Vite owns port 3000 and proxies API requests here.
-// Hosting providers can still override this with their assigned PORT.
-const PORT       = Number(process.env.PORT) || 4000;
-const JWT_SECRET = process.env.JWT_SECRET || 'leafletai-dev-secret-change-in-prod';
-const DATA_DIR   = path.resolve(process.env.DATA_DIR || __dirname);
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-const DB_PATH    = path.join(DATA_DIR, 'leafletai.db');
-
-const STRIPE_SECRET_KEY            = envValue('STRIPE_SECRET_KEY')            || '';
-const STRIPE_WEBHOOK_SECRET        = process.env.STRIPE_WEBHOOK_SECRET        || '';
-const STRIPE_PRO_MONTHLY_PRICE_ID  = process.env.STRIPE_PRO_MONTHLY_PRICE_ID  || '';
-const STRIPE_PRO_ANNUAL_PRICE_ID   = process.env.STRIPE_PRO_ANNUAL_PRICE_ID   || '';
-const STRIPE_BIZ_MONTHLY_PRICE_ID  = process.env.STRIPE_BUSINESS_MONTHLY_PRICE_ID || '';
-const STRIPE_BIZ_ANNUAL_PRICE_ID   = process.env.STRIPE_BUSINESS_ANNUAL_PRICE_ID  || '';
-const APP_URL                      = String(process.env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
-const OPENAI_API_KEY               = envValue('OPENAI_API_KEY') || '';
-const OPENAI_IMAGE_MODEL           = envValue('OPENAI_IMAGE_MODEL') || 'gpt-image-1';
 function envValue(...names) {
   for (const name of names) {
     let value = String(process.env[name] || '').trim();
@@ -56,6 +41,63 @@ function envValue(...names) {
   }
   return '';
 }
+
+// In development Vite owns port 3000 and proxies API requests here.
+// Hosting providers can still override this with their assigned PORT.
+const PORT       = Number(process.env.PORT) || 4000;
+const JWT_SECRET = process.env.JWT_SECRET || 'leafletai-dev-secret-change-in-prod';
+const IS_PRODUCTION                = process.env.NODE_ENV === 'production';
+const ALLOW_PRODUCTION_DB_BOOTSTRAP = process.env.ALLOW_PRODUCTION_DB_BOOTSTRAP === 'I_UNDERSTAND_THIS_CREATES_A_NEW_PRODUCTION_DATABASE';
+const LEGACY_DATA_DIR              = path.resolve(__dirname);
+const DEFAULT_PRODUCTION_DATA_DIR  = path.resolve(__dirname, '../..', 'data');
+const DATA_DIR                     = path.resolve(envValue('DATA_DIR', 'LEAFLETAI_DATA_DIR') || (IS_PRODUCTION ? DEFAULT_PRODUCTION_DATA_DIR : LEGACY_DATA_DIR));
+const DB_PATH                      = path.join(DATA_DIR, 'leafletai.db');
+const LEGACY_DB_PATH               = path.join(LEGACY_DATA_DIR, 'leafletai.db');
+
+function ensureDir(dir) {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+
+function copyDirectoryIfMissing(source, destination) {
+  if (!fs.existsSync(source) || fs.existsSync(destination)) return;
+  fs.cpSync(source, destination, { recursive: true });
+}
+
+function prepareProductionDataDir() {
+  ensureDir(DATA_DIR);
+
+  if (IS_PRODUCTION && DB_PATH !== LEGACY_DB_PATH && !fs.existsSync(DB_PATH) && fs.existsSync(LEGACY_DB_PATH)) {
+    console.warn(`[production-data] Migrating existing database from ${LEGACY_DB_PATH} to ${DB_PATH}.`);
+    fs.copyFileSync(LEGACY_DB_PATH, DB_PATH);
+    for (const suffix of ['-wal', '-shm']) {
+      const source = `${LEGACY_DB_PATH}${suffix}`;
+      if (fs.existsSync(source)) fs.copyFileSync(source, `${DB_PATH}${suffix}`);
+    }
+    copyDirectoryIfMissing(path.join(LEGACY_DATA_DIR, 'uploads'), path.join(DATA_DIR, 'uploads'));
+    copyDirectoryIfMissing(path.join(LEGACY_DATA_DIR, 'pdf_exports'), path.join(DATA_DIR, 'pdf_exports'));
+    copyDirectoryIfMissing(path.join(LEGACY_DATA_DIR, 'backups'), path.join(DATA_DIR, 'backups'));
+  }
+
+  if (IS_PRODUCTION && !fs.existsSync(DB_PATH) && !ALLOW_PRODUCTION_DB_BOOTSTRAP) {
+    throw new Error(
+      `Production database not found at ${DB_PATH}. Refusing to create an empty production database. ` +
+      'Set DATA_DIR/LEAFLETAI_DATA_DIR to the persistent production data folder, or restore the existing leafletai.db. ' +
+      'Only set ALLOW_PRODUCTION_DB_BOOTSTRAP=I_UNDERSTAND_THIS_CREATES_A_NEW_PRODUCTION_DATABASE for a deliberate first-time production install.'
+    );
+  }
+}
+
+prepareProductionDataDir();
+
+const STRIPE_SECRET_KEY            = envValue('STRIPE_SECRET_KEY')            || '';
+const STRIPE_WEBHOOK_SECRET        = process.env.STRIPE_WEBHOOK_SECRET        || '';
+const STRIPE_PRO_MONTHLY_PRICE_ID  = process.env.STRIPE_PRO_MONTHLY_PRICE_ID  || '';
+const STRIPE_PRO_ANNUAL_PRICE_ID   = process.env.STRIPE_PRO_ANNUAL_PRICE_ID   || '';
+const STRIPE_BIZ_MONTHLY_PRICE_ID  = process.env.STRIPE_BUSINESS_MONTHLY_PRICE_ID || '';
+const STRIPE_BIZ_ANNUAL_PRICE_ID   = process.env.STRIPE_BUSINESS_ANNUAL_PRICE_ID  || '';
+const APP_URL                      = String(process.env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
+const OPENAI_API_KEY               = envValue('OPENAI_API_KEY') || '';
+const OPENAI_IMAGE_MODEL           = envValue('OPENAI_IMAGE_MODEL') || 'gpt-image-1';
 function smtpPasswordValue() {
   const value = envValue('SMTP_PASS');
   if (/gmail\.com$/i.test(envValue('SMTP_HOST'))) {
@@ -77,7 +119,6 @@ const SMTP_PASS                    = smtpPasswordValue();
 const MAIL_FROM                    = envValue('MAIL_FROM') || 'LeafletAI <no-reply@leafletai.ai>';
 const SUBSCRIPTION_MAIL_FROM       = 'LeafletAI <no-reply@leafletai.ai>';
 const CONTACT_TO_EMAIL             = envValue('CONTACT_TO_EMAIL') || 'info@leafletai.ai';
-const IS_PRODUCTION                = process.env.NODE_ENV === 'production';
 const ALLOW_PRODUCTION_SEEDING     = process.env.ALLOW_PRODUCTION_SEEDING === 'I_UNDERSTAND_THIS_SEEDS_PRODUCTION';
 
 function productionSafetyError(operation) {

@@ -10,6 +10,8 @@ DOMAIN="leafletai.ai"
 APP_DIR="/var/www/leafletai"
 REPO_DIR="$APP_DIR/app"
 DATA_DIR="$APP_DIR/data"
+PERSISTENT_ENV="$DATA_DIR/.env"
+LEGACY_ENV="$REPO_DIR/server/.env"
 NODE_VERSION="20"
 DEPLOY_BACKUP_DIR="$APP_DIR/deploy-backups/$(date +%Y%m%d-%H%M%S)"
 
@@ -63,7 +65,8 @@ for item in \
   "$DATA_DIR/leafletai.db" \
   "$DATA_DIR/leafletai.db-wal" \
   "$DATA_DIR/leafletai.db-shm" \
-  "$REPO_DIR/server/.env" \
+  "$LEGACY_ENV" \
+  "$PERSISTENT_ENV" \
   "$REPO_DIR/server/uploads" \
   "$REPO_DIR/server/pdf_exports" \
   "$REPO_DIR/server/backups" \
@@ -91,6 +94,11 @@ for dir in uploads pdf_exports backups; do
   fi
 done
 
+if [ ! -f "$PERSISTENT_ENV" ] && [ -f "$LEGACY_ENV" ]; then
+  cp -a "$LEGACY_ENV" "$PERSISTENT_ENV"
+  echo "Migrated production .env to $PERSISTENT_ENV"
+fi
+
 # ── 6. Install dependencies & build frontend ───────────────
 echo "[6/10] Installing dependencies and building frontend..."
 cd "$REPO_DIR"
@@ -105,28 +113,36 @@ mkdir -p "$APP_DIR/dist"
 cp -r "$REPO_DIR/dist/." "$APP_DIR/dist/"
 
 # ── 7. Set up environment variables ───────────────────────
-echo "[7/10] Setting up .env for server..."
-if [ -f "$REPO_DIR/server/.env" ]; then
-  echo "Existing $REPO_DIR/server/.env found; preserving production secrets."
-  if ! grep -q '^DATA_DIR=' "$REPO_DIR/server/.env"; then
-    printf '\nDATA_DIR=%s\n' "$DATA_DIR" >> "$REPO_DIR/server/.env"
-    echo "Added DATA_DIR=$DATA_DIR to existing server/.env"
+echo "[7/10] Verifying production environment and data..."
+if [ -f "$PERSISTENT_ENV" ]; then
+  echo "Using persistent production environment: $PERSISTENT_ENV"
+  if ! grep -q '^DATA_DIR=' "$PERSISTENT_ENV"; then
+    printf '\nDATA_DIR=%s\n' "$DATA_DIR" >> "$PERSISTENT_ENV"
+    echo "Added DATA_DIR=$DATA_DIR to persistent .env"
   fi
+elif [ -f "$LEGACY_ENV" ]; then
+  cp -a "$LEGACY_ENV" "$PERSISTENT_ENV"
+  if ! grep -q '^DATA_DIR=' "$PERSISTENT_ENV"; then
+    printf '\nDATA_DIR=%s\n' "$DATA_DIR" >> "$PERSISTENT_ENV"
+  fi
+  echo "Copied legacy server .env to persistent data folder."
 else
-  cat > "$REPO_DIR/server/.env" <<'ENVEOF'
-PORT=4000
-DATA_DIR=/var/www/leafletai/data
-JWT_SECRET=CHANGE_ME_TO_A_STRONG_RANDOM_SECRET
-STRIPE_SECRET_KEY=sk_live_YOUR_STRIPE_SECRET
-STRIPE_WEBHOOK_SECRET=whsec_YOUR_WEBHOOK_SECRET
-STRIPE_PRICE_STARTER=price_YOUR_STARTER_ID
-STRIPE_PRICE_PRO=price_YOUR_PRO_ID
-STRIPE_PRICE_BUSINESS=price_YOUR_BUSINESS_ID
-NODE_ENV=production
-ENVEOF
+  echo "ERROR: No production .env found at $PERSISTENT_ENV or $LEGACY_ENV."
+  echo "Refusing to create placeholder production credentials during deployment."
+  exit 1
 fi
-mkdir -p "$REPO_DIR/server/uploads" "$REPO_DIR/server/pdf_exports" "$REPO_DIR/server/backups"
-echo "  ⚠  Edit $REPO_DIR/server/.env with real values before starting!"
+
+if [ ! -f "$DATA_DIR/leafletai.db" ]; then
+  echo "ERROR: Production database not found at $DATA_DIR/leafletai.db."
+  echo "Refusing to deploy an empty database. Restore the existing DB before restarting."
+  exit 1
+fi
+
+if grep -q 'CHANGE_ME_TO_A_STRONG_RANDOM_SECRET' "$PERSISTENT_ENV"; then
+  echo "ERROR: Placeholder JWT_SECRET detected in $PERSISTENT_ENV."
+  echo "Refusing to start production with reset credentials."
+  exit 1
+fi
 
 # ── 8. Configure Nginx ─────────────────────────────────────
 echo "[8/10] Configuring Nginx..."
