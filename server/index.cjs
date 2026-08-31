@@ -96,32 +96,97 @@ function restoreProductionDataFromDeployBackup() {
 }
 
 function prepareProductionDataDir() {
-  ensureDir(DATA_DIR);
+  try {
+    ensureDir(DATA_DIR);
 
-  if (IS_PRODUCTION && DB_PATH !== LEGACY_DB_PATH && !fs.existsSync(DB_PATH) && fs.existsSync(LEGACY_DB_PATH)) {
-    console.warn(`[production-data] Migrating existing database from ${LEGACY_DB_PATH} to ${DB_PATH}.`);
-    fs.copyFileSync(LEGACY_DB_PATH, DB_PATH);
-    for (const suffix of ['-wal', '-shm']) {
-      const source = `${LEGACY_DB_PATH}${suffix}`;
-      if (fs.existsSync(source)) fs.copyFileSync(source, `${DB_PATH}${suffix}`);
+    if (IS_PRODUCTION && DB_PATH !== LEGACY_DB_PATH && !fs.existsSync(DB_PATH) && fs.existsSync(LEGACY_DB_PATH)) {
+      console.warn(`[production-data] Migrating existing database from ${LEGACY_DB_PATH} to ${DB_PATH}.`);
+      fs.copyFileSync(LEGACY_DB_PATH, DB_PATH);
+      for (const suffix of ['-wal', '-shm']) {
+        const source = `${LEGACY_DB_PATH}${suffix}`;
+        if (fs.existsSync(source)) fs.copyFileSync(source, `${DB_PATH}${suffix}`);
+      }
+      copyDirectoryIfMissing(path.join(LEGACY_DATA_DIR, 'uploads'), path.join(DATA_DIR, 'uploads'));
+      copyDirectoryIfMissing(path.join(LEGACY_DATA_DIR, 'pdf_exports'), path.join(DATA_DIR, 'pdf_exports'));
+      copyDirectoryIfMissing(path.join(LEGACY_DATA_DIR, 'backups'), path.join(DATA_DIR, 'backups'));
     }
-    copyDirectoryIfMissing(path.join(LEGACY_DATA_DIR, 'uploads'), path.join(DATA_DIR, 'uploads'));
-    copyDirectoryIfMissing(path.join(LEGACY_DATA_DIR, 'pdf_exports'), path.join(DATA_DIR, 'pdf_exports'));
-    copyDirectoryIfMissing(path.join(LEGACY_DATA_DIR, 'backups'), path.join(DATA_DIR, 'backups'));
-  }
 
-  restoreProductionDataFromDeployBackup();
+    restoreProductionDataFromDeployBackup();
 
-  if (IS_PRODUCTION && !fs.existsSync(DB_PATH) && !ALLOW_PRODUCTION_DB_BOOTSTRAP) {
-    throw new Error(
-      `Production database not found at ${DB_PATH}. Refusing to create an empty production database. ` +
-      'Set DATA_DIR/LEAFLETAI_DATA_DIR to the persistent production data folder, or restore the existing leafletai.db. ' +
-      'Only set ALLOW_PRODUCTION_DB_BOOTSTRAP=I_UNDERSTAND_THIS_CREATES_A_NEW_PRODUCTION_DATABASE for a deliberate first-time production install.'
-    );
+    if (IS_PRODUCTION && !fs.existsSync(DB_PATH) && !ALLOW_PRODUCTION_DB_BOOTSTRAP) {
+      throw new Error(
+        `Production database not found at ${DB_PATH}. Refusing to create an empty production database. ` +
+        'Set DATA_DIR/LEAFLETAI_DATA_DIR to the persistent production data folder, or restore the existing leafletai.db. ' +
+        'Only set ALLOW_PRODUCTION_DB_BOOTSTRAP=I_UNDERSTAND_THIS_CREATES_A_NEW_PRODUCTION_DATABASE for a deliberate first-time production install.'
+      );
+    }
+    return null;
+  } catch (error) {
+    return error;
   }
 }
 
-prepareProductionDataDir();
+function startProductionRecoveryServer(error) {
+  const recoveryApp = express();
+  const message = error?.message || 'Production data is unavailable.';
+  const escapeHtml = (value) => String(value).replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+  const recovery = {
+    ok: false,
+    mode: 'production_data_recovery',
+    error: message,
+    data_dir: DATA_DIR,
+    database_path: DB_PATH,
+    deploy_backups_path: path.resolve(DATA_DIR, '..', 'deploy-backups'),
+  };
+
+  recoveryApp.get('/api/health', (req, res) => res.status(503).json(recovery));
+  recoveryApp.use('/api', (req, res) => res.status(503).json(recovery));
+  recoveryApp.use((req, res) => {
+    const safeDbPath = escapeHtml(DB_PATH);
+    const safeBackupsPath = escapeHtml(path.resolve(DATA_DIR, '..', 'deploy-backups'));
+    const safeMessage = escapeHtml(message);
+    res.status(503).type('html').send(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LeafletAI data recovery required</title>
+  <style>
+    body{margin:0;font-family:Arial,sans-serif;background:#f7f7f4;color:#1f2933;display:grid;min-height:100vh;place-items:center;padding:24px}
+    main{max-width:760px;background:#fff;border:1px solid #d9ded8;border-radius:8px;padding:28px;box-shadow:0 16px 40px rgba(31,41,51,.08)}
+    h1{margin:0 0 12px;font-size:26px}
+    p{line-height:1.55}
+    code{background:#eef2ee;padding:2px 6px;border-radius:4px}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Production data recovery required</h1>
+    <p>LeafletAI is online, but it refused to create a new empty production database because that would hide existing users and subscriptions.</p>
+    <p><strong>Database expected at:</strong> <code>${safeDbPath}</code></p>
+    <p><strong>Recovery source:</strong> restore <code>leafletai.db</code> from the newest backup under <code>${safeBackupsPath}</code>, then restart PM2.</p>
+    <p>${safeMessage}</p>
+  </main>
+</body>
+</html>`);
+  });
+  recoveryApp.listen(PORT, () => {
+    console.error('[production-data]', message);
+    console.error(`[production-data] Recovery server running on port ${PORT}`);
+  });
+}
+
+const PRODUCTION_DATA_ERROR = prepareProductionDataDir();
+if (PRODUCTION_DATA_ERROR) {
+  startProductionRecoveryServer(PRODUCTION_DATA_ERROR);
+  return;
+}
 
 const STRIPE_SECRET_KEY            = envValue('STRIPE_SECRET_KEY')            || '';
 const STRIPE_WEBHOOK_SECRET        = process.env.STRIPE_WEBHOOK_SECRET        || '';
