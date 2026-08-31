@@ -49,6 +49,6 @@ Production also blocks silent empty database creation. For an existing productio
 DATA_DIR=/var/www/leafletai/data
 ```
 
-If production returns 503 after this safety check, check that `/var/www/leafletai/data/leafletai.db` exists. The deploy script and app startup will recover it from the newest `/var/www/leafletai/deploy-backups/*/leafletai.db` when available. If no backup exists on the server, restore the last real production database backup to that path before restarting PM2.
+If production returns 503 after this safety check, check that `/var/www/leafletai/data/leafletai.db` exists. The deploy script and app startup will recover it from the newest deployment backup, Hostinger version folder, or `backup-*.db.gz` database backup when available. If no backup exists on the server, restore the last real production database backup to that path before restarting PM2.
 
 On Hostinger hBuilds, production releases live under `hbuilds/versions/<version-id>`. That folder is replaced on deploy, so runtime data must be stored at the domain root, for example `/home/<account>/domains/leafletai.ai/data/leafletai.db`, not inside `hbuilds/versions/<version-id>/data`.

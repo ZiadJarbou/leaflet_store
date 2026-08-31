@@ -98,6 +98,56 @@ function collectDbCandidate(dbPath, label, candidates) {
   if (stat) candidates.push({ dbPath: resolved, sourceDir: path.dirname(resolved), label, mtimeMs: stat.mtimeMs });
 }
 
+function collectGzBackupCandidate(backupPath, label, candidates) {
+  const resolved = path.resolve(backupPath);
+  const stat = existingFileStat(resolved);
+  if (!stat || !path.basename(resolved).startsWith('backup-') || !resolved.endsWith('.db.gz')) return;
+  const backupDir = path.dirname(resolved);
+  const sourceDir = path.basename(backupDir) === 'backups' ? path.dirname(backupDir) : backupDir;
+  candidates.push({ dbPath: resolved, backupDir: sourceDir, sourceDir, label, mtimeMs: stat.mtimeMs, gzip: true });
+}
+
+function collectGzBackupsInDir(backupsDir, label, candidates) {
+  if (!fs.existsSync(backupsDir)) return;
+  for (const entry of fs.readdirSync(backupsDir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    collectGzBackupCandidate(path.join(backupsDir, entry.name), label, candidates);
+  }
+}
+
+function collectDbCandidatesByWalking(rootDir, label, candidates) {
+  if (!rootDir || !fs.existsSync(rootDir)) return;
+  const skipDirs = new Set(['node_modules', '.git', 'dist', 'app-assets', 'assets']);
+  const maxDepth = 7;
+  const maxCandidates = 80;
+
+  function walk(dir, depth) {
+    if (depth > maxDepth || candidates.length >= maxCandidates) return;
+    let entries = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (skipDirs.has(entry.name)) continue;
+        walk(fullPath, depth + 1);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      if (entry.name === 'leafletai.db') {
+        collectDbCandidate(fullPath, label, candidates);
+      } else if (entry.name.startsWith('backup-') && entry.name.endsWith('.db.gz')) {
+        collectGzBackupCandidate(fullPath, label, candidates);
+      }
+    }
+  }
+
+  walk(rootDir, 0);
+}
+
 function findLatestExistingProductionDb() {
   if (!IS_PRODUCTION || fs.existsSync(DB_PATH)) return null;
   const candidates = [];
@@ -105,8 +155,20 @@ function findLatestExistingProductionDb() {
   collectDbCandidate(LEGACY_DB_PATH, 'legacy server data', candidates);
   collectDbCandidate(path.resolve(__dirname, '../data/leafletai.db'), 'version data folder', candidates);
   collectDbCandidate(path.resolve(__dirname, '../../data/leafletai.db'), 'parent data folder', candidates);
+  collectGzBackupsInDir(path.resolve(__dirname, '../data/backups'), 'version data backup', candidates);
+  collectGzBackupsInDir(path.resolve(__dirname, '../../data/backups'), 'parent data backup', candidates);
+  collectGzBackupsInDir(path.join(LEGACY_DATA_DIR, 'backups'), 'legacy server backup', candidates);
 
   if (HOSTING_DOMAIN_ROOT) {
+    collectDbCandidate(path.join(HOSTING_DOMAIN_ROOT, 'nodejs', 'server', 'leafletai.db'), 'Hostinger domain nodejs server data', candidates);
+    collectDbCandidate(path.join(HOSTING_DOMAIN_ROOT, 'nodejs', 'data', 'leafletai.db'), 'Hostinger domain nodejs data', candidates);
+    collectDbCandidate(path.join(HOSTING_DOMAIN_ROOT, 'public_html', 'server', 'leafletai.db'), 'Hostinger public_html server data', candidates);
+    collectDbCandidate(path.join(HOSTING_DOMAIN_ROOT, 'app', 'server', 'leafletai.db'), 'Hostinger app server data', candidates);
+    collectGzBackupsInDir(path.join(HOSTING_DOMAIN_ROOT, 'nodejs', 'server', 'backups'), 'Hostinger domain nodejs server backup', candidates);
+    collectGzBackupsInDir(path.join(HOSTING_DOMAIN_ROOT, 'nodejs', 'data', 'backups'), 'Hostinger domain nodejs data backup', candidates);
+    collectGzBackupsInDir(path.join(HOSTING_DOMAIN_ROOT, 'public_html', 'server', 'backups'), 'Hostinger public_html server backup', candidates);
+    collectGzBackupsInDir(path.join(HOSTING_DOMAIN_ROOT, 'app', 'server', 'backups'), 'Hostinger app server backup', candidates);
+
     const versionsRoot = path.join(HOSTING_DOMAIN_ROOT, 'hbuilds', 'versions');
     if (fs.existsSync(versionsRoot)) {
       for (const entry of fs.readdirSync(versionsRoot, { withFileTypes: true })) {
@@ -114,8 +176,15 @@ function findLatestExistingProductionDb() {
         const versionDir = path.join(versionsRoot, entry.name);
         collectDbCandidate(path.join(versionDir, 'data', 'leafletai.db'), `Hostinger version data ${entry.name}`, candidates);
         collectDbCandidate(path.join(versionDir, 'server', 'leafletai.db'), `Hostinger version server ${entry.name}`, candidates);
+        collectDbCandidate(path.join(versionDir, 'nodejs', 'data', 'leafletai.db'), `Hostinger version nodejs data ${entry.name}`, candidates);
+        collectDbCandidate(path.join(versionDir, 'nodejs', 'server', 'leafletai.db'), `Hostinger version nodejs server ${entry.name}`, candidates);
+        collectGzBackupsInDir(path.join(versionDir, 'data', 'backups'), `Hostinger version data backup ${entry.name}`, candidates);
+        collectGzBackupsInDir(path.join(versionDir, 'server', 'backups'), `Hostinger version server backup ${entry.name}`, candidates);
+        collectGzBackupsInDir(path.join(versionDir, 'nodejs', 'data', 'backups'), `Hostinger version nodejs data backup ${entry.name}`, candidates);
+        collectGzBackupsInDir(path.join(versionDir, 'nodejs', 'server', 'backups'), `Hostinger version nodejs server backup ${entry.name}`, candidates);
       }
     }
+    collectDbCandidatesByWalking(HOSTING_DOMAIN_ROOT, 'Hostinger domain search', candidates);
   }
 
   candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
@@ -126,10 +195,14 @@ function restoreProductionDataFromCandidate(candidate) {
   if (!candidate || fs.existsSync(DB_PATH)) return false;
   console.warn(`[production-data] Restoring database from ${candidate.label}: ${candidate.dbPath} to ${DB_PATH}.`);
   ensureDir(DATA_DIR);
-  fs.copyFileSync(candidate.dbPath, DB_PATH);
-  for (const suffix of ['-wal', '-shm']) {
-    const source = `${candidate.dbPath}${suffix}`;
-    if (fs.existsSync(source)) fs.copyFileSync(source, `${DB_PATH}${suffix}`);
+  if (candidate.gzip) {
+    fs.writeFileSync(DB_PATH, zlib.gunzipSync(fs.readFileSync(candidate.dbPath)), { mode: 0o600 });
+  } else {
+    fs.copyFileSync(candidate.dbPath, DB_PATH);
+    for (const suffix of ['-wal', '-shm']) {
+      const source = `${candidate.dbPath}${suffix}`;
+      if (fs.existsSync(source)) fs.copyFileSync(source, `${DB_PATH}${suffix}`);
+    }
   }
   copyDirectoryIfMissing(path.join(candidate.sourceDir, 'uploads'), path.join(DATA_DIR, 'uploads'));
   copyDirectoryIfMissing(path.join(candidate.sourceDir, 'pdf_exports'), path.join(DATA_DIR, 'pdf_exports'));
@@ -157,8 +230,8 @@ function findLatestDeployBackupWithDb() {
       const backupDir = path.join(backupRoot, entry.name);
       const dbPath = path.join(backupDir, 'leafletai.db');
       const stat = existingFileStat(dbPath);
-      if (!stat) continue;
-      candidates.push({ backupDir, dbPath, mtimeMs: stat.mtimeMs });
+      if (stat) candidates.push({ backupDir, dbPath, mtimeMs: stat.mtimeMs });
+      collectGzBackupsInDir(path.join(backupDir, 'backups'), `deployment backup archive ${entry.name}`, candidates);
     }
   }
   candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
@@ -170,10 +243,14 @@ function restoreProductionDataFromDeployBackup() {
   const backup = findLatestDeployBackupWithDb();
   if (!backup) return false;
   console.warn(`[production-data] Restoring database from deployment backup ${backup.dbPath} to ${DB_PATH}.`);
-  fs.copyFileSync(backup.dbPath, DB_PATH);
-  for (const suffix of ['-wal', '-shm']) {
-    const source = path.join(backup.backupDir, `leafletai.db${suffix}`);
-    if (fs.existsSync(source)) fs.copyFileSync(source, `${DB_PATH}${suffix}`);
+  if (backup.gzip) {
+    fs.writeFileSync(DB_PATH, zlib.gunzipSync(fs.readFileSync(backup.dbPath)), { mode: 0o600 });
+  } else {
+    fs.copyFileSync(backup.dbPath, DB_PATH);
+    for (const suffix of ['-wal', '-shm']) {
+      const source = path.join(backup.backupDir, `leafletai.db${suffix}`);
+      if (fs.existsSync(source)) fs.copyFileSync(source, `${DB_PATH}${suffix}`);
+    }
   }
   copyDirectoryIfMissing(path.join(backup.backupDir, 'uploads'), path.join(DATA_DIR, 'uploads'));
   copyDirectoryIfMissing(path.join(backup.backupDir, 'pdf_exports'), path.join(DATA_DIR, 'pdf_exports'));
