@@ -489,7 +489,8 @@
 .cms-settings-grid input[type=email],
 .cms-settings-grid input[type=url],
 .cms-settings-grid input[type=password],
-.cms-settings-grid input[type=number] {
+.cms-settings-grid input[type=number],
+.cms-settings-grid select {
   min-height: 42px;
   background: rgba(11, 15, 30, .4);
   border: 1px solid rgba(255, 255, 255, .12);
@@ -513,14 +514,16 @@
 .cms-settings-grid input[type=email]:hover,
 .cms-settings-grid input[type=url]:hover,
 .cms-settings-grid input[type=password]:hover,
-.cms-settings-grid input[type=number]:hover {
+.cms-settings-grid input[type=number]:hover,
+.cms-settings-grid select:hover {
   border-color: rgba(255, 255, 255, .2);
 }
 .cms-settings-grid input[type=text]:focus,
 .cms-settings-grid input[type=email]:focus,
 .cms-settings-grid input[type=url]:focus,
 .cms-settings-grid input[type=password]:focus,
-.cms-settings-grid input[type=number]:focus {
+.cms-settings-grid input[type=number]:focus,
+.cms-settings-grid select:focus {
   background: rgba(11, 15, 30, .65);
   border-color: #49f2b6;
   box-shadow: 0 0 0 3px rgba(73, 242, 182, .1);
@@ -528,7 +531,8 @@
 .cms-settings-general input[type=text],
 .cms-settings-general input[type=email],
 .cms-settings-general input[type=url],
-.cms-settings-general input[type=password] {
+.cms-settings-general input[type=password],
+.cms-settings-general select {
   width: 100%;
   min-height: 46px;
   padding: 12px 14px;
@@ -542,7 +546,8 @@
 .cms-settings-general input[type=text]:focus,
 .cms-settings-general input[type=email]:focus,
 .cms-settings-general input[type=url]:focus,
-.cms-settings-general input[type=password]:focus {
+.cms-settings-general input[type=password]:focus,
+.cms-settings-general select:focus {
   background: rgba(11, 15, 30, .65);
   border-color: #49f2b6;
   box-shadow: 0 0 0 3px rgba(73, 242, 182, .1);

@@ -361,6 +361,9 @@ const STRIPE_BIZ_ANNUAL_PRICE_ID   = process.env.STRIPE_BUSINESS_ANNUAL_PRICE_ID
 const APP_URL                      = String(process.env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
 const OPENAI_API_KEY               = envValue('OPENAI_API_KEY') || '';
 const OPENAI_IMAGE_MODEL           = envValue('OPENAI_IMAGE_MODEL') || 'gpt-image-1';
+const GOOGLE_AI_STUDIO_API_KEY     = envValue('GOOGLE_AI_STUDIO_API_KEY', 'GEMINI_API_KEY') || '';
+const SPACEXAI_API_KEY             = envValue('SPACEXAI_API_KEY', 'XAI_API_KEY') || '';
+const AI_API_PROVIDERS             = new Set(['openai', 'google_ai_studio', 'spacexai']);
 function smtpPasswordValue() {
   const value = envValue('SMTP_PASS');
   if (/gmail\.com$/i.test(envValue('SMTP_HOST'))) {
@@ -1338,7 +1341,10 @@ const settingDefaults = {
   announcement_banner: '',
   stripe_secret_key: '',
   stripe_checkout_url: '',
+  ai_api_provider: 'openai',
   openai_api_key: '',
+  google_ai_studio_api_key: '',
+  spacexai_api_key: '',
   default_card_template_id: '',
   nano_a4_enabled: '1',
   home_demo_video_url: '',
@@ -1369,6 +1375,22 @@ refreshStripeClient();
 function openAiApiKeyValue() {
   const row = db.prepare("SELECT value FROM site_settings WHERE key = 'openai_api_key'").get();
   return String(row?.value || '').trim() || OPENAI_API_KEY;
+}
+function normalizeAiApiProvider(provider) {
+  const safeProvider = String(provider || '').trim().toLowerCase();
+  return AI_API_PROVIDERS.has(safeProvider) ? safeProvider : 'openai';
+}
+function aiApiProviderValue() {
+  const row = db.prepare("SELECT value FROM site_settings WHERE key = 'ai_api_provider'").get();
+  return normalizeAiApiProvider(row?.value || 'openai');
+}
+function googleAiStudioApiKeyValue() {
+  const row = db.prepare("SELECT value FROM site_settings WHERE key = 'google_ai_studio_api_key'").get();
+  return String(row?.value || '').trim() || GOOGLE_AI_STUDIO_API_KEY;
+}
+function spacexAiApiKeyValue() {
+  const row = db.prepare("SELECT value FROM site_settings WHERE key = 'spacexai_api_key'").get();
+  return String(row?.value || '').trim() || SPACEXAI_API_KEY;
 }
 
 /* ── Page Content table ── */
@@ -5454,8 +5476,17 @@ async function generateA4ImageFromPayload(payload, options = {}) {
   const safeWidth = Number(width);
   const safeHeight = Number(height);
   const imageSize = safeOrientation === 'landscape' ? '1536x1024' : '1024x1536';
+  const aiProvider = aiApiProviderValue();
   const openAiApiKey = openAiApiKeyValue();
   if (!safePrompt) throw httpError(400, 'Prompt is required');
+  if (aiProvider === 'google_ai_studio') {
+    if (!googleAiStudioApiKeyValue()) throw httpError(500, 'Google AI Studio API key is not configured');
+    throw httpError(501, 'Google AI Studio is selected, but image generation is not configured for this provider yet.');
+  }
+  if (aiProvider === 'spacexai') {
+    if (!spacexAiApiKeyValue()) throw httpError(500, 'spaceXAI API key is not configured');
+    throw httpError(501, 'spaceXAI is selected, but image generation is not configured for this provider yet.');
+  }
   if (!openAiApiKey) throw httpError(500, 'OPENAI_API_KEY is not configured');
   if (!Number.isInteger(safeWidth) || !Number.isInteger(safeHeight) || safeWidth % 8 !== 0 || safeHeight % 8 !== 0) {
     throw httpError(400, 'Dimensions must be multiples of 8');
@@ -6180,6 +6211,9 @@ app.put('/api/admin/settings', adminMiddleware, async (req, res) => {
   const upsert = db.prepare('INSERT OR REPLACE INTO site_settings (key,value) VALUES (?,?)');
   const body = req.body || {};
   const normalizeSettingValue = (key, value) => {
+    if (key === 'ai_api_provider') {
+      return normalizeAiApiProvider(value);
+    }
     if (PLAN_PRICE_SETTING_KEYS.has(key)) {
       const parsed = parsePlanAmount(value);
       return parsed === null ? '' : parsed.toFixed(2);

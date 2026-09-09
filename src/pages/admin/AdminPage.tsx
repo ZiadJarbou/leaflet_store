@@ -84,7 +84,10 @@ interface SiteSettings {
     announcement_banner: string;
     stripe_secret_key: string;
     stripe_checkout_url: string;
+    ai_api_provider: 'openai' | 'google_ai_studio' | 'spacexai' | string;
     openai_api_key: string;
+    google_ai_studio_api_key: string;
+    spacexai_api_key: string;
     home_demo_video_url: string;
     help_video_1_url: string;
     help_video_2_url: string;
@@ -119,6 +122,11 @@ const PLAN_PRICE_FIELDS = [
     { plan: 'pro', label: 'Professional', icon: 'workspace_premium', monthlyKey: 'plan_price_pro_monthly', annualKey: 'plan_price_pro_annual' },
     { plan: 'business', label: 'Business', icon: 'business_center', monthlyKey: 'plan_price_business_monthly', annualKey: 'plan_price_business_annual' },
     { plan: 'agency', label: 'Agency', icon: 'groups', monthlyKey: 'plan_price_agency_monthly', annualKey: 'plan_price_agency_annual' },
+] as const;
+const AI_API_PROVIDER_OPTIONS = [
+    { value: 'openai', label: 'OpenAI', keyLabel: 'OPENAI_API_KEY', placeholder: 'sk-...' },
+    { value: 'google_ai_studio', label: 'Google AI Studio', keyLabel: 'GOOGLE_AI_STUDIO_API_KEY', placeholder: 'AIza...' },
+    { value: 'spacexai', label: 'spaceXAI', keyLabel: 'SPACEXAI_API_KEY', placeholder: 'xai-...' },
 ] as const;
 const DEFAULT_LEAFLET_CREATION_LIMITS: Pick<SiteSettings,
   'max_leaflets_free' |
@@ -177,6 +185,17 @@ const DEFAULT_PLAN_PRICES: Pick<SiteSettings,
     plan_price_business_annual: '677.99',
     plan_price_agency_monthly: '163.10',
     plan_price_agency_annual: '',
+};
+const DEFAULT_AI_INTEGRATION_SETTINGS: Pick<SiteSettings,
+  'ai_api_provider' |
+  'openai_api_key' |
+  'google_ai_studio_api_key' |
+  'spacexai_api_key'
+> = {
+    ai_api_provider: 'openai',
+    openai_api_key: '',
+    google_ai_studio_api_key: '',
+    spacexai_api_key: '',
 };
 interface AdminIcon {
     id: number;
@@ -1511,7 +1530,7 @@ function AdminSettings() {
     const [err, setErr] = useState('');
     useEffect(() => {
         adminGetSettings()
-            .then(settings => setS({ ...DEFAULT_LEAFLET_CREATION_LIMITS, ...DEFAULT_CONCURRENT_LOGIN_LIMITS, ...DEFAULT_PLAN_PRICES, ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...settings }))
+            .then(settings => setS({ ...DEFAULT_LEAFLET_CREATION_LIMITS, ...DEFAULT_CONCURRENT_LOGIN_LIMITS, ...DEFAULT_PLAN_PRICES, ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...DEFAULT_AI_INTEGRATION_SETTINGS, ...settings }))
             .catch(e => setErr(e.message));
     }, []);
     async function save() {
@@ -1519,7 +1538,7 @@ function AdminSettings() {
             return;
         try {
             const settings = await adminSaveSettings(s);
-            setS({ ...DEFAULT_LEAFLET_CREATION_LIMITS, ...DEFAULT_CONCURRENT_LOGIN_LIMITS, ...DEFAULT_PLAN_PRICES, ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...settings });
+            setS({ ...DEFAULT_LEAFLET_CREATION_LIMITS, ...DEFAULT_CONCURRENT_LOGIN_LIMITS, ...DEFAULT_PLAN_PRICES, ...DEFAULT_AI_COVER_GENERATION_LIMITS, ...DEFAULT_AI_INTEGRATION_SETTINGS, ...settings });
             setSaved(true);
             setTimeout(() => setSaved(false), 2500);
         }
@@ -1529,6 +1548,7 @@ function AdminSettings() {
     }
     if (!s)
         return <div className="cms-loading">Loading...</div>;
+    const selectedAiProvider = AI_API_PROVIDER_OPTIONS.find(option => option.value === s.ai_api_provider) ?? AI_API_PROVIDER_OPTIONS[0];
     return (<div className="cms-section">
       <h2 className="cms-section-title">Site Settings</h2>
       {err && <div className="cms-error">{err}</div>}
@@ -1567,8 +1587,38 @@ function AdminSettings() {
                 <input type="password" value={s.stripe_secret_key || ''} placeholder="sk_live_..." autoComplete="off" onChange={e => setS({ ...s, stripe_secret_key: e.target.value })}/>
               </div>
               <div className="cms-form-row">
-                <label>OPENAI_API_KEY</label>
-                <input type="password" value={s.openai_api_key || ''} placeholder="sk-..." autoComplete="off" onChange={e => setS({ ...s, openai_api_key: e.target.value })}/>
+                <label>AI API Provider</label>
+                <select
+                  value={selectedAiProvider.value}
+                  onChange={e => setS({ ...s, ai_api_provider: e.target.value })}
+                >
+                  {AI_API_PROVIDER_OPTIONS.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="cms-form-row">
+                <label>{selectedAiProvider.keyLabel}</label>
+                <input
+                  type="password"
+                  value={
+                    selectedAiProvider.value === 'google_ai_studio'
+                      ? s.google_ai_studio_api_key || ''
+                      : selectedAiProvider.value === 'spacexai'
+                        ? s.spacexai_api_key || ''
+                        : s.openai_api_key || ''
+                  }
+                  placeholder={selectedAiProvider.placeholder}
+                  autoComplete="off"
+                  onChange={e => {
+                    const key = selectedAiProvider.value === 'google_ai_studio'
+                      ? 'google_ai_studio_api_key'
+                      : selectedAiProvider.value === 'spacexai'
+                        ? 'spacexai_api_key'
+                        : 'openai_api_key';
+                    setS({ ...s, [key]: e.target.value });
+                  }}
+                />
               </div>
             </div>
             <div className="cms-settings-group cms-plan-price-group">
