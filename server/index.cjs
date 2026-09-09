@@ -5749,7 +5749,7 @@ app.get('/api/admin/stats', adminMiddleware, (req, res) => {
 });
 
 /* ── GET /api/admin/users/export ── */
-app.get('/api/admin/users/export', adminMiddleware, (req, res) => {
+app.get('/api/admin/users/export', adminMiddleware, async (req, res) => {
   const { search = '', sort_by = 'created_at', sort_dir = 'desc', format = 'csv' } = req.query;
   const like = `%${search}%`;
   const ALLOWED_COLS = ['name','email','role','subscription_plan','subscription_period','subscription_end','created_at','leaflet_count','email_verified'];
@@ -5782,14 +5782,22 @@ app.get('/api/admin/users/export', adminMiddleware, (req, res) => {
   }));
 
   if (format === 'xlsx') {
-    const XLSX = require('xlsx');
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Users');
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Users');
+    const headers = Object.keys(data[0] || {});
+    sheet.columns = headers.map(header => ({
+      header,
+      key: header,
+      width: Math.max(String(header).length + 4, 16),
+    }));
+    data.forEach(row => sheet.addRow(row));
+    sheet.getRow(1).font = { bold: true };
+    sheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+    const buf = await workbook.xlsx.writeBuffer();
     res.setHeader('Content-Disposition', 'attachment; filename="users.xlsx"');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    return res.send(buf);
+    return res.send(Buffer.from(buf));
   }
 
   // default: CSV

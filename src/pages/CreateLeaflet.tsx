@@ -12,8 +12,7 @@
  */
 import { useRef, useState, useEffect, useCallback, type CSSProperties, type DragEvent, type ChangeEvent, } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
-import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
+import ExcelJS from 'exceljs';
 import { parseFile, generateErrorReportCSV } from '../services/parseImport';
 import { createLeaflet, getProductImportLimit, saveLeafletLayout } from '../services/api';
 import type { ImportResult, ParsedProduct } from '../types/leaflet';
@@ -88,57 +87,19 @@ const CREATE_LEAFLET_TOUR_STEPS = [
     },
 ] as const;
 const TEMPLATE_EDITABLE_ROWS = 1000;
-function addStyleElement(stylesXml: string, tagName: 'fonts' | 'fills' | 'cellXfs', elementXml: string) {
-    const openTag = new RegExp(`<${tagName}([^>]*)count="(\\d+)"([^>]*)>`);
-    const match = stylesXml.match(openTag);
-    const styleId = match ? Number(match[2]) : 0;
-    const nextXml = stylesXml
-        .replace(openTag, `<${tagName}$1count="${styleId + 1}"$3>`)
-        .replace(`</${tagName}>`, `${elementXml}</${tagName}>`);
-    return { stylesXml: nextXml, styleId };
+function columnLetter(index: number) {
+    let label = '';
+    let n = index + 1;
+    while (n > 0) {
+        const mod = (n - 1) % 26;
+        label = String.fromCharCode(65 + mod) + label;
+        n = Math.floor((n - mod) / 26);
+    }
+    return label;
 }
-function applyCellStyle(sheetXml: string, cellRef: string, styleId: number) {
-    const cellTag = new RegExp(`<c r="${cellRef}"([^>]*)>`);
-    return sheetXml.replace(cellTag, (_match, attrs: string) => {
-        const nextAttrs = attrs.replace(/\s+s="\d+"/, '');
-        return `<c r="${cellRef}"${nextAttrs} s="${styleId}">`;
-    });
-}
-function patchTemplateWorkbookStyles(buffer: ArrayBuffer, headers: string[]) {
-    const zip = unzipSync(new Uint8Array(buffer));
-    let stylesXml = strFromU8(zip['xl/styles.xml']);
-    const boldFont = '<font><b/><sz val="12"/><color rgb="FF000000"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font>';
-    const yellowFill = '<fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/><bgColor indexed="64"/></patternFill></fill>';
-    let fontResult = addStyleElement(stylesXml, 'fonts', boldFont);
-    stylesXml = fontResult.stylesXml;
-    let fillResult = addStyleElement(stylesXml, 'fills', yellowFill);
-    stylesXml = fillResult.stylesXml;
-    const headerCellXf = `<xf numFmtId="0" fontId="${fontResult.styleId}" fillId="${fillResult.styleId}" borderId="0" xfId="0" ` +
-        'applyFont="1" applyFill="1" applyAlignment="1">' +
-        '<alignment horizontal="center" vertical="center" wrapText="1"/></xf>';
-    let headerResult = addStyleElement(stylesXml, 'cellXfs', headerCellXf);
-    stylesXml = headerResult.stylesXml;
-    let sheetXml = strFromU8(zip['xl/worksheets/sheet1.xml']);
-    headers.forEach((_header, col) => {
-        const column = XLSX.utils.encode_col(col);
-        sheetXml = applyCellStyle(sheetXml, `${column}1`, headerResult.styleId);
-    });
-    sheetXml = sheetXml.replace(/<sheetProtection[^>]*\/>/, '');
-    sheetXml = sheetXml.replace(/<sheetProtection[^>]*>.*?<\/sheetProtection>/, '');
-    zip['xl/styles.xml'] = strToU8(stylesXml);
-    zip['xl/worksheets/sheet1.xml'] = strToU8(sheetXml);
-    return zipSync(zip, { level: 6 });
-}
-function downloadStyledTemplateWorkbook(wb: XLSX.WorkBook, headers: string[], filename: string) {
-    const workbookBuffer = XLSX.write(wb, {
-        type: 'array',
-        bookType: 'xlsx',
-        cellStyles: true,
-    }) as ArrayBuffer;
-    const patchedWorkbook = patchTemplateWorkbookStyles(workbookBuffer, headers);
-    const blobBuffer = new ArrayBuffer(patchedWorkbook.byteLength);
-    new Uint8Array(blobBuffer).set(patchedWorkbook);
-    const blob = new Blob([blobBuffer], {
+async function downloadStyledTemplateWorkbook(wb: ExcelJS.Workbook, filename: string) {
+    const workbookBuffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([workbookBuffer as BlobPart], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
     const link = document.createElement('a');
@@ -149,33 +110,47 @@ function downloadStyledTemplateWorkbook(wb: XLSX.WorkBook, headers: string[], fi
     document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
 }
-function styleTemplateWorksheet(ws: XLSX.WorkSheet, headers: string[], editableRows = TEMPLATE_EDITABLE_ROWS) {
-    const headerStyle = {
-        fill: { patternType: 'solid', fgColor: { rgb: 'FFFF00' } },
-        font: { bold: true, color: { rgb: '000000' } },
-        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-    };
+function addTemplateWorksheet(workbook: ExcelJS.Workbook, name: string, headers: string[], rows: Record<string, string>[]) {
+    const ws = workbook.addWorksheet(name);
+    ws.columns = headers.map(header => ({ header, key: header, width: Math.max(header.length + 4, 22) }));
+    rows.forEach(row => ws.addRow(row));
+    styleTemplateWorksheet(ws, headers);
+    return ws;
+}
+function addGuideWorksheet(workbook: ExcelJS.Workbook, rows: Record<string, string>[]) {
+    const ws = workbook.addWorksheet('Column Guide');
+    const headers = ['Column', 'Required', 'Description'];
+    ws.columns = [
+        { header: 'Column', key: 'Column', width: 22 },
+        { header: 'Required', key: 'Required', width: 10 },
+        { header: 'Description', key: 'Description', width: 60 },
+    ];
+    rows.forEach(row => ws.addRow(row));
+    styleTemplateWorksheet(ws, headers, rows.length);
+}
+function styleTemplateWorksheet(ws: ExcelJS.Worksheet, headers: string[], editableRows = TEMPLATE_EDITABLE_ROWS) {
+    const headerRow = ws.getRow(1);
+    headerRow.height = 24;
     headers.forEach((header, col) => {
-        const headerAddress = XLSX.utils.encode_cell({ r: 0, c: col });
-        ws[headerAddress] = ws[headerAddress] || { t: 's', v: header };
-        ws[headerAddress].s = headerStyle;
-        for (let row = 1; row <= editableRows; row += 1) {
-            const address = XLSX.utils.encode_cell({ r: row, c: col });
-            ws[address] = ws[address] || { t: 's', v: '' };
+        const cell = headerRow.getCell(col + 1);
+        cell.value = header;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+        cell.font = { bold: true, color: { argb: 'FF000000' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        for (let row = 2; row <= editableRows + 1; row += 1) {
+            const bodyCell = ws.getRow(row).getCell(col + 1);
+            if (bodyCell.value === null) bodyCell.value = '';
         }
     });
-    ws['!ref'] = XLSX.utils.encode_range({
-        s: { r: 0, c: 0 },
-        e: { r: editableRows, c: headers.length - 1 },
-    });
-    ws['!autofilter'] = {
-        ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } }),
+    ws.autoFilter = {
+        from: 'A1',
+        to: `${columnLetter(headers.length - 1)}1`,
     };
 }
 /* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Template download
 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-function downloadTemplate() {
+async function downloadTemplate() {
     const headers = [
         'product_name_lan1',
         'product_name_lan2',
@@ -218,12 +193,8 @@ function downloadTemplate() {
             current_price: '6.99',
         },
     ];
-    const ws = XLSX.utils.json_to_sheet(sampleRows, { header: headers });
-    const wb = XLSX.utils.book_new();
-    /* Style the header row by setting column widths */
-    ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 4, 22) }));
-    styleTemplateWorksheet(ws, headers);
-    XLSX.utils.book_append_sheet(wb, ws, 'Products');
+    const wb = new ExcelJS.Workbook();
+    addTemplateWorksheet(wb, 'Products', headers, sampleRows);
     /* Second sheet: column reference guide */
     const guideData = [
         { Column: 'product_name_lan1', Required: 'Yes', Description: 'Primary product name (language 1)' },
@@ -235,12 +206,10 @@ function downloadTemplate() {
         { Column: 'old_price', Required: 'Yes', Description: 'Original price before discount (leave blank if no discount). Formats: 12.50 Â· 12,50 Â· $12.50 Â· â‚¬12,50' },
         { Column: 'current_price', Required: 'Yes', Description: 'Current / sale price. Formats: 12.50 Â· 12,50 Â· $12.50 Â· â‚¬12,50' },
     ];
-    const wsGuide = XLSX.utils.json_to_sheet(guideData);
-    wsGuide['!cols'] = [{ wch: 22 }, { wch: 10 }, { wch: 60 }];
-    XLSX.utils.book_append_sheet(wb, wsGuide, 'Column Guide');
-    downloadStyledTemplateWorkbook(wb, headers, 'leaflet_products_template.xlsx');
+    addGuideWorksheet(wb, guideData);
+    await downloadStyledTemplateWorkbook(wb, 'leaflet_products_template.xlsx');
 }
-function downloadOneLanguageTemplate() {
+async function downloadOneLanguageTemplate() {
     const headers = [
         'product_name_lan1',
         'product_img_url',
@@ -275,11 +244,8 @@ function downloadOneLanguageTemplate() {
             current_price: '6.99',
         },
     ];
-    const ws = XLSX.utils.json_to_sheet(sampleRows, { header: headers });
-    const wb = XLSX.utils.book_new();
-    ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 4, 22) }));
-    styleTemplateWorksheet(ws, headers);
-    XLSX.utils.book_append_sheet(wb, ws, 'Products');
+    const wb = new ExcelJS.Workbook();
+    addTemplateWorksheet(wb, 'Products', headers, sampleRows);
     const guideData = [
         { Column: 'product_name_lan1', Required: 'Yes', Description: 'Product name (language 1)' },
         { Column: 'product_img_url', Required: 'Yes', Description: 'Full URL to the product image' },
@@ -288,10 +254,8 @@ function downloadOneLanguageTemplate() {
         { Column: 'old_price', Required: 'Yes', Description: 'Original price before discount (leave blank if no discount). Formats: 12.50 - 12,50 - $12.50 - EUR12,50' },
         { Column: 'current_price', Required: 'Yes', Description: 'Current / sale price. Formats: 12.50 - 12,50 - $12.50 - EUR12,50' },
     ];
-    const wsGuide = XLSX.utils.json_to_sheet(guideData);
-    wsGuide['!cols'] = [{ wch: 22 }, { wch: 10 }, { wch: 60 }];
-    XLSX.utils.book_append_sheet(wb, wsGuide, 'Column Guide');
-    downloadStyledTemplateWorkbook(wb, headers, 'leaflet_products_one_language_template.xlsx');
+    addGuideWorksheet(wb, guideData);
+    await downloadStyledTemplateWorkbook(wb, 'leaflet_products_one_language_template.xlsx');
 }
 /* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Small reusable helpers
@@ -910,13 +874,13 @@ export default function CreateLeaflet() {
                     Browse file
                   </button>
                   <div className="cl-dz-types">
-                    {['.csv', '.xlsx', '.xls'].map(t => (<span key={t} className="cl-type-chip">{t}</span>))}
+                    {['.csv', '.xlsx'].map(t => (<span key={t} className="cl-type-chip">{t}</span>))}
                   </div>
                 </>)}
             </div>
 
             {/* Hidden file input */}
-            <input ref={inputRef} type="file" accept=".csv,.xlsx,.xls" onChange={onFileInput} className={cssClass({ display: 'none' })}/>
+            <input ref={inputRef} type="file" accept=".csv,.xlsx" onChange={onFileInput} className={cssClass({ display: 'none' })}/>
 
             {/* First-row-is-header note */}
             <div className="cl-header-note">

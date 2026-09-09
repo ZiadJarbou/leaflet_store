@@ -1,13 +1,13 @@
 /**
  * parseImport.ts
  * ──────────────
- * Handles CSV (PapaParse) and Excel (SheetJS) file parsing,
+ * Handles CSV (PapaParse) and Excel (ExcelJS) file parsing,
  * header validation, row normalisation and validation,
  * language-mode detection, and error-report CSV generation.
  */
 
 import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import type { ParsedProduct, ImportResult, LanguageMode } from '../types/leaflet';
 
 /* ─────────────────────────────────────────────
@@ -253,22 +253,50 @@ export function parseCSVFile(file: File): Promise<ImportResult> {
   });
 }
 
-/** Parse a .xlsx / .xls file using SheetJS */
+function excelCellToString(value: ExcelJS.CellValue): string {
+  if (value === null || value === undefined) return '';
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (typeof value === 'object') {
+    if ('text' in value && value.text !== undefined) return String(value.text);
+    if ('result' in value && value.result !== undefined) return excelCellToString(value.result as ExcelJS.CellValue);
+    if ('richText' in value && Array.isArray(value.richText)) return value.richText.map(part => part.text || '').join('');
+    if ('hyperlink' in value && 'text' in value) return String(value.text || value.hyperlink || '');
+    return String((value as { formula?: string }).formula || '');
+  }
+  return String(value);
+}
+
+/** Parse a .xlsx file using ExcelJS */
 export function parseExcelFile(file: File): Promise<ImportResult> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
-    reader.onload = e => {
+    reader.onload = async e => {
       try {
-        const buffer  = e.target!.result as ArrayBuffer;
-        const data    = new Uint8Array(buffer);
-        const wb      = XLSX.read(data, { type: 'array' });
-        const sheet   = wb.Sheets[wb.SheetNames[0]];
+        const buffer = e.target!.result as ArrayBuffer;
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(buffer);
+        const sheet = workbook.worksheets[0];
+        if (!sheet) throw new Error('The Excel file does not contain any worksheets.');
 
-        // raw:false → all values stringified (avoids date/number type surprises)
-        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-          defval: '',
-          raw: false,
+        const headerRow = sheet.getRow(1);
+        const headers: string[] = [];
+        headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          headers[colNumber - 1] = excelCellToString(cell.value).trim();
+        });
+
+        const rows: Record<string, unknown>[] = [];
+        sheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return;
+          const item: Record<string, unknown> = {};
+          let hasValue = false;
+          headers.forEach((header, index) => {
+            if (!header) return;
+            const value = excelCellToString(row.getCell(index + 1).value);
+            if (value.trim()) hasValue = true;
+            item[header] = value;
+          });
+          if (hasValue) rows.push(item);
         });
 
         resolve(processRows(rows));
@@ -286,8 +314,9 @@ export function parseExcelFile(file: File): Promise<ImportResult> {
 export function parseFile(file: File): Promise<ImportResult> {
   const ext = file.name.split('.').pop()?.toLowerCase();
   if (ext === 'csv')               return parseCSVFile(file);
-  if (ext === 'xlsx' || ext === 'xls') return parseExcelFile(file);
-  return Promise.reject(new Error(`Unsupported file type ".${ext}". Use .csv, .xlsx, or .xls.`));
+  if (ext === 'xlsx') return parseExcelFile(file);
+  if (ext === 'xls') return Promise.reject(new Error('Legacy .xls files are not supported for security reasons. Save the spreadsheet as .xlsx or .csv and try again.'));
+  return Promise.reject(new Error(`Unsupported file type ".${ext}". Use .csv or .xlsx.`));
 }
 
 /* ─────────────────────────────────────────────
