@@ -2714,6 +2714,64 @@ body.dragging-icon .lv-card-drop-layer {
 }
 
 /* ── Icons sidebar section ──────────────────────────────────────── */
+.lv-sb-ai-icon {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px;
+  background: rgba(30,30,56,.72);
+}
+.lv-sb-ai-icon-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #e2e8f0;
+  font-size: .82rem;
+  font-weight: 700;
+}
+.lv-sb-ai-icon-head .material-symbol {
+  font-size: 17px;
+  color: #a5b4fc;
+}
+.lv-sb-ai-icon-input {
+  width: 100%;
+}
+.lv-sb-ai-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid rgba(99,102,241,.42);
+  border-radius: 8px;
+  background: rgba(99,102,241,.16);
+  color: #dbeafe;
+  font-size: .78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.lv-sb-ai-icon-button:hover:not(:disabled) {
+  background: rgba(99,102,241,.26);
+  border-color: #818cf8;
+  color: #ffffff;
+}
+.lv-sb-ai-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+.lv-sb-ai-icon-button .material-symbol {
+  font-size: 16px;
+}
+.lv-sb-ai-icon-error {
+  color: #fecaca;
+  font-size: .72rem;
+  line-height: 1.35;
+}
 .lv-sb-icons-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

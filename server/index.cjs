@@ -5586,6 +5586,64 @@ async function generateA4ImageFromPayload(payload, options = {}) {
   };
 }
 
+async function generateTransparentIconFromPayload(payload, options = {}) {
+  const { prompt } = payload || {};
+  const safePrompt = String(prompt || '').trim();
+  const aiProvider = aiApiProviderValue();
+  const openAiApiKey = openAiApiKeyValue();
+  if (!safePrompt) throw httpError(400, 'Icon prompt is required');
+  if (safePrompt.length > 600) throw httpError(400, 'Icon prompt is too long');
+  if (aiProvider === 'google_ai_studio') {
+    if (!googleAiStudioApiKeyValue()) throw httpError(500, 'Google AI Studio API key is not configured');
+    throw httpError(501, 'Google AI Studio is selected, but icon generation is not configured for this provider yet.');
+  }
+  if (aiProvider === 'spacexai') {
+    if (!spacexAiApiKeyValue()) throw httpError(500, 'spaceXAI API key is not configured');
+    throw httpError(501, 'spaceXAI is selected, but icon generation is not configured for this provider yet.');
+  }
+  if (!openAiApiKey) throw httpError(500, 'OPENAI_API_KEY is not configured');
+
+  const finalPrompt = [
+    safePrompt,
+    'Create a single clean reusable retail leaflet icon or sticker asset.',
+    'Transparent background, PNG output, isolated centered subject, no shadows that require an opaque backdrop.',
+    'No written words, letters, numbers, prices, brand names, logos with text, captions, watermarks, borders, frames, or mockup backgrounds.',
+  ].join(' ');
+  const startTime = Date.now();
+  const data = await httpsJsonPostWithAiRetry(
+    'https://api.openai.com/v1/images/generations',
+    {
+      model: OPENAI_IMAGE_MODEL,
+      prompt: finalPrompt,
+      n: 1,
+      size: '1024x1024',
+      quality: 'medium',
+      background: 'transparent',
+      output_format: 'png',
+    },
+    {
+      ...options,
+      headers: { Authorization: `Bearer ${openAiApiKey}` },
+    },
+  );
+  const imageData = data?.data?.[0];
+  if (!imageData?.b64_json) {
+    throw httpError(502, 'No icon image data in response');
+  }
+  const imageBuffer = Buffer.from(imageData.b64_json, 'base64');
+  if (imageBuffer.byteLength > 12 * 1024 * 1024) throw httpError(413, 'Generated icon is too large.');
+  const filename = `${crypto.randomBytes(16).toString('hex')}.png`;
+  fs.writeFileSync(path.join(UPLOADS_DIR, filename), imageBuffer);
+  return {
+    imageUrl: `/uploads/${filename}`,
+    mimeType: 'image/png',
+    width: 1024,
+    height: 1024,
+    duration: Number(((Date.now() - startTime) / 1000).toFixed(1)),
+    textResponse: imageData.revised_prompt || null,
+  };
+}
+
 app.post('/api/generate-a4-jobs', authMiddleware, (req, res) => {
   let jobId = null;
   let usage = null;
@@ -5648,6 +5706,22 @@ app.post('/api/generate-a4', authMiddleware, async (req, res) => {
   } catch (err) {
     setAiCoverGenerationStatus(jobId, 'error');
     const message = err.message || 'Failed to generate image';
+    const isQuotaError = /quota|rate limit|429|insufficient_quota/i.test(message);
+    res.status(err.status || (isQuotaError ? 429 : 500)).json({
+      message: isQuotaError
+        ? 'OpenAI image generation quota or rate limit was reached. Check billing/quota or try again later.'
+        : message,
+      details: message,
+    });
+  }
+});
+
+app.post('/api/generate-icon', authMiddleware, async (req, res) => {
+  try {
+    const result = await generateTransparentIconFromPayload(req.body || {});
+    res.json(result);
+  } catch (err) {
+    const message = err.message || 'Failed to generate icon';
     const isQuotaError = /quota|rate limit|429|insufficient_quota/i.test(message);
     res.status(err.status || (isQuotaError ? 429 : 500)).json({
       message: isQuotaError

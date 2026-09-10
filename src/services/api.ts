@@ -128,6 +128,23 @@ export function getA4CoverImageJob(jobId: string): Promise<A4CoverImageJob> {
   });
 }
 
+export function generateAiIcon(payload: {
+  prompt: string;
+  leafletId?: number | string;
+}): Promise<{
+  imageUrl: string;
+  mimeType: string;
+  width: number;
+  height: number;
+  duration?: number;
+  textResponse?: string | null;
+}> {
+  return request('/generate-icon', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 
 export function deleteLeaflet(id: number): Promise<{ success: boolean }> {
   return request(`/leaflets/${id}`, { method: 'DELETE' });

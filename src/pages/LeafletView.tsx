@@ -7,7 +7,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import HTMLFlipBook from 'react-pageflip';
 import { Link, useParams } from 'react-router-dom';
-import { getLeaflet, getAdminLeaflet, updateProduct, uploadImage, deleteProduct, getLeafletLayout, getAdminLeafletLayout, saveLeafletLayout, resetLeafletLayout, saveLeafletThumbnail, createCheckoutSession, searchProductImages, getIconLibrary, getLayoutTemplates, deleteLayoutTemplate, startA4CoverImageJob, getA4CoverImageJob, getCoverLayoutTemplates, createCoverLayoutTemplate, createAdminCoverLayoutTemplate, updateAdminCoverLayoutTemplate, deleteCoverLayoutTemplate, deleteAdminCoverLayoutTemplate, getPublicSettings, deleteAdminDealTag, exportFlipbookToStore, getRegionCountry, countLeafletExport } from '../services/api';
+import { getLeaflet, getAdminLeaflet, updateProduct, uploadImage, deleteProduct, getLeafletLayout, getAdminLeafletLayout, saveLeafletLayout, resetLeafletLayout, saveLeafletThumbnail, createCheckoutSession, searchProductImages, getIconLibrary, getLayoutTemplates, deleteLayoutTemplate, startA4CoverImageJob, getA4CoverImageJob, generateAiIcon, getCoverLayoutTemplates, createCoverLayoutTemplate, createAdminCoverLayoutTemplate, updateAdminCoverLayoutTemplate, deleteCoverLayoutTemplate, deleteAdminCoverLayoutTemplate, getPublicSettings, deleteAdminDealTag, exportFlipbookToStore, getRegionCountry, countLeafletExport } from '../services/api';
 import { getStoredToken } from '../services/authService';
 import { countryToFlag, countryToIso } from '../utils/countryToFlag';
 import type { CardLayout, CardElementPos, TextElementStyle, ProductImageSuggestion, LayoutTemplate, CoverLayoutTemplate } from '../services/api';
@@ -2831,6 +2831,9 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         label: string;
         url: string;
     }[]>([]);
+    const [aiIconPrompt, setAiIconPrompt] = useState('');
+    const [aiIconGenerating, setAiIconGenerating] = useState(false);
+    const [aiIconError, setAiIconError] = useState<string | null>(null);
     const [adminIcons, setAdminIcons] = useState<{
         label: string;
         url: string;
@@ -4370,6 +4373,30 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
         }
         finally {
             setNanoGenerating(false);
+        }
+    }
+    async function generateSidebarAiIcon() {
+        const prompt = aiIconPrompt.trim();
+        if (!prompt) {
+            setAiIconError('Enter an icon idea first.');
+            return;
+        }
+        setAiIconGenerating(true);
+        setAiIconError(null);
+        try {
+            const result = await generateAiIcon({ prompt, leafletId: id });
+            const label = prompt.replace(/\s+/g, ' ').slice(0, 36) || 'AI icon';
+            setCustomIcons(prev => [
+                { label, url: result.imageUrl },
+                ...prev.filter(icon => icon.url !== result.imageUrl),
+            ]);
+            setAiIconPrompt('');
+        }
+        catch (err) {
+            setAiIconError(err instanceof Error ? err.message : 'Failed to generate icon.');
+        }
+        finally {
+            setAiIconGenerating(false);
         }
     }
     function saveGeneratedCoverBackground(imageUrl: string, prompt: string) {
@@ -9498,6 +9525,40 @@ function LeafletView({ coverBuilderOnly = false, leafletId, nanoA4VisibleOverrid
 
           {/* -- Icons -- */}
           <SbSection id="icons" open={openSbSection === 'icons'} onToggle={() => { }} title="Icons" tooltip={SB_TOOLTIPS.icons}>
+            <div className="lv-sb-ai-icon">
+              <div className="lv-sb-ai-icon-head">
+                <span className="material-symbol" aria-hidden="true">auto_awesome</span>
+                <span>Create icon by AI</span>
+              </div>
+              <input
+                type="text"
+                className="lv-sb-text-input lv-sb-ai-icon-input"
+                placeholder="e.g. shopping cart badge"
+                value={aiIconPrompt}
+                disabled={aiIconGenerating}
+                maxLength={160}
+                onChange={e => {
+                    setAiIconPrompt(e.target.value);
+                    if (aiIconError) setAiIconError(null);
+                }}
+                onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void generateSidebarAiIcon();
+                    }
+                }}
+              />
+              <button
+                type="button"
+                className="lv-sb-ai-icon-button"
+                disabled={aiIconGenerating || !aiIconPrompt.trim()}
+                onClick={() => void generateSidebarAiIcon()}
+              >
+                <span className="material-symbol" aria-hidden="true">{aiIconGenerating ? 'hourglass_empty' : 'auto_awesome'}</span>
+                {aiIconGenerating ? 'Creating PNG...' : 'Create transparent PNG'}
+              </button>
+              {aiIconError && <div className="lv-sb-ai-icon-error">{aiIconError}</div>}
+            </div>
             <div className="lv-sb-icons-grid">
               {[...presetIcons, ...adminIcons, ...customIcons].map(ic => (<div key={ic.url} className="lv-sb-icon-item" draggable title={ic.label} onDragStart={e => {
                 _dragIconSrc = ic.url;
